@@ -157,6 +157,37 @@ section{padding:100px 24px}
 .step-card p{font-size:13px;color:var(--text2);line-height:1.6}
 .step-code{background:var(--bg2);border-radius:10px;padding:12px 14px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:var(--green2);margin-top:12px;line-height:1.7;overflow-x:auto}
 
+/* ─── SHOWCASE INTERACTIVE ─── */
+.showcase-layout{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start;margin-top:32px}
+.showcase-tabs{display:flex;flex-direction:column;gap:8px}
+.sc-tab{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:14px;border:1px solid var(--border-light);background:var(--card);cursor:pointer;transition:all .3s;user-select:none}
+.sc-tab:hover{border-color:rgba(16,185,129,.25);transform:translateX(4px)}
+.sc-tab.active{border-color:var(--green);box-shadow:0 0 16px rgba(16,185,129,.15),inset 0 0 0 1px rgba(16,185,129,.1);background:linear-gradient(135deg,rgba(16,185,129,.04),var(--card))}
+.sc-tab-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sc-tab-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;margin-bottom:2px}
+.sc-tab.active .sc-tab-title{color:var(--green2)}
+.sc-tab-desc{font-size:12px;color:var(--text2)}
+.showcase-preview{background:#0f172a;border-radius:16px;border:1px solid rgba(255,255,255,.06);overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.sc-preview-header{background:#1e293b;padding:12px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.sc-preview-title{color:#94a3b8;font-size:12px;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.5px}
+.sc-preview-body{padding:28px;min-height:300px;position:relative}
+.sc-panel{display:none;animation:scFadeIn .4s ease}
+.sc-panel.active{display:block}
+@keyframes scFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.sc-flow-label{font-size:11px;font-weight:700;color:#64748b;letter-spacing:1.5px;margin-bottom:12px}
+.sc-steps{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.sc-step{display:flex;align-items:center;gap:10px;font-size:14px;color:#64748b;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid transparent;transition:all .3s}
+.sc-step.done{color:#cbd5e1;border-color:rgba(16,185,129,.1)}
+.sc-step.active{color:#fff;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.2)}
+.sc-check{display:inline-flex;width:20px;height:20px;border-radius:50%;background:rgba(16,185,129,.15);color:#10b981;font-size:12px;align-items:center;justify-content:center;font-weight:700}
+.sc-circle{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid #334155}
+.sc-spinner{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid transparent;border-top-color:#10b981;border-right-color:#10b981;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sc-tools{display:flex;gap:8px;flex-wrap:wrap}
+.sc-tools span{background:rgba(16,185,129,.08);color:#10b981;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid rgba(16,185,129,.12)}
+.grad{background:linear-gradient(135deg,var(--green2),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+@media(max-width:768px){.showcase-layout{grid-template-columns:1fr;gap:16px}.showcase-tabs{flex-direction:row;overflow-x:auto;padding-bottom:8px}.sc-tab{min-width:200px}}
+
 /* ─── CHAT DEMO ─── */
 #agents-demo{background:var(--bg2)}
 .agent-demo-container{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);overflow:hidden;max-width:800px;margin:0 auto}
@@ -265,10 +296,9 @@ section{transition:background .6s ease}
 /* Demo card typing animation */
 @keyframes cursorBlink{0%,100%{border-right-color:transparent}50%{border-right-color:var(--green)}}
 
-/* Platform card shine effect on hover */
-.platform-card::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:linear-gradient(135deg,transparent 40%,rgba(16,185,129,.03) 50%,transparent 60%);transform:rotate(0deg);transition:transform .6s}
-.platform-card:hover::before{transform:rotate(180deg)}
-.platform-card.featured::before{content:'⭐ Phổ biến'}
+/* Platform card shine effect on hover — uses ::after to avoid conflict with .featured::before label */
+.platform-card::after{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,transparent 40%,rgba(16,185,129,.04) 50%,transparent 60%);opacity:0;transition:opacity .4s;pointer-events:none}
+.platform-card:hover::after{opacity:1}
 
 /* Step card connector line */
 .step-card::after{content:'';position:absolute;top:50%;right:-10px;width:20px;height:2px;background:linear-gradient(90deg,var(--border),transparent);pointer-events:none}
@@ -600,72 +630,140 @@ section{transition:background .6s ease}
   </div>
 </section>
 
-<!-- SHOWCASE -->
+<!-- SHOWCASE — Interactive 2-column layout inspired by bizino.ai -->
 <section id="showcase" style="background:var(--bg2)">
   <div class="container">
-    <div class="section-tag" data-vi="🎯 Showcase" data-en="🎯 Showcase">🎯 Showcase</div>
-    <div class="section-title" data-vi="Những gì BizClaw<br>có thể làm" data-en="What BizClaw<br>can do">Những gì BizClaw<br>có thể làm</div>
-    <div class="section-desc" data-vi="Từ tự động hóa email đến quản lý đội ngũ AI agent — mọi thứ đều có thể." data-en="From email automation to managing AI agent teams — anything is possible.">Từ tự động hóa email đến quản lý đội ngũ AI agent — mọi thứ đều có thể.</div>
-    <div class="features-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="feature-card fade-up" style="--i:0">
-        <span class="pf-tag pf-tag-green" data-vi="⚙️ TỰ ĐỘNG HÓA" data-en="⚙️ AUTOMATION">⚙️ TỰ ĐỘNG HÓA</span>
-        <h3 data-vi="Trợ lý Email & Lịch thông minh" data-en="Smart Email & Calendar Assistant">Trợ lý Email & Lịch thông minh</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ Kiểm tra email, lọc spam tự động" data-en="→ Check email, auto-filter spam">→ Kiểm tra email, lọc spam tự động</li>
-          <li data-vi="→ Quản lý lịch, giải quyết xung đột" data-en="→ Manage calendar, resolve conflicts">→ Quản lý lịch, giải quyết xung đột</li>
-          <li data-vi="→ Gửi báo cáo sáng: thời tiết, cuộc họp, việc cần làm" data-en="→ Morning report: weather, meetings, tasks">→ Gửi báo cáo sáng: thời tiết, cuộc họp, việc cần làm</li>
-          <li data-vi="→ Check-in chuyến bay, chọn ghế cửa sổ" data-en="→ Check-in flights, pick window seat">→ Check-in chuyến bay, chọn ghế cửa sổ</li>
-        </ul>
+    <div class="section-center">
+      <div class="section-tag" data-vi="🎯 Showcase" data-en="🎯 Showcase">🎯 Showcase</div>
+      <div class="section-title" data-vi="Giao việc. Theo dõi.<br><span class='grad'>Để AI hoàn thành.</span>" data-en="Assign tasks. Monitor.<br><span class='grad'>Let AI finish.</span>">Giao việc. Theo dõi.<br><span class="grad">Để AI hoàn thành.</span></div>
+      <div class="section-desc" data-vi="Mỗi Agent là chuyên gia trong lĩnh vực của họ — click để xem quy trình xử lý." data-en="Each Agent is an expert in their field — click to see the workflow.">Mỗi Agent là chuyên gia trong lĩnh vực của họ — click để xem quy trình xử lý.</div>
+    </div>
+    <div class="showcase-layout fade-up" style="--i:0">
+      <!-- LEFT: Tabs -->
+      <div class="showcase-tabs">
+        <div class="sc-tab active" onclick="showCase(0)">
+          <div class="sc-tab-icon" style="background:rgba(16,185,129,.1);color:#10b981">⚙️</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Trợ lý Email & Lịch" data-en="Email & Calendar Assistant">Trợ lý Email & Lịch</div>
+            <div class="sc-tab-desc" data-vi="Tự động hóa email, lịch, báo cáo sáng" data-en="Automate email, calendar, morning reports">Tự động hóa email, lịch, báo cáo sáng</div>
+          </div>
+        </div>
+        <div class="sc-tab" onclick="showCase(1)">
+          <div class="sc-tab-icon" style="background:rgba(59,130,246,.1);color:#3b82f6">💻</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Agent Lập trình từ xa" data-en="Remote Coding Agent">Agent Lập trình từ xa</div>
+            <div class="sc-tab-desc" data-vi="Code, deploy, fix bugs từ Telegram" data-en="Code, deploy, fix bugs from Telegram">Code, deploy, fix bugs từ Telegram</div>
+          </div>
+        </div>
+        <div class="sc-tab" onclick="showCase(2)">
+          <div class="sc-tab-icon" style="background:rgba(245,158,11,.1);color:#f59e0b">📋</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Quản lý công việc" data-en="Task Management">Quản lý công việc</div>
+            <div class="sc-tab-desc" data-vi="Timeblock, scoring, tổng hợp cuộc họp" data-en="Timeblock, scoring, meeting summaries">Timeblock, scoring, tổng hợp cuộc họp</div>
+          </div>
+        </div>
+        <div class="sc-tab" onclick="showCase(3)">
+          <div class="sc-tab-icon" style="background:rgba(16,185,129,.1);color:#10b981">🏠</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Smart Home & Sức khỏe" data-en="Smart Home & Health">Smart Home & Sức khỏe</div>
+            <div class="sc-tab-desc" data-vi="IoT, Garmin, Home Assistant, Pi" data-en="IoT, Garmin, Home Assistant, Pi">IoT, Garmin, Home Assistant, Pi</div>
+          </div>
+        </div>
+        <div class="sc-tab" onclick="showCase(4)">
+          <div class="sc-tab-icon" style="background:rgba(139,92,246,.1);color:#8b5cf6">👨‍👩‍👧</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Trợ lý Gia đình" data-en="Family Assistant">Trợ lý Gia đình</div>
+            <div class="sc-tab-desc" data-vi="Thực đơn, mua sắm, lịch học con" data-en="Meal plans, shopping, kids' schedule">Thực đơn, mua sắm, lịch học con</div>
+          </div>
+        </div>
+        <div class="sc-tab" onclick="showCase(5)">
+          <div class="sc-tab-icon" style="background:rgba(16,185,129,.1);color:#10b981">🤖</div>
+          <div>
+            <div class="sc-tab-title" data-vi="Đội ngũ Multi-Agent" data-en="Multi-Agent Team">Đội ngũ Multi-Agent</div>
+            <div class="sc-tab-desc" data-vi="15+ agents, rollcall, auto-skills" data-en="15+ agents, rollcall, auto-skills">15+ agents, rollcall, auto-skills</div>
+          </div>
+        </div>
       </div>
-      <div class="feature-card fade-up" style="--i:1">
-        <span class="pf-tag pf-tag-blue" data-vi="💻 DEVELOPER" data-en="💻 DEVELOPER">💻 DEVELOPER</span>
-        <h3 data-vi="Agent Lập trình từ xa" data-en="Remote Coding Agent">Agent Lập trình từ xa</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ Build website từ Telegram trong khi nằm xem Netflix" data-en="→ Build websites from Telegram while watching Netflix">→ Build website từ Telegram trong khi nằm xem Netflix</li>
-          <li data-vi="→ Tạo GitHub issues, refactor PRs từ code review" data-en="→ Create GitHub issues, refactor PRs from code review">→ Tạo GitHub issues, refactor PRs từ code review</li>
-          <li data-vi="→ Review logs, fix lỗi deploy, auto-redeploy" data-en="→ Review logs, fix deploy bugs, auto-redeploy">→ Review logs, fix lỗi deploy, auto-redeploy</li>
-          <li data-vi="→ Code agents chạy xuyên đêm khi bạn ngủ" data-en="→ Code agents run overnight while you sleep">→ Code agents chạy xuyên đêm khi bạn ngủ</li>
-        </ul>
-      </div>
-      <div class="feature-card fade-up" style="--i:2">
-        <span class="pf-tag" style="background:rgba(245,158,11,.08);color:#f59e0b;border-color:rgba(245,158,11,.15)" data-vi="📋 NĂNG SUẤT" data-en="📋 PRODUCTIVITY">📋 NĂNG SUẤT</span>
-        <h3 data-vi="Quản lý công việc thông minh" data-en="Smart Task Management">Quản lý công việc thông minh</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ Timeblock tasks trong calendar theo mức ưu tiên" data-en="→ Timeblock tasks in calendar by priority">→ Timeblock tasks trong calendar theo mức ưu tiên</li>
-          <li data-vi="→ Chấm điểm công việc theo urgency & importance" data-en="→ Score tasks by urgency & importance">→ Chấm điểm công việc theo urgency & importance</li>
-          <li data-vi="→ Tóm tắt 122 slides Google cho cuộc họp" data-en="→ Summarize 122 Google slides for meeting">→ Tóm tắt 122 slides Google cho cuộc họp</li>
-          <li data-vi="→ Xóa 10,000 email trong ngày đầu tiên" data-en="→ Delete 10,000 emails on day one">→ Xóa 10,000 email trong ngày đầu tiên</li>
-        </ul>
-      </div>
-      <div class="feature-card fade-up" style="--i:3">
-        <span class="pf-tag pf-tag-green" data-vi="🏠 SMART HOME" data-en="🏠 SMART HOME">🏠 SMART HOME</span>
-        <h3 data-vi="Nhà thông minh & Sức khỏe" data-en="Smart Home & Health">Nhà thông minh & Sức khỏe</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ Kết nối Garmin, WHOOP — theo dõi sức khỏe" data-en="→ Connect Garmin, WHOOP — health tracking">→ Kết nối Garmin, WHOOP — theo dõi sức khỏe</li>
-          <li data-vi="→ Chạy trên Raspberry Pi với Cloudflare tunnel" data-en="→ Run on Raspberry Pi with Cloudflare tunnel">→ Chạy trên Raspberry Pi với Cloudflare tunnel</li>
-          <li data-vi="→ Điều khiển Home Assistant qua chat" data-en="→ Control Home Assistant via chat">→ Điều khiển Home Assistant qua chat</li>
-          <li data-vi="→ Theo dõi bạn và nhắn tin nếu im lặng quá lâu" data-en="→ Monitor you and text if silent too long">→ Theo dõi bạn và nhắn tin nếu im lặng quá lâu</li>
-        </ul>
-      </div>
-      <div class="feature-card fade-up" style="--i:4">
-        <span class="pf-tag" style="background:rgba(139,92,246,.08);color:#8b5cf6;border-color:rgba(139,92,246,.15)" data-vi="👨‍👩‍👧 GIA ĐÌNH" data-en="👨‍👩‍👧 FAMILY">👨‍👩‍👧 GIA ĐÌNH</span>
-        <h3 data-vi="Trợ lý Gia đình" data-en="Family Assistant">Trợ lý Gia đình</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ Lên thực đơn tuần trong Notion (365 ngày)" data-en="→ Weekly meal plans in Notion (365 days)">→ Lên thực đơn tuần trong Notion (365 ngày)</li>
-          <li data-vi="→ Danh sách mua sắm theo cửa hàng & kệ hàng" data-en="→ Shopping lists by store & aisle">→ Danh sách mua sắm theo cửa hàng & kệ hàng</li>
-          <li data-vi="→ Thông báo lịch kiểm tra của con" data-en="→ Kids' exam schedule notifications">→ Thông báo lịch kiểm tra của con</li>
-          <li data-vi="→ Dự báo thời tiết để gợi ý nấu nướng" data-en="→ Weather forecast for cooking suggestions">→ Dự báo thời tiết để gợi ý nấu nướng</li>
-        </ul>
-      </div>
-      <div class="feature-card fade-up" style="--i:5;border:2px solid var(--green);box-shadow:0 0 20px rgba(16,185,129,.1)">
-        <span class="pf-tag pf-tag-green">🤖 MULTI-AGENT</span>
-        <h3 data-vi="Đội ngũ AI Agent" data-en="AI Agent Team">Đội ngũ AI Agent</h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;font-size:13px;color:var(--text2);line-height:2">
-          <li data-vi="→ 15+ agents trên 1 VPS, rollcall hàng ngày" data-en="→ 15+ agents on 1 VPS, daily rollcall">→ 15+ agents trên 1 VPS, rollcall hàng ngày</li>
-          <li data-vi="→ 4 agents cho solo founder: Strategy, Dev, Marketing, Business" data-en="→ 4 agents for solo founder: Strategy, Dev, Marketing, Business">→ 4 agents cho solo founder: Strategy, Dev, Marketing, Business</li>
-          <li data-vi="→ Sub-agents chạy research qua đêm" data-en="→ Sub-agents run research overnight">→ Sub-agents chạy research qua đêm</li>
-          <li data-vi="→ Agents tự cập nhật, tự tạo skills mới" data-en="→ Agents auto-update, auto-create new skills">→ Agents tự cập nhật, tự tạo skills mới</li>
-        </ul>
+      <!-- RIGHT: Preview Panel -->
+      <div class="showcase-preview">
+        <div class="sc-preview-header">
+          <div class="demo-dots"><span></span><span></span><span></span></div>
+          <span class="sc-preview-title">● BIZCLAW OS v0.3 // <span id="sc-agent-name">EMAIL ASSISTANT</span></span>
+        </div>
+        <div class="sc-preview-body" id="sc-preview-body">
+          <!-- Panel 0: Email -->
+          <div class="sc-panel active" data-panel="0">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Tự động kiểm tra email, lọc spam, quản lý lịch và gửi báo cáo sáng." data-en="Auto-check email, filter spam, manage calendar and send morning reports.">Tự động kiểm tra email, lọc spam, quản lý lịch và gửi báo cáo sáng.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Kết nối Gmail API" data-en="Connect Gmail API">Kết nối Gmail API</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Lọc 47 spam, 12 quan trọng" data-en="Filter 47 spam, 12 important">Lọc 47 spam, 12 quan trọng</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Đang tạo báo cáo sáng..." data-en="Creating morning report...">Đang tạo báo cáo sáng...</span></div>
+              <div class="sc-step"><span class="sc-circle"></span> <span data-vi="Gửi qua Zalo + Telegram" data-en="Send via Zalo + Telegram">Gửi qua Zalo + Telegram</span></div>
+            </div>
+            <div class="sc-tools"><span>Gmail</span><span>Calendar</span><span>Zalo</span><span>Telegram</span></div>
+          </div>
+          <!-- Panel 1: Dev -->
+          <div class="sc-panel" data-panel="1">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Build website từ tin nhắn Telegram, push code, auto-deploy." data-en="Build website from Telegram message, push code, auto-deploy.">Build website từ tin nhắn Telegram, push code, auto-deploy.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Nhận yêu cầu từ Telegram" data-en="Receive request from Telegram">Nhận yêu cầu từ Telegram</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Clone repo, tạo branch feature" data-en="Clone repo, create feature branch">Clone repo, tạo branch feature</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Code 347 dòng, 12 files changed" data-en="Code 347 lines, 12 files changed">Code 347 dòng, 12 files changed</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Đang chạy tests + deploy..." data-en="Running tests + deploy...">Đang chạy tests + deploy...</span></div>
+            </div>
+            <div class="sc-tools"><span>GitHub</span><span>Claude Sonnet</span><span>Docker</span><span>Vercel</span></div>
+          </div>
+          <!-- Panel 2: Productivity -->
+          <div class="sc-panel" data-panel="2">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Quản lý công việc thông minh: scoring, timeblock, tổng hợp." data-en="Smart task management: scoring, timeblock, summaries.">Quản lý công việc thông minh: scoring, timeblock, tổng hợp.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Chấm điểm 23 tasks (urgency × importance)" data-en="Score 23 tasks (urgency × importance)">Chấm điểm 23 tasks (urgency × importance)</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Timeblock vào Google Calendar" data-en="Timeblock into Google Calendar">Timeblock vào Google Calendar</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Tóm tắt 122 slides cho meeting 2pm..." data-en="Summarizing 122 slides for 2pm meeting...">Tóm tắt 122 slides cho meeting 2pm...</span></div>
+              <div class="sc-step"><span class="sc-circle"></span> <span data-vi="Xóa 10,000 email cũ" data-en="Delete 10,000 old emails">Xóa 10,000 email cũ</span></div>
+            </div>
+            <div class="sc-tools"><span>Google Calendar</span><span>Notion</span><span>Gemini Flash</span></div>
+          </div>
+          <!-- Panel 3: Smart Home -->
+          <div class="sc-panel" data-panel="3">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Kết nối IoT, theo dõi sức khỏe, điều khiển nhà thông minh." data-en="Connect IoT, health tracking, smart home control.">Kết nối IoT, theo dõi sức khỏe, điều khiển nhà thông minh.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Sync Garmin: HR 72bpm, Sleep 7h12m" data-en="Sync Garmin: HR 72bpm, Sleep 7h12m">Sync Garmin: HR 72bpm, Sleep 7h12m</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Bật đèn phòng khách, 24°C" data-en="Turn on living room light, 24°C">Bật đèn phòng khách, 24°C</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Đang check camera an ninh..." data-en="Checking security cameras...">Đang check camera an ninh...</span></div>
+              <div class="sc-step"><span class="sc-circle"></span> <span data-vi="Gửi nhắc uống nước 2h/lần" data-en="Send water reminder every 2h">Gửi nhắc uống nước 2h/lần</span></div>
+            </div>
+            <div class="sc-tools"><span>Home Assistant</span><span>Garmin</span><span>Raspberry Pi</span></div>
+          </div>
+          <!-- Panel 4: Family -->
+          <div class="sc-panel" data-panel="4">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Quản lý gia đình: thực đơn, mua sắm, lịch học." data-en="Family management: meal plans, shopping, school schedule.">Quản lý gia đình: thực đơn, mua sắm, lịch học.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Lên thực đơn thứ 2-7 (cân bằng dinh dưỡng)" data-en="Plan Mon-Sat menu (balanced nutrition)">Lên thực đơn thứ 2-7 (cân bằng dinh dưỡng)</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Danh sách mua sắm → CoopMart (kệ 3, 7, 12)" data-en="Shopping list → CoopMart (aisle 3, 7, 12)">Danh sách mua sắm → CoopMart (kệ 3, 7, 12)</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Đang nhắc: Kiểm tra Toán con Bi ngày mai..." data-en="Reminder: Bi's Math test tomorrow...">Đang nhắc: Kiểm tra Toán con Bi ngày mai...</span></div>
+              <div class="sc-step"><span class="sc-circle"></span> <span data-vi="Dự báo: mưa → gợi ý nấu lẩu" data-en="Forecast: rain → suggest hot pot">Dự báo: mưa → gợi ý nấu lẩu</span></div>
+            </div>
+            <div class="sc-tools"><span>Notion</span><span>Weather API</span><span>Zalo</span></div>
+          </div>
+          <!-- Panel 5: Multi-Agent -->
+          <div class="sc-panel" data-panel="5">
+            <div class="sc-flow-label" data-vi="QUY TRÌNH XỬ LÝ" data-en="PROCESS FLOW">QUY TRÌNH XỬ LÝ</div>
+            <p style="font-size:14px;color:var(--text2);margin-bottom:16px" data-vi="Điều phối 15+ agents, mỗi agent có vai trò và provider riêng." data-en="Orchestrate 15+ agents, each with its own role and provider.">Điều phối 15+ agents, mỗi agent có vai trò và provider riêng.</p>
+            <div class="sc-steps">
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Rollcall: 15/15 agents online ✅" data-en="Rollcall: 15/15 agents online ✅">Rollcall: 15/15 agents online ✅</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Strategy Agent → phân tích thị trường Q1" data-en="Strategy Agent → Q1 market analysis">Strategy Agent → phân tích thị trường Q1</span></div>
+              <div class="sc-step done"><span class="sc-check">✓</span> <span data-vi="Dev Agent → ship 3 features trong đêm" data-en="Dev Agent → shipped 3 features overnight">Dev Agent → ship 3 features trong đêm</span></div>
+              <div class="sc-step active"><span class="sc-spinner"></span> <span data-vi="Marketing Agent đang tạo kế hoạch content..." data-en="Marketing Agent creating content plan...">Marketing Agent đang tạo kế hoạch content...</span></div>
+            </div>
+            <div class="sc-tools"><span>Claude</span><span>Gemini</span><span>DeepSeek</span><span>Ollama</span><span>Groq</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -819,6 +917,17 @@ function goLogin(){
 function contactOrder(plan){
   const msg=encodeURIComponent('Xin chào! Tôi muốn đăng ký gói '+plan+' trên BizClaw.');
   window.open('https://zalo.me/0888468988?text='+msg,'_blank');
+}
+
+// Showcase tab switching
+const scAgentNames=['EMAIL ASSISTANT','CODING AGENT','TASK MANAGER','SMART HOME','FAMILY AGENT','MULTI-AGENT TEAM'];
+function showCase(idx){
+  document.querySelectorAll('.sc-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.sc-panel').forEach(p=>p.classList.remove('active'));
+  const panel=document.querySelector('.sc-panel[data-panel="'+idx+'"]');
+  if(panel)panel.classList.add('active');
+  const name=document.getElementById('sc-agent-name');
+  if(name)name.textContent=scAgentNames[idx]||'AGENT';
 }
 
 // Mouse-follow glow on feature cards
