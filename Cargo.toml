@@ -27,7 +27,7 @@ version = "0.2.0"
 edition = "2024"
 authors = ["BizClaw Team"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/BizClaw/bizclaw"
+repository = "https://github.com/nguyenduchoai/bizclaw"
 rust-version = "1.85"
 
 [workspace.dependencies]

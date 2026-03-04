@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════
+# BizClaw — Docker Compose (Standalone / Single-Tenant)
+# No PostgreSQL needed. Uses SQLite embedded.
+#
+# Usage: docker-compose -f docker-compose.standalone.yml up -d
+# Dashboard:  http://localhost:3000
+# ═══════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+
+  # ── BizClaw Agent + Dashboard ──────────────────────────────
+  bizclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: bizclaw
+    restart: unless-stopped
+    ports:
+      - "3000:3000"       # Web Dashboard + API
+    volumes:
+      - bizclaw_data:/root/.bizclaw
+    environment:
+      - RUST_LOG=info
+      - BIZCLAW_CONFIG=/root/.bizclaw/config.toml
+      - BIZCLAW_BIND_ALL=1
+      - TZ=Asia/Ho_Chi_Minh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Ollama (optional — local AI, $0/month) ────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: bizclaw-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+volumes:
+  bizclaw_data:
+    driver: local
+  ollama_data:
+    driver: local

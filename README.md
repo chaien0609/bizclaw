@@ -34,35 +34,37 @@
 
 ## 🚀 Cài đặt — 3 cách
 
-### Cách 1: Docker (Khuyên dùng)
-
-```bash
-git clone https://github.com/nguyenduchoai/bizclaw.git
-cd bizclaw && docker-compose up -d
-# → Dashboard tại http://localhost:3579
-```
-
-### Cách 2: Build từ Source
+### Cách 1: Build từ Source (Khuyên dùng)
 
 ```bash
 git clone https://github.com/nguyenduchoai/bizclaw.git
 cd bizclaw && cargo build --release
 
-# Cài đặt (wizard tương tác)
+# Cài đặt (wizard tương tác — chọn provider, API key)
 ./target/release/bizclaw init
 
 # Chạy agent + dashboard
 ./target/release/bizclaw serve
-# → Dashboard tại http://localhost:3579
+# → Dashboard tại http://localhost:3000
+```
+
+### Cách 2: Docker Standalone
+
+```bash
+git clone https://github.com/nguyenduchoai/bizclaw.git
+cd bizclaw && docker-compose -f docker-compose.standalone.yml up -d
+# → Dashboard tại http://localhost:3000
 ```
 
 ### Cách 3: One-Click Install (VPS / Raspberry Pi)
 
 ```bash
 curl -sSL https://bizclaw.vn/install.sh | sudo bash
+# → Dashboard tại http://<IP>:3000
 ```
 
 > 💡 **Chỉ cần 1 file `config.toml`** — không cần PostgreSQL, không cần Nginx, không cần domain.
+> Database sử dụng SQLite embedded, mọi thứ chạy trong 1 binary duy nhất.
 
 ---
 
@@ -239,6 +241,12 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | `bizclaw-gateway` | HTTP + WS + Dashboard | ✅ |
 | `bizclaw-knowledge` | Knowledge RAG | ✅ |
 | `bizclaw-scheduler` | Scheduled tasks | ✅ |
+| `bizclaw-runtime` | Agent runtime lifecycle | ✅ |
+| `bizclaw-platform` | Multi-tenant admin server | ✅ |
+| `bizclaw-db` | PostgreSQL abstraction (cloud) | ✅ |
+| `bizclaw-hands` | Autonomous device tools | ✅ |
+| `bizclaw-workflows` | Workflow orchestration | ✅ |
+| `bizclaw-skills` | Agent skill modules | ✅ |
 | `bizclaw-ffi` | Android FFI layer | ✅ |
 
 ---
@@ -264,12 +272,12 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | Metric | Value |
 |--------|-------|
 | **Language** | 100% Rust + Kotlin (Android) |
-| **Crates** | 17 |
-| **Lines of Code** | ~43,000 |
+| **Crates** | 19 |
+| **Lines of Code** | ~48,000 |
 | **Tests** | 240 passing |
 | **Clippy Warnings** | **0** ✅ |
 | **Binary Size** | bizclaw 12MB |
-| **Last Updated** | 2026-03-04 |
+| **Last Updated** | 2026-03-05 |
 
 ---
 
@@ -286,7 +294,7 @@ git clone https://github.com/nguyenduchoai/bizclaw.git
 cd bizclaw && cargo build --release
 ./target/release/bizclaw init
 ./target/release/bizclaw serve
-# Open http://localhost:3579
+# Open http://localhost:3000
 ```
 
 ### Key Features
@@ -319,4 +327,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**BizClaw** v0.3.0 — *AI riêng, chạy mọi nơi. / Your own AI, runs everywhere.*
+**BizClaw** v0.2.0 — *AI riêng, chạy mọi nơi. / Your own AI, runs everywhere.*

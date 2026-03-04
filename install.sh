@@ -1,8 +1,11 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# BizClaw AI Agent Platform — One-Click Install
-# Usage: curl -sSL https://bizclaw.vn/install.sh | bash
+# BizClaw AI Agent Platform — One-Click Install (Standalone)
+# Usage: curl -sSL https://bizclaw.vn/install.sh | sudo bash
 # Works on: Ubuntu/Debian VPS, Raspberry Pi, any Linux with systemd
+#
+# This installs the STANDALONE (single-tenant) version.
+# For multi-tenant Cloud, see docker-compose.yml
 # ═══════════════════════════════════════════════════════════════
 
 set -e
@@ -11,10 +14,10 @@ REPO="https://github.com/nguyenduchoai/bizclaw.git"
 INSTALL_DIR="/opt/bizclaw"
 BIN_DIR="/usr/local/bin"
 DATA_DIR="$HOME/.bizclaw"
-SERVICE_NAME="bizclaw-platform"
+SERVICE_NAME="bizclaw"
 
 echo ""
-echo "  🦀 BizClaw AI Agent Platform — Installer"
+echo "  🦀 BizClaw AI Agent — Standalone Installer"
 echo "  ════════════════════════════════════════════"
 echo ""
 
@@ -70,33 +73,38 @@ else
   cd "$INSTALL_DIR"
 fi
 
-cargo build --release --bin bizclaw --bin bizclaw-platform 2>&1 | tail -3
+# Build ONLY the standalone binary (no PostgreSQL needed)
+cargo build --release --bin bizclaw 2>&1 | tail -3
 echo "  ✅ Build complete"
 
-# ── Step 4: Install binaries ────────────────────────────────
-echo "📦 [4/5] Installing binaries..."
+# ── Step 4: Install binary ─────────────────────────────────
+echo "📦 [4/5] Installing binary..."
 cp "$INSTALL_DIR/target/release/bizclaw" "$BIN_DIR/bizclaw"
-cp "$INSTALL_DIR/target/release/bizclaw-platform" "$BIN_DIR/bizclaw-platform"
-chmod +x "$BIN_DIR/bizclaw" "$BIN_DIR/bizclaw-platform"
+chmod +x "$BIN_DIR/bizclaw"
 echo "  ✅ bizclaw → $BIN_DIR/bizclaw ($(du -h $BIN_DIR/bizclaw | cut -f1))"
-echo "  ✅ bizclaw-platform → $BIN_DIR/bizclaw-platform ($(du -h $BIN_DIR/bizclaw-platform | cut -f1))"
 
 # Create data directory
 mkdir -p "$DATA_DIR"
 
+# Run init wizard if no config exists
+if [ ! -f "$DATA_DIR/config.toml" ]; then
+  echo ""
+  echo "  📝 Running setup wizard..."
+  "$BIN_DIR/bizclaw" init || true
+fi
+
 # ── Step 5: Setup systemd service ───────────────────────────
 echo "🚀 [5/5] Setting up systemd service..."
-JWT_SECRET="bizclaw-$(head /dev/urandom | tr -dc a-z0-9 | head -c 16)"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
-Description=BizClaw AI Agent Platform
+Description=BizClaw AI Agent (Standalone)
 After=network.target
 
 [Service]
 Type=simple
 User=root
-ExecStart=${BIN_DIR}/bizclaw-platform --port 3001 --bizclaw-bin ${BIN_DIR}/bizclaw --jwt-secret ${JWT_SECRET}
+ExecStart=${BIN_DIR}/bizclaw serve --port 3000
 Restart=always
 RestartSec=5
 Environment=RUST_LOG=info
@@ -119,25 +127,22 @@ echo "  ╔═══════════════════════
 echo "  ║  🎉  BizClaw installed successfully!                  ║"
 echo "  ╠═══════════════════════════════════════════════════════╣"
 echo "  ║                                                       ║"
-echo "  ║  Dashboard:  http://${SERVER_IP}:3001                 ║"
-echo "  ║  CLI:        bizclaw chat                             ║"
+echo "  ║  Dashboard:  http://${SERVER_IP}:3000                 ║"
+echo "  ║  CLI Chat:   bizclaw chat                             ║"
+echo "  ║  CLI Info:   bizclaw info                             ║"
 echo "  ║                                                       ║"
-echo "  ║  ┌─────────────────────────────────────────────────┐   ║"
-echo "  ║  │  🔑 Default Admin Credentials:                  │   ║"
-echo "  ║  │     Email:    admin@bizclaw.vn                  │   ║"
-echo "  ║  │     Password: BizClaw@2026                      │   ║"
-echo "  ║  │     ⚠️  Change password after first login!       │   ║"
-echo "  ║  └─────────────────────────────────────────────────┘   ║"
-echo "  ║                                                       ║"
-echo "  ║  Status:     systemctl status ${SERVICE_NAME}        ║"
-echo "  ║  Logs:       journalctl -u ${SERVICE_NAME} -f        ║"
+echo "  ║  Status:     systemctl status ${SERVICE_NAME}         ║"
+echo "  ║  Logs:       journalctl -u ${SERVICE_NAME} -f         ║"
 echo "  ║  Config:     ${DATA_DIR}/config.toml                  ║"
 echo "  ║                                                       ║"
 echo "  ╚═══════════════════════════════════════════════════════╝"
 echo ""
 echo "  💡 Next steps:"
-echo "     1. Open the dashboard: http://${SERVER_IP}:3001"
-echo "     2. Login with: admin@bizclaw.vn / BizClaw@2026"
-echo "     3. Set your AI provider (OpenAI, Ollama, Brain Engine, etc.)"
-echo "     4. Start chatting!"
+echo "     1. Open the dashboard: http://${SERVER_IP}:3000"
+echo "     2. Configure your AI provider in the dashboard"
+echo "     3. Start chatting: bizclaw chat"
+echo ""
+echo "  📱 Optional — add Ollama for free local AI:"
+echo "     curl -fsSL https://ollama.ai/install.sh | sh"
+echo "     ollama pull qwen3:0.6b   # ~500MB, good for Pi"
 echo ""

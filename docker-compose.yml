@@ -1,7 +1,10 @@
 # ═══════════════════════════════════════════════════════════════
-# BizClaw Platform — Docker Compose (Dev + PG Mode)
+# BizClaw Platform — Docker Compose (Multi-Tenant + PostgreSQL)
+# ⚠️  This is for CLOUD / MULTI-TENANT deployment.
+# For standalone single-tenant, use: docker-compose.standalone.yml
+# 
 # Usage: docker-compose up -d
-# Dashboard:  http://localhost:3001
+# Admin Dashboard:  http://localhost:3001
 # PostgreSQL: localhost:5432
 # ═══════════════════════════════════════════════════════════════
 
