@@ -88,6 +88,39 @@ fn get_lang_config(language: &str) -> Option<LangConfig> {
     }
 }
 
+/// Scan code content for dangerous patterns.
+/// Returns a block reason if the code is suspicious.
+fn scan_code_for_danger(code: &str, language: &str) -> Option<String> {
+    let lower = code.to_lowercase();
+    let dangerous = [
+        ("rm -rf", "destructive file deletion"),
+        ("curl | bash", "remote code execution via pipe"),
+        ("curl | sh", "remote code execution via pipe"),
+        ("wget | bash", "remote code execution via pipe"),
+        ("/etc/shadow", "sensitive file access"),
+        ("/etc/passwd", "sensitive file access"),
+        ("authorized_keys", "SSH key manipulation"),
+        ("id_rsa", "SSH private key access"),
+        ("reverse shell", "reverse shell attempt"),
+        ("os.system", "system command execution"),
+        ("subprocess.call", "subprocess execution"),
+        ("exec(", "dynamic code execution"),
+        ("child_process", "Node.js subprocess execution"),
+        ("process.env", "environment variable access"),
+        ("std::env::var", "environment variable access"),
+        ("secrets.enc", "secrets file access"),
+    ];
+    for (pattern, desc) in &dangerous {
+        if lower.contains(pattern) {
+            return Some(format!(
+                "🔒 Blocked {} code: detected '{}' ({}). Code execution denied for security.",
+                language, pattern, desc
+            ));
+        }
+    }
+    None
+}
+
 #[async_trait]
 impl Tool for ExecuteCodeTool {
     fn name(&self) -> &str {
@@ -136,6 +169,16 @@ impl Tool for ExecuteCodeTool {
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool(
                 format!("Unsupported language: {}. Supported: python, javascript, ruby, bash, php, go, rust, c, typescript", language)
             ))?;
+
+        // ═══ SECURITY: Scan code for dangerous patterns ═══
+        if let Some(block_reason) = scan_code_for_danger(code, language) {
+            tracing::warn!("🛡️ ExecuteCodeTool security block: {}", block_reason);
+            return Ok(ToolResult {
+                tool_call_id: String::new(),
+                output: block_reason,
+                success: false,
+            });
+        }
 
         // Write code to temp file
         let temp_dir = std::env::temp_dir().join("bizclaw_exec");

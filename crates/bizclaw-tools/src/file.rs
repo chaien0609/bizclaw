@@ -1,15 +1,97 @@
-//! File read/write tool — read, write, append files with ls-style directory listing.
+//! File read/write tool — with mandatory path security validation.
+//!
+//! Enforces path restrictions to prevent reading/writing sensitive files.
 
 use async_trait::async_trait;
 use bizclaw_core::error::Result;
 use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
 
+/// Paths that are always forbidden (case-insensitive prefix match).
+const FORBIDDEN_PATHS: &[&str] = &[
+    "/etc/shadow",
+    "/etc/gshadow",
+    "/proc/",
+    "/sys/",
+    "/dev/",
+];
+
+/// Path prefixes that require extra caution (warning but allowed).
+const SENSITIVE_PATHS: &[&str] = &[
+    "/etc/",
+    "/root/.ssh",
+    "/root/.gnupg",
+    "/root/.aws",
+    "/root/.config",
+];
+
+/// Files that should never be written to.
+const WRITE_FORBIDDEN: &[&str] = &[
+    "/etc/passwd",
+    "/etc/shadow",
+    "/etc/sudoers",
+    "authorized_keys",
+    "id_rsa",
+    "id_ed25519",
+    ".env",
+    "secrets.enc",
+    ".git/config",
+];
+
 pub struct FileTool;
 
 impl FileTool {
     pub fn new() -> Self {
         Self
+    }
+
+    /// Validate a path for read or write access.
+    /// Returns an error reason if the path is blocked.
+    fn validate_path(path: &str, is_write: bool) -> Option<String> {
+        let lower = path.to_lowercase();
+
+        // 1. Absolute forbidden paths
+        for forbidden in FORBIDDEN_PATHS {
+            if lower.starts_with(forbidden) {
+                return Some(format!(
+                    "🔒 Access denied: '{}' is in a restricted directory ({})",
+                    path, forbidden
+                ));
+            }
+        }
+
+        // 2. Path traversal detection
+        if path.contains("../") || path.contains("/..") {
+            return Some(format!(
+                "🔒 Access denied: path traversal detected in '{}'",
+                path
+            ));
+        }
+
+        // 3. Write-specific restrictions
+        if is_write {
+            for pattern in WRITE_FORBIDDEN {
+                if lower.contains(pattern) {
+                    return Some(format!(
+                        "🔒 Write denied: '{}' matches protected pattern '{}'",
+                        path, pattern
+                    ));
+                }
+            }
+        }
+
+        // 4. Warn about sensitive paths (read allowed, just logged)
+        for sensitive in SENSITIVE_PATHS {
+            if lower.starts_with(sensitive) {
+                tracing::warn!(
+                    "⚠️ FileTool accessing sensitive path: {} (action: {})",
+                    path,
+                    if is_write { "write" } else { "read" }
+                );
+            }
+        }
+
+        None // Path is allowed
     }
 }
 
@@ -28,7 +110,7 @@ impl Tool for FileTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "file".into(),
-            description: "Read, write, or list files and directories. The list action shows detailed info (type, size, modified time).".into(),
+            description: "Read, write, or list files and directories. Path security is enforced — sensitive system files are protected.".into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -55,6 +137,17 @@ impl Tool for FileTool {
         let path = args["path"]
             .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'path'".into()))?;
+
+        // ═══ MANDATORY PATH SECURITY CHECK ═══
+        let is_write = matches!(action, "write" | "append");
+        if let Some(block_reason) = Self::validate_path(path, is_write) {
+            tracing::warn!("🛡️ FileTool security block: {}", block_reason);
+            return Ok(ToolResult {
+                tool_call_id: String::new(),
+                output: block_reason,
+                success: false,
+            });
+        }
 
         let result = match action {
             "read" => {
@@ -199,5 +292,56 @@ fn format_size(bytes: u64) -> String {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     } else {
         format!("{:.1} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_blocks_shadow_read() {
+        assert!(FileTool::validate_path("/etc/shadow", false).is_some());
+    }
+
+    #[test]
+    fn test_blocks_proc_access() {
+        assert!(FileTool::validate_path("/proc/self/environ", false).is_some());
+    }
+
+    #[test]
+    fn test_blocks_dev_access() {
+        assert!(FileTool::validate_path("/dev/sda", false).is_some());
+    }
+
+    #[test]
+    fn test_blocks_path_traversal() {
+        assert!(FileTool::validate_path("/tmp/../etc/shadow", false).is_some());
+        assert!(FileTool::validate_path("../../../etc/passwd", false).is_some());
+    }
+
+    #[test]
+    fn test_blocks_write_to_ssh_keys() {
+        assert!(FileTool::validate_path("/root/.ssh/authorized_keys", true).is_some());
+        assert!(FileTool::validate_path("/home/user/.ssh/id_rsa", true).is_some());
+    }
+
+    #[test]
+    fn test_blocks_write_to_env_files() {
+        assert!(FileTool::validate_path("/app/.env", true).is_some());
+        assert!(FileTool::validate_path("secrets.enc", true).is_some());
+    }
+
+    #[test]
+    fn test_allows_normal_read() {
+        assert!(FileTool::validate_path("/tmp/test.txt", false).is_none());
+        assert!(FileTool::validate_path("/home/user/code/main.rs", false).is_none());
+        assert!(FileTool::validate_path("README.md", false).is_none());
+    }
+
+    #[test]
+    fn test_allows_normal_write() {
+        assert!(FileTool::validate_path("/tmp/output.txt", true).is_none());
+        assert!(FileTool::validate_path("/home/user/code/output.rs", true).is_none());
     }
 }

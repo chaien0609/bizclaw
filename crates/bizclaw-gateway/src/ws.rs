@@ -39,7 +39,7 @@ fn ollama_url(_state: &AppState) -> String {
 
 /// Get the active model from config.
 fn active_model(state: &AppState) -> String {
-    let config = state.full_config.lock().unwrap();
+    let config = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     let model = config.default_model.clone();
     if model.is_empty() {
         "tinyllama".to_string()
@@ -50,7 +50,7 @@ fn active_model(state: &AppState) -> String {
 
 /// Get the active provider from config.
 fn active_provider(state: &AppState) -> String {
-    let config = state.full_config.lock().unwrap();
+    let config = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     let provider = config.default_provider.clone();
     if provider.is_empty() {
         "ollama".to_string()
@@ -561,7 +561,7 @@ async fn chat_openai(
     stream: bool,
 ) -> Result<String, String> {
     let api_key = {
-        let config = state.full_config.lock().unwrap();
+        let config = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         config.api_key.clone()
     };
     let api_key = if api_key.is_empty() {

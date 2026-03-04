@@ -103,7 +103,7 @@ pub async fn health_check() -> Json<serde_json::Value> {
 /// System information endpoint.
 pub async fn system_info(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let uptime = state.start_time.elapsed();
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     Json(serde_json::json!({
         "name": cfg.identity.name,
         "version": env!("CARGO_PKG_VERSION"),
@@ -121,7 +121,7 @@ pub async fn system_info(State(state): State<Arc<AppState>>) -> Json<serde_json:
 
 /// Get current configuration (sanitized — no API keys).
 pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     Json(serde_json::json!({
         "default_provider": cfg.default_provider,
         "default_model": cfg.default_model,
@@ -228,7 +228,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
 
 /// Get full config as TOML string for export/display.
 pub async fn get_full_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     let toml_str = toml::to_string_pretty(&*cfg).unwrap_or_default();
     Json(serde_json::json!({
         "ok": true,
@@ -242,7 +242,7 @@ pub async fn update_config(
     State(state): State<Arc<AppState>>,
     Json(req): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let mut cfg = state.full_config.lock().unwrap();
+    let mut cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
 
     // Update top-level fields + sync to LLM section
     // CRITICAL: create_provider() reads llm.* FIRST, so both must be in sync
@@ -403,7 +403,7 @@ pub async fn update_channel(
         .get("enabled")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let mut cfg = state.full_config.lock().unwrap();
+    let mut cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
 
     match channel_type {
         "telegram" => {
@@ -728,7 +728,7 @@ pub async fn save_channel_instance(
         sync_body.insert("channel_type".into(), serde_json::json!(channel_type));
         sync_body.insert("enabled".into(), serde_json::json!(true));
         // Trigger update_channel internally via direct config write
-        let mut full_cfg = state.full_config.lock().unwrap();
+        let mut full_cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         match channel_type.as_str() {
             "telegram" => {
                 let token = sync_body.get("bot_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -754,7 +754,7 @@ pub async fn save_channel_instance(
     }
 
     // Also write channels_sync.json for platform restart persistence
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(parent) = state.config_path.parent() {
         let channels_json = serde_json::json!({
             "telegram": cfg.channel.telegram.as_ref().map(|t| serde_json::json!({"enabled": t.enabled, "bot_token": t.bot_token, "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", ")})),
@@ -1078,7 +1078,7 @@ pub async fn auto_connect_channels(state: Arc<AppState>) {
     if !has_telegram_instance {
         // Extract telegram config data (owned) to avoid holding MutexGuard across await
         let tg_data = {
-            let cfg = state.full_config.lock().unwrap();
+            let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
             cfg.channel.telegram.as_ref().and_then(|tg| {
                 if tg.enabled && !tg.bot_token.is_empty() {
                     Some((tg.bot_token.clone(), tg.allowed_chat_ids.clone()))
@@ -1185,7 +1185,7 @@ pub async fn auto_connect_channels(state: Arc<AppState>) {
 
 /// List available providers (from DB) — fully self-describing, no hardcoded metadata.
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     let active = cfg.default_provider.clone();
     drop(cfg);
     
@@ -1468,7 +1468,7 @@ pub async fn fetch_provider_models(
 
 /// List available channels with config status.
 pub async fn list_channels(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
-    let cfg = state.full_config.lock().unwrap();
+    let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     Json(serde_json::json!({
         "channels": [
             {"name": "cli", "type": "interactive", "status": "active", "configured": true},
@@ -1652,7 +1652,7 @@ pub async fn whatsapp_webhook_verify(
         .unwrap_or("");
 
     let expected_token = {
-        let cfg = state.full_config.lock().unwrap();
+        let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         cfg.channel
             .whatsapp
             .as_ref()
@@ -1706,7 +1706,7 @@ pub async fn whatsapp_webhook(
 
                             // Get WhatsApp config for reply
                             let wa_config = {
-                                let cfg = state.full_config.lock().unwrap();
+                                let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
                                 cfg.channel.whatsapp.clone()
                             };
 
@@ -1776,7 +1776,7 @@ pub async fn _webhook_inbound_legacy(
 ) -> Json<serde_json::Value> {
     // Check if webhook channel is enabled
     let (enabled, secret, outbound_url) = {
-        let cfg = state.full_config.lock().unwrap();
+        let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         match cfg.channel.webhook.as_ref() {
             Some(wh) => (wh.enabled, wh.secret.clone(), wh.outbound_url.clone()),
             None => {
@@ -2330,7 +2330,7 @@ pub async fn create_agent(
     let description = body["description"].as_str().unwrap_or("A helpful AI agent");
 
     // Use current config as base, optionally override provider/model
-    let mut agent_config = state.full_config.lock().unwrap().clone();
+    let mut agent_config = state.full_config.lock().unwrap_or_else(|p| p.into_inner()).clone();
     if let Some(provider) = body["provider"].as_str()
         && !provider.is_empty() {
             agent_config.default_provider = provider.to_string();
@@ -2452,7 +2452,7 @@ pub async fn update_agent(
     // Phase 2: Re-create agent ONLY if provider/model actually changed
     if needs_recreate {
 
-        let mut agent_config = state.full_config.lock().unwrap().clone();
+        let mut agent_config = state.full_config.lock().unwrap_or_else(|p| p.into_inner()).clone();
         {
             let mut orch = state.orchestrator.lock().await;
             if let Some(agent) = orch.get_agent_mut(&name) {
@@ -3007,7 +3007,7 @@ Output ONLY valid JSON, no markdown fences."#
 pub async fn system_health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     // Extract all needed values from config — drop guard before any .await
     let (provider, api_key_empty, model_empty, model_info, config_path_display) = {
-        let cfg = state.full_config.lock().unwrap();
+        let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         (
             cfg.default_provider.clone(),
             cfg.api_key.is_empty(),
@@ -3874,7 +3874,7 @@ pub async fn orch_list_traces(
 pub async fn mcp_list_servers(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    let config = state.full_config.lock().unwrap();
+    let config = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     let servers: Vec<serde_json::Value> = config.mcp_servers.iter().map(|s| {
         serde_json::json!({
             "name": s.name,

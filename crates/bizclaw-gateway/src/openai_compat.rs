@@ -97,7 +97,7 @@ fn extract_api_key(headers: &axum::http::HeaderMap) -> Option<String> {
 
 /// Validate API key against pairing code. Returns true if valid.
 fn validate_key(state: &AppState, key: &str) -> bool {
-    let stored = state.pairing_code.lock().unwrap().clone();
+    let stored = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
     // Constant-time comparison
     if key.len() != stored.len() {
         return false;
@@ -178,7 +178,7 @@ pub async fn chat_completions(
             tool_calls: 0,
             error: None,
         };
-        let mut traces = state.traces.lock().unwrap();
+        let mut traces = state.traces.lock().unwrap_or_else(|p| p.into_inner());
         // Cap at 10,000 traces to prevent unbounded memory growth
         if traces.len() >= 10_000 {
             traces.drain(..1_000); // Remove oldest 1,000 when full
@@ -314,7 +314,7 @@ fn estimate_cost(model: &str, prompt_tokens: u32, completion_tokens: u32) -> f64
 pub async fn list_traces(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
-    let traces = state.traces.lock().unwrap();
+    let traces = state.traces.lock().unwrap_or_else(|p| p.into_inner());
     let recent: Vec<_> = traces.iter().rev().take(100).cloned().collect();
 
     // Aggregate stats
@@ -344,7 +344,7 @@ pub async fn list_traces(
 pub async fn cost_breakdown(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
-    let traces = state.traces.lock().unwrap();
+    let traces = state.traces.lock().unwrap_or_else(|p| p.into_inner());
 
     let mut by_model: std::collections::HashMap<String, (f64, u64, usize)> = std::collections::HashMap::new();
     for t in traces.iter() {
@@ -377,7 +377,7 @@ pub async fn cost_breakdown(
 pub async fn list_activity(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
-    let events = state.activity_log.lock().unwrap();
+    let events = state.activity_log.lock().unwrap_or_else(|p| p.into_inner());
     let recent: Vec<_> = events.iter().rev().take(50).cloned().collect();
     Json(json!({
         "ok": true,

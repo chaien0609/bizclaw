@@ -701,6 +701,7 @@ dependencies = [
  "base64",
  "bizclaw-core",
  "dirs",
+ "hmac",
  "hostname",
  "rand 0.8.5",
  "serde",

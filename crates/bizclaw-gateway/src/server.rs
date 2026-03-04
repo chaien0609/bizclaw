@@ -108,7 +108,7 @@ async fn require_pairing(
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     // If no pairing code configured, allow all
-    let expected = state.pairing_code.lock().unwrap().clone();
+    let expected = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
     if expected.is_empty() {
         return next.run(req).await;
     }
@@ -219,7 +219,7 @@ async fn verify_pairing(
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let code = body["code"].as_str().unwrap_or("");
-    let expected = state.pairing_code.lock().unwrap().clone();
+    let expected = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
     if expected.is_empty() || constant_time_eq(code, &expected) {
         Json(serde_json::json!({"ok": true}))
     } else {
