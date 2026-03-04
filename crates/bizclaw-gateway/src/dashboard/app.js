@@ -2605,15 +2605,16 @@ export function App() {
   }, []);
 
   // Navigate: client-side state routing — NO full page reloads.
-  // Updates URL via pushState and sets state to trigger Preact re-render.
-  // This ensures useEffect hooks in page components fire correctly.
-  const navigate = useCallback((pageId) => {
+  // IMPORTANT: NOT using useCallback to avoid stale closure issues.
+  // setCurrentPage is always stable (React/Preact guarantees this),
+  // so this function reference will change on each render but that's fine.
+  function navigate(pageId) {
     const path = '/' + (pageId === 'dashboard' ? '' : pageId);
     if (location.pathname !== path) {
       history.pushState({}, '', path);
-      setCurrentPage(pageId);
     }
-  }, []);
+    setCurrentPage(pageId);
+  }
 
   // Global navigate — must be set AFTER navigate is created
   window._navigate = navigate;
