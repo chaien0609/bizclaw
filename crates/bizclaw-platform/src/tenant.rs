@@ -113,6 +113,7 @@ system_prompt = """{system_prompt}"""
 [gateway]
 host = "0.0.0.0"
 port = {}
+require_pairing = false
 "#,
             tenant.port
         );
