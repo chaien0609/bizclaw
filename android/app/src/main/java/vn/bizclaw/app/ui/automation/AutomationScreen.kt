@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
+import vn.bizclaw.app.engine.ProviderManager
 import vn.bizclaw.app.service.BizClawAccessibilityService
 import vn.bizclaw.app.service.BizClawNotificationListener
 
@@ -45,6 +46,9 @@ val SOCIAL_APPS = listOf(
     SocialApp("📸", "Instagram", "com.instagram.android", Color(0xFFE4405F)),
     SocialApp("📧", "Gmail", "com.google.android.gm", Color(0xFFEA4335)),
     SocialApp("📧", "Outlook", "com.microsoft.office.outlook", Color(0xFF0078D4)),
+    SocialApp("💬", "Lark", "com.larksuite.suite", Color(0xFF3370FF)),
+    SocialApp("💬", "Lark CN", "com.ss.android.lark", Color(0xFF3370FF)),
+    SocialApp("✈️", "Telegram", "org.telegram.messenger", Color(0xFF26A5E4)),
 )
 
 // ═══════════════════════════════════════════════════════════════
@@ -58,8 +62,13 @@ fun AutomationScreen(
 ) {
     val context = LocalContext.current
     val manager = remember { LocalAgentManager(context) }
+    val providerManager = remember { ProviderManager(context) }
     var agents by remember { mutableStateOf(manager.loadAgents()) }
     var showCreateFlow by remember { mutableStateOf(false) }
+
+    // Agent picker for flow activation
+    var pendingTemplate by remember { mutableStateOf<FlowTemplate?>(null) }
+    var showAgentPicker by remember { mutableStateOf(false) }
 
     // Service status
     val notifListenerConnected = BizClawNotificationListener.instance != null
@@ -192,22 +201,9 @@ fun AutomationScreen(
                 FlowTemplateCard(
                     template = template,
                     onUse = {
-                        val agent = LocalAgent(
-                            id = "flow_${System.currentTimeMillis()}",
-                            emoji = template.emoji,
-                            name = template.name,
-                            role = template.description,
-                            systemPrompt = template.systemPrompt,
-                            triggerApps = template.targetApps,
-                            autoReply = true,
-                        )
-                        manager.addAgent(agent)
-                        agents = manager.loadAgents()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(
-                                "✅ Flow \"${template.name}\" đã kích hoạt!"
-                            )
-                        }
+                        // Show agent picker first
+                        pendingTemplate = template
+                        showAgentPicker = true
                     },
                 )
             }
@@ -239,6 +235,176 @@ fun AutomationScreen(
                 }
             }
         }
+    }
+
+    // ─── Agent Picker Dialog ───────────────────────────────
+    if (showAgentPicker && pendingTemplate != null) {
+        val template = pendingTemplate!!
+        val existingAgents = agents.filter { !it.autoReply || it.triggerApps != template.targetApps }
+        val providers = remember { providerManager.loadProviders() }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAgentPicker = false
+                pendingTemplate = null
+            },
+            title = {
+                Text("🤖 Chọn Agent cho Flow")
+            },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.heightIn(max = 400.dp),
+                ) {
+                    // Option 1: Use flow's built-in prompt (no agent)
+                    item {
+                        Card(
+                            onClick = {
+                                val agent = LocalAgent(
+                                    id = "flow_${System.currentTimeMillis()}",
+                                    emoji = template.emoji,
+                                    name = template.name,
+                                    role = template.description,
+                                    systemPrompt = template.systemPrompt,
+                                    triggerApps = template.targetApps,
+                                    autoReply = true,
+                                    providerId = providers.firstOrNull { it.enabled }?.id ?: "local_gguf",
+                                )
+                                manager.addAgent(agent)
+                                agents = manager.loadAgents()
+                                showAgentPicker = false
+                                pendingTemplate = null
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "✅ Flow \"${template.name}\" đã kích hoạt!"
+                                    )
+                                }
+                            },
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                            ),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(template.emoji, fontSize = 24.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Dùng prompt mặc định",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        template.systemPrompt.take(60) + "...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Divider
+                    if (existingAgents.isNotEmpty()) {
+                        item {
+                            Row(
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                HorizontalDivider(modifier = Modifier.weight(1f))
+                                Text(
+                                    " hoặc chọn agent ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                HorizontalDivider(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    // Option 2: Use an existing agent
+                    items(existingAgents) { existingAgent ->
+                        val agentProvider = providers.find { it.id == existingAgent.providerId }
+
+                        Card(
+                            onClick = {
+                                // Create flow agent with existing agent's prompt + provider
+                                val flowAgent = LocalAgent(
+                                    id = "flow_${System.currentTimeMillis()}",
+                                    emoji = existingAgent.emoji,
+                                    name = "${template.name} (${existingAgent.name})",
+                                    role = template.description,
+                                    systemPrompt = existingAgent.systemPrompt,
+                                    knowledgeBaseIds = existingAgent.knowledgeBaseIds,
+                                    triggerApps = template.targetApps,
+                                    autoReply = true,
+                                    providerId = existingAgent.providerId,
+                                    groupId = existingAgent.groupId,
+                                )
+                                manager.addAgent(flowAgent)
+                                agents = manager.loadAgents()
+                                showAgentPicker = false
+                                pendingTemplate = null
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "✅ Flow \"${template.name}\" dùng agent ${existingAgent.name}!"
+                                    )
+                                }
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(existingAgent.emoji, fontSize = 24.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        existingAgent.name,
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        existingAgent.role.ifBlank { existingAgent.systemPrompt.take(50) + "..." },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    // Show provider badge
+                                    if (agentProvider != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFF3370FF).copy(alpha = 0.15f),
+                                            modifier = Modifier.padding(top = 2.dp),
+                                        ) {
+                                            Text(
+                                                "⚡ ${agentProvider.name}",
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF3370FF),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = {
+                    showAgentPicker = false
+                    pendingTemplate = null
+                }) {
+                    Text("Huỷ")
+                }
+            },
+        )
     }
 }
 
@@ -419,6 +585,38 @@ val FLOW_TEMPLATES = listOf(
             "- Bao nhiêu cần trả lời, " +
             "- Tóm tắt email quan trọng nhất, " +
             "- Đề xuất hành động tiếp theo.",
+    ),
+    // ─── Lark Flows ──────────────────────────────
+    FlowTemplate(
+        emoji = "💬",
+        name = "Trả lời Lark Chat",
+        description = "Tự động trả lời tin nhắn Lark/Feishu bằng AI",
+        targetApps = listOf("com.larksuite.suite", "com.ss.android.lark"),
+        systemPrompt = "Bạn là trợ lý chuyên nghiệp trên Lark. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Trả lời tin nhắn công việc nhanh, rõ ràng. " +
+            "Nếu cần xác nhận, hỏi lại ngắn gọn.",
+    ),
+    FlowTemplate(
+        emoji = "📧",
+        name = "Quản lý Lark Mail",
+        description = "Tự động đọc và trả lời Lark Mail",
+        targetApps = listOf("com.larksuite.suite", "com.ss.android.lark"),
+        systemPrompt = "Bạn quản lý Lark Mail chuyên nghiệp. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Phân loại email: Khẩn/Quan trọng/Bình thường. " +
+            "Soạn reply ngắn gọn, đúng form công việc.",
+    ),
+    // ─── Telegram Flows ──────────────────────────────
+    FlowTemplate(
+        emoji = "✈️",
+        name = "Trả lời Telegram",
+        description = "Tự động trả lời tin nhắn Telegram",
+        targetApps = listOf("org.telegram.messenger"),
+        systemPrompt = "Bạn là trợ lý trên Telegram. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Trả lời tin nhắn thân thiện, nhanh gọn. " +
+            "Nếu không biết, nói: 'Mình sẽ kiểm tra và trả lời sau nhé.'",
     ),
 )
 
