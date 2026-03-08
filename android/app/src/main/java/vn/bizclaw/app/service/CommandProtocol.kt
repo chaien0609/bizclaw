@@ -43,6 +43,7 @@ enum class CommandType {
     social_reply,
     automation,
     schedule,
+    mama,
     flow,
 }
 

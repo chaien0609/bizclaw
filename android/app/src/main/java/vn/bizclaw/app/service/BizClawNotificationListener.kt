@@ -93,8 +93,81 @@ class BizClawNotificationListener : NotificationListenerService() {
         // Notify UI
         onNotificationReceived?.invoke(socialNotif)
 
+        // ─── MAMA: Check if this is a boss command ───
+        val mama = MamaAgent(applicationContext)
+        if (mama.isBossCommand(title, pkg)) {
+            Log.i(TAG, "👑 MAMA: Boss command detected from $title")
+            processMamaCommand(sbn, socialNotif, mama)
+            return // Don't auto-reply — Mama handles this
+        }
+
         // Check if any agent should auto-reply
         checkAutoReply(socialNotif)
+    }
+
+    /**
+     * Process a MAMA boss command — delegate to MamaAgent, reply results.
+     */
+    private fun processMamaCommand(
+        sbn: StatusBarNotification,
+        notif: SocialNotification,
+        mama: MamaAgent,
+    ) {
+        scope.launch {
+            try {
+                // Process the command through Mama
+                val report = mama.processCommand(notif.sender, notif.message)
+
+                if (report.isBlank()) {
+                    Log.w(TAG, "👑 MAMA: Empty result — skipping reply")
+                    return@launch
+                }
+
+                Log.i(TAG, "👑 MAMA report: ${report.take(200)}")
+
+                // Update notification record
+                synchronized(recentNotifications) {
+                    val idx = recentNotifications.indexOfFirst {
+                        it.timestamp == notif.timestamp && it.message == notif.message
+                    }
+                    if (idx >= 0) {
+                        recentNotifications[idx] = notif.copy(
+                            replied = true,
+                            replyContent = "👑 $report",
+                        )
+                    }
+                }
+
+                // ─── Reply back to boss via Zalo ───
+                // Method 1: Notification inline reply
+                var replied = false
+                val activeNotifs = getActiveNotifications()
+                val targetNotif = activeNotifs?.find { it.packageName == notif.packageName }
+
+                if (targetNotif != null) {
+                    replied = CommandExecutor.replySocialNotification(
+                        applicationContext, targetNotif, "👑 $report"
+                    )
+                }
+
+                // Method 2: Fallback to AppController
+                if (!replied) {
+                    Log.w(TAG, "👑 Inline reply failed — using AppController")
+                    val controller = AppController(applicationContext)
+                    val result = controller.zaloSendMessage(notif.sender, "👑 $report")
+                    replied = result.success
+                }
+
+                if (replied) {
+                    Log.i(TAG, "👑 MAMA replied to boss ${notif.sender}")
+                } else {
+                    Log.w(TAG, "👑 MAMA could not reply — check services")
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "👑 MAMA command failed: ${e.message?.take(100)}")
+            }
+        }
     }
 
     private fun checkAutoReply(notif: SocialNotification) {

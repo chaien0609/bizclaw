@@ -36,6 +36,7 @@ object CommandExecutor {
                 CommandType.social_reply -> executeSocialReply(context, cmd)
                 CommandType.automation -> executeAutomation(context, cmd)
                 CommandType.schedule -> executeSchedule(context, cmd)
+                CommandType.mama -> executeMama(context, cmd)
                 CommandType.device -> executeDeviceInfo(context, cmd)
                 CommandType.flow -> executeFlow(context, cmd)
             }
@@ -592,6 +593,108 @@ object CommandExecutor {
                 id = cmd.id,
                 status = CommandStatus.unsupported,
                 error = "Unknown schedule action: ${cmd.action}. Available: list, create, run, delete, toggle",
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Mama — boss command configuration
+    // ═══════════════════════════════════════════════════════
+
+    private suspend fun executeMama(context: Context, cmd: DeviceCommand): CommandResult {
+        val mama = MamaAgent(context)
+
+        return when (cmd.action) {
+            "setup" -> {
+                val bossContacts = cmd.params["boss_contacts"]?.split(",")?.map { it.trim() }
+                    ?: return errorResult(cmd, "Missing 'boss_contacts' (comma-separated)")
+                val agentId = cmd.params["agent_id"]
+                    ?: return errorResult(cmd, "Missing 'agent_id' for Mama orchestrator")
+
+                val config = mama.loadConfig().copy(
+                    bossContacts = bossContacts,
+                    mamaAgentId = agentId,
+                    enabled = true,
+                    replyToBoss = cmd.params["reply"] != "false",
+                )
+                mama.saveConfig(config)
+
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "message" to "👑 Mama activated! Boss: ${bossContacts.joinToString()}, Agent: $agentId",
+                        "boss_contacts" to bossContacts.joinToString(),
+                        "agent_id" to agentId,
+                    ),
+                )
+            }
+
+            "status" -> {
+                val config = mama.loadConfig()
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "enabled" to config.enabled.toString(),
+                        "boss_contacts" to config.bossContacts.joinToString(),
+                        "agent_id" to config.mamaAgentId,
+                        "reply_to_boss" to config.replyToBoss.toString(),
+                    ),
+                )
+            }
+
+            "toggle" -> {
+                val config = mama.loadConfig()
+                val updated = config.copy(enabled = !config.enabled)
+                mama.saveConfig(updated)
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "message" to "${if (updated.enabled) "👑 ON" else "🚫 OFF"}: Mama",
+                    ),
+                )
+            }
+
+            "test" -> {
+                val message = cmd.params["message"]
+                    ?: return errorResult(cmd, "Missing 'message' to test")
+                val sender = cmd.params["sender"] ?: "Test Boss"
+
+                val report = mama.processCommand(sender, message)
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf("report" to report),
+                )
+            }
+
+            "logs" -> {
+                val logs = mama.getCommandLogs()
+                val summary = if (logs.isEmpty()) {
+                    "Chưa có lệnh nào"
+                } else {
+                    logs.take(10).joinToString("\n") { log ->
+                        val time = java.text.SimpleDateFormat("HH:mm dd/MM", java.util.Locale.getDefault())
+                            .format(java.util.Date(log.timestamp))
+                        "[$time] ${log.from}: ${log.command.take(50)} → ${if (log.success) "✅" else "❌"}"
+                    }
+                }
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "count" to logs.size.toString(),
+                        "logs" to summary,
+                    ),
+                )
+            }
+
+            else -> CommandResult(
+                id = cmd.id,
+                status = CommandStatus.unsupported,
+                error = "Unknown mama action: ${cmd.action}. Available: setup, status, toggle, test, logs",
             )
         }
     }
