@@ -3911,7 +3911,7 @@ export function App() {
   }, [theme]);
   const wsRef = useRef(null);
 
-  // Check pairing
+  // Check pairing — if server has require_pairing=false, verify-pairing returns ok for empty code
   useEffect(() => {
     (async () => {
       try {
@@ -3920,15 +3920,13 @@ export function App() {
           body: JSON.stringify({ code: pairingCode || '' })
         });
         const r = await res.json();
-        if (r.ok) { setPaired(true); }
+        if (r.ok) {
+          setPaired(true);
+        }
+        // If not ok and we have a stored code that didn't work, clear it
         else if (pairingCode) {
-          // Try stored code
-          const res2 = await fetch('/api/v1/verify-pairing', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: pairingCode })
-          });
-          const r2 = await res2.json();
-          if (r2.ok) setPaired(true);
+          sessionStorage.removeItem('bizclaw_pairing');
+          pairingCode = '';
         }
       } catch (e) { setPaired(true); } // if API fails, assume no pairing required
       setCheckingPairing(false);

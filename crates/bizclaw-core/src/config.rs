@@ -290,7 +290,9 @@ pub struct GatewayConfig {
     pub port: u16,
     #[serde(default = "default_host")]
     pub host: String,
-    #[serde(default = "bool_true")]
+    /// Legacy pairing code auth — disabled by default.
+    /// Platform JWT auth is used instead.
+    #[serde(default)]
     pub require_pairing: bool,
 }
 
@@ -306,10 +308,11 @@ impl Default for GatewayConfig {
         Self {
             port: default_port(),
             host: default_host(),
-            require_pairing: true,
+            require_pairing: false,
         }
     }
 }
+
 
 /// Autonomy / security configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
