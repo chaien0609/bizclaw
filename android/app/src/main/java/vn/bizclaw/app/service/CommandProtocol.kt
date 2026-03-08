@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
  * - app: Launch apps, press back/home
  * - device: Status, battery, screenshot
  * - social_reply: Reply to a social app message
+ * - automation: High-level app workflows (Gmail, Facebook, Instagram)
  * - flow: Multi-step automation
  */
 
@@ -40,6 +41,7 @@ enum class CommandType {
     app,
     device,
     social_reply,
+    automation,
     flow,
 }
 

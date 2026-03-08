@@ -194,6 +194,284 @@ class AppController(private val context: Context) {
         }
     }
 
+    // ─── Gmail / Email ────────────────────────────────────────────
+
+    /**
+     * Read the Gmail inbox — returns subject lines + senders of visible emails.
+     *
+     * Flow:
+     * 1. Open Gmail app
+     * 2. Wait for inbox to load
+     * 3. Read screen content to extract email subjects and senders
+     */
+    suspend fun gmailReadInbox(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.google.android.gm")
+            delay(2500) // Gmail can be slow to load
+
+            val screen = a11y.readScreen()
+                ?: return AutomationResult.error("Cannot read Gmail screen")
+
+            if (!screen.packageName.contains("android.gm")) {
+                return AutomationResult.error("Gmail is not open (current: ${screen.packageName})")
+            }
+
+            // Extract email items from screen elements
+            val emails = screen.elements
+                .filter { it.text.isNotEmpty() && !it.isEditable }
+                .map { it.text }
+                .filter { text ->
+                    // Filter out UI chrome, keep email content
+                    text.length > 3 &&
+                    !text.startsWith("Gmail") &&
+                    !text.startsWith("Search") &&
+                    !text.startsWith("Compose") &&
+                    !text.contains("Navigation")
+                }
+                .take(20)
+
+            if (emails.isEmpty()) {
+                AutomationResult.success("Inbox trống hoặc không đọc được nội dung.")
+            } else {
+                AutomationResult.success(
+                    "📧 Gmail Inbox (${emails.size} items):\n${emails.joinToString("\n") { "• $it" }}"
+                )
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail read failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Compose and send an email via Gmail.
+     *
+     * Flow:
+     * 1. Open Gmail app
+     * 2. Tap Compose button
+     * 3. Fill To, Subject, Body
+     * 4. Tap Send
+     */
+    suspend fun gmailCompose(to: String, subject: String, body: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.google.android.gm")
+            delay(2000)
+
+            // Tap Compose / Soạn thư
+            val tapped = a11y.clickByText("Compose")
+                || a11y.clickByText("Soạn thư")
+                || a11y.clickByText("✏️")
+            if (!tapped) return AutomationResult.error("Cannot find Compose button")
+            delay(1500)
+
+            // Fill To field
+            val toFilled = a11y.typeIntoField("To", to)
+                || a11y.typeIntoField("Tới", to)
+            if (!toFilled) return AutomationResult.error("Cannot fill To field")
+            delay(300)
+
+            // Fill Subject
+            val subFilled = a11y.typeIntoField("Subject", subject)
+                || a11y.typeIntoField("Chủ đề", subject)
+            if (!subFilled) return AutomationResult.error("Cannot fill Subject field")
+            delay(300)
+
+            // Fill Body
+            val bodyFilled = a11y.typeIntoField("Compose email", body)
+                || a11y.typeIntoField("Soạn email", body)
+                || a11y.typeText(body)
+            if (!bodyFilled) return AutomationResult.error("Cannot fill email body")
+            delay(300)
+
+            // Send
+            val sent = a11y.clickByText("Send")
+                || a11y.clickByText("Gửi")
+                || a11y.clickByText("➤")
+            if (!sent) return AutomationResult.error("Cannot find Send button")
+
+            AutomationResult.success("📧 Email sent to $to: $subject")
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail compose failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Search emails in Gmail.
+     * Returns subjects of matching emails visible on screen.
+     */
+    suspend fun gmailSearch(query: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.google.android.gm")
+            delay(2000)
+
+            // Tap search
+            val tapped = a11y.clickByText("Search in mail")
+                || a11y.clickByText("Tìm trong thư")
+                || a11y.clickByText("Search")
+            if (!tapped) return AutomationResult.error("Cannot find Search field")
+            delay(800)
+
+            // Type search query
+            val typed = a11y.typeText(query)
+            if (!typed) return AutomationResult.error("Cannot type search query")
+            delay(300)
+
+            // Submit search
+            a11y.pressEnter()
+            delay(2000) // Wait for results
+
+            // Read results
+            val screen = a11y.readScreen()
+                ?: return AutomationResult.error("Cannot read search results")
+
+            val results = screen.elements
+                .filter { it.text.isNotEmpty() && it.text.length > 5 }
+                .map { it.text }
+                .take(15)
+
+            AutomationResult.success(
+                "🔍 Search '$query' (${results.size} results):\n${results.joinToString("\n") { "• $it" }}"
+            )
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail search failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Archive the currently open email in Gmail.
+     */
+    suspend fun gmailArchive(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            val archived = a11y.clickByText("Archive")
+                || a11y.clickByText("Lưu trữ")
+            if (archived) {
+                AutomationResult.success("📥 Email archived")
+            } else {
+                AutomationResult.error("Cannot find Archive button — is an email open?")
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail archive failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Label/categorize the currently open email.
+     * Taps "Label" menu and selects the specified label.
+     */
+    suspend fun gmailLabel(label: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            // Tap the 3-dot menu or Label button
+            val menuTapped = a11y.clickByText("More options")
+                || a11y.clickByText("Thêm tùy chọn")
+                || a11y.clickByText("⋮")
+            if (!menuTapped) return AutomationResult.error("Cannot open menu")
+            delay(500)
+
+            // Tap Label
+            val labelTapped = a11y.clickByText("Label")
+                || a11y.clickByText("Nhãn")
+                || a11y.clickByText("Move to")
+                || a11y.clickByText("Di chuyển tới")
+            if (!labelTapped) return AutomationResult.error("Cannot find Label option")
+            delay(500)
+
+            // Select the target label
+            val selected = a11y.clickByText(label)
+            if (!selected) return AutomationResult.error("Label not found: $label")
+            delay(300)
+
+            // Confirm
+            a11y.clickByText("OK") || a11y.clickByText("Apply") || a11y.clickByText("Áp dụng")
+
+            AutomationResult.success("🏷️ Email labeled: $label")
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail label failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Mark the current email as read/unread.
+     */
+    suspend fun gmailMarkRead(markAsRead: Boolean = true): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            val text = if (markAsRead) {
+                a11y.clickByText("Mark as read") || a11y.clickByText("Đánh dấu là đã đọc")
+            } else {
+                a11y.clickByText("Mark as unread") || a11y.clickByText("Đánh dấu là chưa đọc")
+            }
+
+            if (text) {
+                AutomationResult.success(if (markAsRead) "✅ Marked as read" else "📧 Marked as unread")
+            } else {
+                AutomationResult.error("Cannot find mark read/unread option")
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Gmail mark failed: ${e.message}")
+        }
+    }
+
+    // ─── Instagram ────────────────────────────────────────────────
+
+    /**
+     * Post a caption to Instagram (assumes image is already selected or camera is open).
+     * For full posting, user needs to select image first.
+     */
+    suspend fun instagramCaption(caption: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            // If Instagram isn't open, open it
+            openApp("com.instagram.android")
+            delay(2000)
+
+            // Tap the create/post button (+ icon)
+            val createTapped = a11y.clickByText("Create")
+                || a11y.clickByText("Tạo")
+                || a11y.clickByText("+")
+            if (!createTapped) return AutomationResult.error("Cannot find Create button")
+            delay(1500)
+
+            // Select Post option
+            a11y.clickByText("Post") || a11y.clickByText("Bài viết")
+            delay(1000)
+
+            // Select first image (tap "Next" to proceed)
+            a11y.clickByText("Next") || a11y.clickByText("Tiếp")
+            delay(1000)
+
+            // Skip filters
+            a11y.clickByText("Next") || a11y.clickByText("Tiếp")
+            delay(1000)
+
+            // Type caption
+            val typed = a11y.typeIntoField("Write a caption", caption)
+                || a11y.typeIntoField("Viết chú thích", caption)
+                || a11y.typeText(caption)
+            if (!typed) return AutomationResult.error("Cannot type caption")
+            delay(300)
+
+            // Share
+            val shared = a11y.clickByText("Share")
+                || a11y.clickByText("Chia sẻ")
+            if (!shared) return AutomationResult.error("Cannot find Share button")
+
+            AutomationResult.success("📸 Instagram posted: ${caption.take(50)}...")
+        } catch (e: Exception) {
+            AutomationResult.error("Instagram post failed: ${e.message}")
+        }
+    }
+
     // ─── Generic App Control ──────────────────────────────────────
 
     /**

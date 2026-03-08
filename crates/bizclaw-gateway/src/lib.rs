@@ -6,6 +6,7 @@ pub mod db;
 pub mod openai_compat;
 pub mod routes;
 pub mod server;
+pub mod usage;
 pub mod ws;
 
 use bizclaw_core::config::GatewayConfig;

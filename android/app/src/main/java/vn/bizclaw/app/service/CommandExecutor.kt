@@ -34,6 +34,7 @@ object CommandExecutor {
                 CommandType.chat -> executeChat(context, cmd)
                 CommandType.app -> executeApp(context, cmd)
                 CommandType.social_reply -> executeSocialReply(context, cmd)
+                CommandType.automation -> executeAutomation(context, cmd)
                 CommandType.device -> executeDeviceInfo(context, cmd)
                 CommandType.flow -> executeFlow(context, cmd)
             }
@@ -386,6 +387,86 @@ object CommandExecutor {
                 "steps_completed" to steps.size.toString(),
                 "results" to results.joinToString("\n"),
             ),
+        )
+    }
+    // ═══════════════════════════════════════════════════════
+    // Automation — high-level app workflows via AppController
+    // ═══════════════════════════════════════════════════════
+
+    private suspend fun executeAutomation(context: Context, cmd: DeviceCommand): CommandResult {
+        val controller = AppController(context)
+
+        val automationResult = when (cmd.action) {
+            // Gmail
+            "gmail_read" -> controller.gmailReadInbox()
+            "gmail_compose" -> {
+                val to = cmd.params["to"] ?: return errorResult(cmd, "Missing 'to'")
+                val subject = cmd.params["subject"] ?: return errorResult(cmd, "Missing 'subject'")
+                val body = cmd.params["body"] ?: ""
+                controller.gmailCompose(to, subject, body)
+            }
+            "gmail_search" -> {
+                val query = cmd.params["query"] ?: return errorResult(cmd, "Missing 'query'")
+                controller.gmailSearch(query)
+            }
+            "gmail_archive" -> controller.gmailArchive()
+            "gmail_label" -> {
+                val label = cmd.params["label"] ?: return errorResult(cmd, "Missing 'label'")
+                controller.gmailLabel(label)
+            }
+            "gmail_mark_read" -> controller.gmailMarkRead(true)
+            "gmail_mark_unread" -> controller.gmailMarkRead(false)
+
+            // Facebook
+            "facebook_post" -> {
+                val content = cmd.params["content"] ?: return errorResult(cmd, "Missing 'content'")
+                controller.facebookPost(content)
+            }
+            "facebook_comment" -> {
+                val comment = cmd.params["comment"] ?: return errorResult(cmd, "Missing 'comment'")
+                controller.facebookComment(comment)
+            }
+
+            // Messenger
+            "messenger_reply" -> {
+                val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
+                val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
+                controller.messengerReply(contact, message)
+            }
+            "messenger_read" -> controller.messengerReadMessages()
+
+            // Zalo
+            "zalo_send" -> {
+                val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
+                val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
+                controller.zaloSendMessage(contact, message)
+            }
+
+            // Instagram
+            "instagram_post" -> {
+                val caption = cmd.params["caption"] ?: return errorResult(cmd, "Missing 'caption'")
+                controller.instagramCaption(caption)
+            }
+
+            // Screen reading
+            "read_screen" -> controller.readCurrentScreen()
+            "click" -> {
+                val text = cmd.params["text"] ?: return errorResult(cmd, "Missing 'text'")
+                controller.clickElement(text)
+            }
+
+            else -> return CommandResult(
+                id = cmd.id,
+                status = CommandStatus.unsupported,
+                error = "Unknown automation: ${cmd.action}. Available: gmail_read, gmail_compose, gmail_search, gmail_archive, gmail_label, facebook_post, facebook_comment, messenger_reply, zalo_send, instagram_post",
+            )
+        }
+
+        return CommandResult(
+            id = cmd.id,
+            status = if (automationResult.success) CommandStatus.success else CommandStatus.failed,
+            result = mapOf("message" to automationResult.message),
+            error = if (!automationResult.success) automationResult.message else null,
         )
     }
 
