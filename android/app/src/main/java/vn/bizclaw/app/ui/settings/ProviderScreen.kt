@@ -77,15 +77,30 @@ fun ProviderScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-            ) {
-                Icon(Icons.Default.Add, "Thêm")
-            }
-        },
+        // No FAB — use + in TopAppBar
     ) { padding ->
+        // Ensure app providers exist in storage with fixed IDs
+        val appProviderDefs = listOf(
+            Triple("app_gemini", "📱 Gemini App", ProviderType.APP_GEMINI),
+            Triple("app_chatgpt", "📱 ChatGPT App", ProviderType.APP_CHATGPT),
+            Triple("app_grok", "📱 Grok App", ProviderType.APP_GROK),
+            Triple("app_deepseek", "📱 DeepSeek App", ProviderType.APP_DEEPSEEK),
+            Triple("app_notebooklm", "📓 NotebookLM (RAG)", ProviderType.APP_NOTEBOOKLM),
+        )
+        LaunchedEffect(Unit) {
+            var changed = false
+            appProviderDefs.forEach { (id, name, type) ->
+                if (providers.none { it.id == id }) {
+                    manager.addProvider(AIProvider(id = id, name = name, type = type, emoji = name.substringBefore(" "), enabled = false))
+                    changed = true
+                }
+            }
+            if (changed) providers = manager.loadProviders()
+        }
+
+        val apiProviders = providers.filter { !it.type.name.startsWith("APP_") }
+        val appProviders = providers.filter { it.type.name.startsWith("APP_") }
+
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -105,8 +120,7 @@ fun ProviderScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            "Thêm API key của OpenAI, Gemini, hoặc kết nối Ollama trên máy tính. " +
-                                "Sau đó vào Trợ Lý AI → chọn nguồn cho từng agent.",
+                            "App AI miễn phí → bật/tắt bên dưới. API → thêm key.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -114,7 +128,70 @@ fun ProviderScreen(
                 }
             }
 
-            items(providers) { provider ->
+            // ═══ App AI (Free) — Fixed toggle section ═══
+            item {
+                Text(
+                    "📱 App AI — Miễn phí (bật/tắt)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE65100),
+                )
+                Text(
+                    "Dùng app AI trên máy — chậm (~15s) nhưng FREE!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            items(appProviders) { provider ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (provider.enabled)
+                            Color(0xFFE65100).copy(alpha = 0.12f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                provider.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                if (provider.enabled) "🟢 Đang bật" else "⚪ Tắt",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (provider.enabled) Color(0xFF00E676) else Color.Gray,
+                            )
+                        }
+                        Switch(
+                            checked = provider.enabled,
+                            onCheckedChange = { enabled ->
+                                manager.updateProvider(provider.copy(enabled = enabled))
+                                providers = manager.loadProviders()
+                            },
+                        )
+                    }
+                }
+            }
+
+            // ═══ API Providers — configurable ═══
+            item {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "🌐 API Providers",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            items(apiProviders) { provider ->
                 ProviderCard(
                     provider = provider,
                     onEdit = { editingProvider = provider },
@@ -135,7 +212,7 @@ fun ProviderScreen(
                 )
             }
 
-            // Quick add shortcuts
+            // Quick add shortcuts (API only)
             item {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -194,7 +271,7 @@ fun ProviderScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(80.dp)) } // FAB clearance
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -236,25 +313,21 @@ private fun ProviderCard(
     onTest: () -> Unit,
     isTesting: Boolean = false,
 ) {
-    val typeLabel = when (provider.type) {
-        ProviderType.LOCAL_GGUF -> "Cục bộ (GGUF)"
-        ProviderType.OPENAI -> "OpenAI API"
-        ProviderType.GEMINI -> "Google Gemini"
-        ProviderType.OLLAMA -> "Ollama"
-        ProviderType.BIZCLAW_CLOUD -> "BizClaw Cloud"
-        ProviderType.CUSTOM_API -> "API Tương Thích"
-        ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
-        ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
-        ProviderType.APP_GROK -> "📱 Grok App (Free)"
-        ProviderType.APP_DEEPSEEK -> "📱 DeepSeek App (Free)"
-        ProviderType.APP_NOTEBOOKLM -> "📓 NotebookLM (RAG Free)"
+    val typeLabel = when {
+        provider.type == ProviderType.LOCAL_GGUF -> "Cục bộ (GGUF)"
+        provider.type == ProviderType.OPENAI -> "OpenAI API"
+        provider.type == ProviderType.GEMINI -> "Google Gemini"
+        provider.type == ProviderType.OLLAMA -> "Ollama"
+        provider.type == ProviderType.BIZCLAW_CLOUD -> "BizClaw Cloud"
+        provider.type == ProviderType.CUSTOM_API -> "API Tương Thích"
+        provider.type.name.startsWith("APP_") -> "📱 App (Free)"
+        else -> provider.type.name
     }
 
     val statusColor = when {
         !provider.enabled -> MaterialTheme.colorScheme.surfaceVariant
         provider.type == ProviderType.LOCAL_GGUF -> Color(0xFF1B5E20).copy(alpha = 0.15f)
-        provider.type in listOf(ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK, ProviderType.APP_DEEPSEEK, ProviderType.APP_NOTEBOOKLM) ->
-            Color(0xFFE65100).copy(alpha = 0.12f) // Orange for app-based
+        provider.type.name.startsWith("APP_") -> Color(0xFFE65100).copy(alpha = 0.12f)
         provider.apiKey.isNotBlank() || provider.type == ProviderType.OLLAMA -> Color(0xFF0D47A1).copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
     }
@@ -441,11 +514,7 @@ private fun ProviderFormDialog(
                             ProviderType.CUSTOM_API -> "🔗 API Tương Thích"
                             ProviderType.BIZCLAW_CLOUD -> "☁️ BizClaw Cloud"
                             ProviderType.LOCAL_GGUF -> "🧠 Cục Bộ (GGUF)"
-                            ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
-                            ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
-                            ProviderType.APP_GROK -> "📱 Grok App (Free)"
-                            ProviderType.APP_DEEPSEEK -> "📱 DeepSeek App (Free)"
-                            ProviderType.APP_NOTEBOOKLM -> "📓 NotebookLM (RAG Free)"
+                            else -> "📱 App (quản lý ở mục bật/tắt)"
                         },
                         onValueChange = {},
                         readOnly = true,
@@ -464,11 +533,6 @@ private fun ProviderFormDialog(
                             ProviderType.GEMINI to "✨ Google Gemini",
                             ProviderType.OLLAMA to "🦙 Ollama (Máy tính)",
                             ProviderType.CUSTOM_API to "🔗 API Tương Thích",
-                            ProviderType.APP_GEMINI to "📱 Gemini App (Miễn phí)",
-                            ProviderType.APP_CHATGPT to "📱 ChatGPT App (Miễn phí)",
-                            ProviderType.APP_GROK to "📱 Grok App (Miễn phí)",
-                            ProviderType.APP_DEEPSEEK to "📱 DeepSeek App (Miễn phí)",
-                            ProviderType.APP_NOTEBOOKLM to "📓 NotebookLM (RAG Miễn phí)",
                         ).forEach { (t, label) ->
                             DropdownMenuItem(
                                 text = { Text(label) },
@@ -491,8 +555,8 @@ private fun ProviderFormDialog(
                     singleLine = true,
                 )
 
-                // API Key (not for Ollama or App providers)
-                if (type !in listOf(ProviderType.OLLAMA, ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK, ProviderType.APP_DEEPSEEK, ProviderType.APP_NOTEBOOKLM)) {
+                // API Key (not for Ollama)
+                if (type != ProviderType.OLLAMA && !type.name.startsWith("APP_")) {
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
