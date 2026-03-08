@@ -38,7 +38,29 @@ class LocalAgentManager(private val context: Context) {
     fun loadAgents(): List<LocalAgent> {
         if (!agentsFile.exists()) return defaultAgents()
         return try {
-            json.decodeFromString<List<LocalAgent>>(agentsFile.readText())
+            val savedAgents = json.decodeFromString<List<LocalAgent>>(agentsFile.readText())
+            val defaultAgentsList = defaultAgents()
+            var savedAgentsList = savedAgents.toMutableList()
+            var modified = false
+            
+            // Force update old CSKH agent to new V2 version with autoReply
+            for (i in savedAgentsList.indices) {
+                if (savedAgentsList[i].id == "customer_support" && savedAgentsList[i].name == "CSKH") {
+                    savedAgentsList[i] = defaultAgentsList.first { it.id == "customer_support" }
+                    modified = true
+                }
+            }
+
+            // Inject any missing default agents that the user doesn't have yet
+            val missingDefaults = defaultAgentsList.filter { def -> savedAgentsList.none { it.id == def.id } }
+            if (missingDefaults.isNotEmpty()) {
+                val mergedAgents = savedAgentsList + missingDefaults
+                saveAgents(mergedAgents)
+                mergedAgents
+            } else {
+                if (modified) saveAgents(savedAgentsList)
+                savedAgentsList
+            }
         } catch (e: Exception) {
             defaultAgents()
         }
@@ -157,7 +179,9 @@ class LocalAgentManager(private val context: Context) {
                 triggerApps = listOf("com.zing.zalo", "com.facebook.orca", "org.telegram.messenger")
             ),
         )
-        saveAgents(defaults)
+        // Note: Do not call saveAgents(defaults) here to avoid unnecessary disk writes 
+        // every time defaultAgents() is evaluated for comparison in loadAgents().
+        // They are already saved conditionally in loadAgents() if missing.
         return defaults
     }
 }
