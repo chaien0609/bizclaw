@@ -267,7 +267,7 @@ fun AutomationScreen(
     // ─── Agent Picker Dialog ───────────────────────────────
     if (showAgentPicker && pendingTemplate != null) {
         val template = pendingTemplate!!
-        val existingAgents = agents.filter { !it.autoReply || it.triggerApps != template.targetApps }
+        val existingAgents = agents.filter { !it.id.startsWith("flow_") }
         val providers = remember { providerManager.loadProviders() }
 
         AlertDialog(
@@ -531,7 +531,7 @@ private fun MamaSetupCard(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                 ) {
-                    agents.forEach { agent ->
+                    agents.filter { !it.id.startsWith("flow_") }.forEach { agent ->
                         DropdownMenuItem(
                             text = {
                                 Text("${agent.emoji} ${agent.name} — ${agent.role.take(30)}")
