@@ -22,11 +22,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import androidx.compose.ui.platform.LocalContext
 import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
 import vn.bizclaw.app.engine.ProviderManager
+import vn.bizclaw.app.engine.ProviderChat
 import vn.bizclaw.app.engine.AgentGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +62,8 @@ fun ChatScreen(
     var selectedAgentId by remember { mutableStateOf<String?>(null) }
     var groups by remember { mutableStateOf(providerManager.loadGroups()) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var selectedGroupId by remember { mutableStateOf<String?>(null) }
+    var isGroupChatting by remember { mutableStateOf(false) }
 
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
@@ -267,18 +272,34 @@ fun ChatScreen(
 
                     // Existing groups
                     items(groups) { group ->
+                        val isGroupSelected = selectedGroupId == group.id
                         FilterChip(
-                            selected = false,
-                            onClick = { /* TODO: activate group chat */ },
+                            selected = isGroupSelected,
+                            onClick = {
+                                if (isGroupSelected) {
+                                    selectedGroupId = null
+                                    selectedAgentId = null
+                                    viewModel.currentAgent.value = "BizClaw"
+                                } else {
+                                    selectedGroupId = group.id
+                                    selectedAgentId = null
+                                    val memberNames = group.agentIds.mapNotNull { id ->
+                                        localAgents.find { it.id == id }?.name
+                                    }.joinToString(", ")
+                                    viewModel.currentAgent.value = "${group.emoji} ${group.name}"
+                                }
+                            },
                             label = {
+                                val memberCount = group.agentIds.size
                                 Text(
-                                    "${group.emoji} ${group.name}",
+                                    "${group.emoji} ${group.name} ($memberCount)",
                                     maxLines = 1,
                                     style = MaterialTheme.typography.labelMedium,
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
                             ),
                         )
                     }
@@ -337,10 +358,62 @@ fun ChatScreen(
                     Spacer(Modifier.width(8.dp))
                     FilledIconButton(
                         onClick = {
-                            viewModel.sendMessage(inputText)
+                            val msg = inputText.trim()
+                            if (msg.isBlank()) return@FilledIconButton
                             inputText = ""
+
+                            val activeGroup = selectedGroupId?.let { gid ->
+                                groups.find { it.id == gid }
+                            }
+
+                            if (activeGroup != null) {
+                                // ─── GROUP CHAT: tất cả agent trả lời ───
+                                val providers = providerManager.loadProviders()
+                                val groupAgents = activeGroup.agentIds.mapNotNull { aid ->
+                                    localAgents.find { it.id == aid }
+                                }
+
+                                // Add user message
+                                viewModel.addUserMessage(msg)
+                                isGroupChatting = true
+
+                                scope.launch {
+                                    // Fire all agent calls in parallel
+                                    val results = groupAgents.map { agent ->
+                                        async {
+                                            val provider = providers.find { it.id == agent.providerId }
+                                                ?: providers.find { it.id == "local_gguf" }
+                                                ?: return@async Pair(agent, "⚠️ Không tìm thấy nguồn AI")
+
+                                            val prompt = agentManager.buildPromptForAgent(agent, msg)
+                                            val response = try {
+                                                ProviderChat.chat(provider, prompt, msg)
+                                            } catch (e: Exception) {
+                                                "❌ Lỗi: ${e.message?.take(60)}"
+                                            }
+                                            Pair(agent, response)
+                                        }
+                                    }.awaitAll()
+
+                                    // Add each agent's response
+                                    results.forEach { (agent, response) ->
+                                        val providerName = providers
+                                            .find { it.id == agent.providerId }?.name ?: "Local"
+                                        viewModel.addGroupResponse(
+                                            agentEmoji = agent.emoji,
+                                            agentName = agent.name,
+                                            providerName = providerName,
+                                            content = response,
+                                        )
+                                    }
+                                    isGroupChatting = false
+                                }
+                            } else {
+                                // ─── SINGLE AGENT CHAT ───
+                                viewModel.sendMessage(msg)
+                            }
                         },
-                        enabled = inputText.isNotBlank() && !isLoading,
+                        enabled = inputText.isNotBlank() && !isLoading && !isGroupChatting,
                         modifier = Modifier.size(48.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = if (isLocalMode) Color(0xFF00E676)

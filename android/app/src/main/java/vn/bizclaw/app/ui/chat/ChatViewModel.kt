@@ -175,6 +175,35 @@ class ChatViewModel : ViewModel() {
     }
 
     // ═══════════════════════════════════════════════════════════
+    // GROUP CHAT HELPERS
+    // ═══════════════════════════════════════════════════════════
+
+    /** Add user message without triggering AI response */
+    fun addUserMessage(text: String) {
+        messages.add(UiMessage(role = "user", content = text))
+    }
+
+    /** Add a group agent's response */
+    fun addGroupResponse(
+        agentEmoji: String,
+        agentName: String,
+        providerName: String,
+        content: String,
+    ) {
+        messages.add(
+            UiMessage(
+                role = "assistant",
+                content = content,
+                agentName = "$agentEmoji $agentName",
+                toolActions = "⚡ $providerName",
+                isLocal = providerName.contains("Cục bộ", ignoreCase = true)
+                    || providerName.contains("Local", ignoreCase = true)
+                    || providerName.contains("GGUF", ignoreCase = true),
+            )
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // UNIFIED SEND MESSAGE
     // ═══════════════════════════════════════════════════════════
 
