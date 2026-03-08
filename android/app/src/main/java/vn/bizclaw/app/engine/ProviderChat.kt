@@ -279,7 +279,7 @@ object ProviderChat {
     private const val TEMPERATURE = 0.7
 
     /** Validate URL scheme — prevent SSRF */
-    private fun validateUrl(url: String) {
+    internal fun validateUrl(url: String) {
         require(url.startsWith("http://") || url.startsWith("https://")) {
             "URL must start with http:// or https://"
         }
