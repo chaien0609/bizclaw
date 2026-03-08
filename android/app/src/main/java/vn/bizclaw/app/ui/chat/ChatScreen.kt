@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import vn.bizclaw.app.engine.GlobalLLM
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +59,11 @@ fun ChatScreen(
                     Column {
                         Text("BizClaw", fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Determine effective status
+                            val hasLocalModel = isLocalMode && viewModel.localLLM.isLoaded
+                            val hasGlobalModel = GlobalLLM.instance.isLoaded
+                            val effectiveConnected = isConnected || hasLocalModel || hasGlobalModel
+
                             // Status dot
                             Box(
                                 modifier = Modifier
@@ -65,8 +71,9 @@ fun ChatScreen(
                                     .clip(CircleShape)
                                     .background(
                                         when {
-                                            isLocalMode && viewModel.localLLM.isLoaded -> Color(0xFF00E676) // Green
-                                            isLocalMode -> Color(0xFFFF9800)   // Orange (local but no model)
+                                            hasLocalModel -> Color(0xFF00E676)
+                                            isLocalMode -> Color(0xFFFF9800)
+                                            hasGlobalModel -> Color(0xFF00E676)
                                             isConnected -> MaterialTheme.colorScheme.secondary
                                             else -> MaterialTheme.colorScheme.error
                                         }
@@ -75,11 +82,13 @@ fun ChatScreen(
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = when {
-                                    isLocalMode && viewModel.localLLM.isLoaded ->
+                                    hasLocalModel ->
                                         "🧠 $currentAgent — ${localModelName ?: "cục bộ"}"
                                     isLocalMode -> "🧠 Cục bộ (chưa tải mô hình)"
+                                    hasGlobalModel ->
+                                        "🧠 AI Cục Bộ sẵn sàng — bấm 🧠 để dùng"
                                     isConnected -> "🤖 $currentAgent"
-                                    else -> "Mất kết nối"
+                                    else -> "Bấm 🧠 để dùng AI cục bộ"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -93,9 +102,8 @@ fun ChatScreen(
                         if (isLocalMode) {
                             viewModel.isLocalMode.value = false
                             viewModel.currentAgent.value = "default"
-                        } else if (viewModel.localLLM.isLoaded) {
-                            viewModel.isLocalMode.value = true
-                            viewModel.currentAgent.value = "local"
+                        } else if (viewModel.localLLM.isLoaded || GlobalLLM.instance.isLoaded) {
+                            onOpenLocalLLM() // Go to LocalLLM chat (model already loaded)
                         } else {
                             onOpenLocalLLM()
                         }
