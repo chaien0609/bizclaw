@@ -2,6 +2,7 @@ package vn.bizclaw.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,7 +47,34 @@ enum class Screen {
 fun BizClawNavHost() {
     val context = LocalContext.current
     val chatViewModel: ChatViewModel = viewModel()
-    var currentScreen by remember { mutableStateOf(Screen.Chat) }
+
+    // ─── Navigation with back stack ───
+    // Keep a history so back gesture pops to previous screen
+    val navStack = remember { mutableStateListOf(Screen.Chat) }
+    val currentScreen = navStack.last()
+
+    fun navigateTo(screen: Screen) {
+        if (screen != currentScreen) {
+            navStack.add(screen)
+        }
+    }
+
+    fun goBack(): Boolean {
+        return if (navStack.size > 1) {
+            navStack.removeAt(navStack.lastIndex)
+            true
+        } else {
+            false // Already at root — let system handle (exit app)
+        }
+    }
+
+    // ─── System back handler ───
+    // When user swipes back or presses back button:
+    // - If on a sub-screen → go to previous screen
+    // - If on Chat (home) → default behavior (exit or minimize)
+    BackHandler(enabled = navStack.size > 1) {
+        goBack()
+    }
 
     // Server config
     var serverUrl by remember { mutableStateOf("http://127.0.0.1:3001") }
@@ -68,10 +96,10 @@ fun BizClawNavHost() {
         Screen.Chat -> {
             ChatScreen(
                 viewModel = chatViewModel,
-                onOpenAgents = { currentScreen = Screen.Agents },
-                onOpenSettings = { currentScreen = Screen.Settings },
-                onOpenAutomation = { currentScreen = Screen.Automation },
-                onOpenLocalLLM = { currentScreen = Screen.LocalLLM },
+                onOpenAgents = { navigateTo(Screen.Agents) },
+                onOpenSettings = { navigateTo(Screen.Settings) },
+                onOpenAutomation = { navigateTo(Screen.Automation) },
+                onOpenLocalLLM = { navigateTo(Screen.LocalLLM) },
             )
         }
 
@@ -82,10 +110,10 @@ fun BizClawNavHost() {
                     if (GlobalLLM.instance.isLoaded) {
                         GlobalLLM.instance.addSystemPrompt(agent.systemPrompt)
                     }
-                    currentScreen = Screen.LocalLLM
+                    navigateTo(Screen.LocalLLM)
                 },
-                onOpenKB = { currentScreen = Screen.KnowledgeBase },
-                onBack = { currentScreen = Screen.Chat },
+                onOpenKB = { navigateTo(Screen.KnowledgeBase) },
+                onBack = { goBack() },
             )
         }
 
@@ -99,14 +127,14 @@ fun BizClawNavHost() {
                     apiKey = key
                     chatViewModel.updateServer(url, key)
                 },
-                onOpenProviders = { currentScreen = Screen.Providers },
-                onBack = { currentScreen = Screen.Chat },
+                onOpenProviders = { navigateTo(Screen.Providers) },
+                onBack = { goBack() },
             )
         }
 
         Screen.Dashboard -> {
             DashboardScreen(
-                onBack = { currentScreen = Screen.Chat },
+                onBack = { goBack() },
             )
         }
 
@@ -115,26 +143,26 @@ fun BizClawNavHost() {
                 onBack = {
                     // Refresh local models when returning
                     chatViewModel.refreshLocalModels(context)
-                    currentScreen = Screen.Chat
+                    goBack()
                 },
             )
         }
 
         Screen.KnowledgeBase -> {
             KnowledgeBaseScreen(
-                onBack = { currentScreen = Screen.Agents },
+                onBack = { goBack() },
             )
         }
 
         Screen.Automation -> {
             AutomationScreen(
-                onBack = { currentScreen = Screen.Chat },
+                onBack = { goBack() },
             )
         }
 
         Screen.Providers -> {
             ProviderScreen(
-                onBack = { currentScreen = Screen.Settings },
+                onBack = { goBack() },
             )
         }
     }
