@@ -107,18 +107,20 @@ suspend fun sendGroupMessage(
 // ═══════════════════════════════════════════════════════════
 
 @Composable
-fun GroupCreationDialog(
+fun GroupEditDialog(
     agents: List<LocalAgent>,
+    editingGroup: AgentGroup? = null,
     onDismiss: () -> Unit,
-    onCreate: (AgentGroup) -> Unit,
+    onSave: (AgentGroup) -> Unit,
+    onDelete: ((AgentGroup) -> Unit)? = null,
 ) {
-    var groupName by remember { mutableStateOf("") }
-    var groupEmoji by remember { mutableStateOf("👥") }
-    var selectedMembers by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var groupName by remember { mutableStateOf(editingGroup?.name ?: "") }
+    var groupEmoji by remember { mutableStateOf(editingGroup?.emoji ?: "👥") }
+    var selectedMembers by remember { mutableStateOf<Set<String>>(editingGroup?.agentIds?.toSet() ?: emptySet()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tạo nhóm Agent", fontWeight = FontWeight.Bold) },
+        title = { Text(if (editingGroup == null) "Tạo nhóm Agent" else "Sửa nhóm Agent", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -153,9 +155,9 @@ fun GroupCreationDialog(
             Button(
                 onClick = {
                     if (groupName.isNotBlank() && selectedMembers.isNotEmpty()) {
-                        onCreate(
+                        onSave(
                             AgentGroup(
-                                id = "group_${System.currentTimeMillis()}",
+                                id = editingGroup?.id ?: "group_${System.currentTimeMillis()}",
                                 name = groupName,
                                 emoji = groupEmoji,
                                 agentIds = selectedMembers.toList(),
@@ -164,10 +166,18 @@ fun GroupCreationDialog(
                     }
                 },
                 enabled = groupName.isNotBlank() && selectedMembers.isNotEmpty(),
-            ) { Text("Tạo nhóm") }
+            ) { Text(if (editingGroup == null) "Tạo nhóm" else "Lưu nhóm") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Huỷ") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (editingGroup != null && onDelete != null) {
+                    TextButton(
+                        onClick = { onDelete(editingGroup) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Xoá Nhóm") }
+                }
+                TextButton(onClick = onDismiss) { Text("Huỷ") }
+            }
         },
     )
 }

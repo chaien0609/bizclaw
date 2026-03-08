@@ -58,6 +58,7 @@ fun ChatScreen(
     var selectedAgentId by remember { mutableStateOf<String?>(null) }
     var groups by remember { mutableStateOf(providerManager.loadGroups()) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var editingGroup by remember { mutableStateOf<vn.bizclaw.app.engine.AgentGroup?>(null) }
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
     var isGroupChatting by remember { mutableStateOf(false) }
 
@@ -119,6 +120,14 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    if (selectedGroupId != null) {
+                        IconButton(onClick = {
+                            editingGroup = groups.find { it.id == selectedGroupId }
+                            showGroupDialog = true
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Sửa nhóm", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     // Toggle local/cloud mode
                     IconButton(onClick = {
                         if (isLocalMode) {
@@ -235,7 +244,10 @@ fun ChatScreen(
                     item {
                         FilterChip(
                             selected = false,
-                            onClick = { showGroupDialog = true },
+                            onClick = {
+                                editingGroup = null
+                                showGroupDialog = true
+                            },
                             label = { Text("👥 Nhóm", maxLines = 1) },
                             leadingIcon = { Text("➕", fontSize = 12.sp) },
                         )
@@ -453,14 +465,40 @@ fun ChatScreen(
     }
 
     if (showGroupDialog) {
-        GroupCreationDialog(
+        GroupEditDialog(
             agents = localAgents,
-            onDismiss = { showGroupDialog = false },
-            onCreate = { group ->
-                providerManager.addGroup(group)
-                groups = providerManager.loadGroups()
+            editingGroup = editingGroup,
+            onDismiss = {
                 showGroupDialog = false
+                editingGroup = null
             },
+            onSave = { group ->
+                if (editingGroup == null) {
+                    providerManager.addGroup(group)
+                } else {
+                    providerManager.updateGroup(group)
+                }
+                groups = providerManager.loadGroups()
+                // Auto switch to newly created group or updated group
+                selectedGroupId = group.id
+                selectedAgentId = null
+                viewModel.switchToConversation("group_${group.id}")
+                viewModel.currentAgent.value = "${group.emoji} ${group.name}"
+                showGroupDialog = false
+                editingGroup = null
+            },
+            onDelete = { group ->
+                providerManager.deleteGroup(group.id)
+                groups = providerManager.loadGroups()
+                if (selectedGroupId == group.id) {
+                    selectedGroupId = null
+                    selectedAgentId = null
+                    viewModel.currentAgent.value = "BizClaw"
+                    viewModel.switchToConversation("default")
+                }
+                showGroupDialog = false
+                editingGroup = null
+            }
         )
     }
 }
