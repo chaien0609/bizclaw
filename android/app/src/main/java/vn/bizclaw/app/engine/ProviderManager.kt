@@ -1,6 +1,10 @@
 package vn.bizclaw.app.engine
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -18,6 +22,9 @@ import java.io.File
  * - Custom API
  *
  * Mỗi agent chọn 1 provider để trả lời.
+ *
+ * SECURITY: API keys mã hoá bằng EncryptedSharedPreferences (Android Keystore).
+ * File JSON KHÔNG chứa API key plaintext.
  */
 
 @Serializable
@@ -45,13 +52,6 @@ enum class ProviderType {
 
 /**
  * Agent Group — nhóm agent cùng làm việc
- *
- * Ví dụ: Nhóm "CSKH" gồm:
- * - Agent phân loại (phân loại câu hỏi)
- * - Agent bán hàng (tư vấn sản phẩm)
- * - Agent kỹ thuật (hỗ trợ kỹ thuật)
- *
- * Khi có tin nhắn → agent phân loại chạy trước → chuyển cho agent phù hợp
  */
 @Serializable
 data class AgentGroup(
@@ -59,8 +59,8 @@ data class AgentGroup(
     val name: String,
     val emoji: String = "👥",
     val description: String = "",
-    val agentIds: List<String> = emptyList(), // Agent IDs in this group
-    val routerAgentId: String? = null, // Agent that routes to others (optional)
+    val agentIds: List<String> = emptyList(),
+    val routerAgentId: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
@@ -70,19 +70,59 @@ class ProviderManager(context: Context) {
     private val providersFile = File(context.filesDir, "ai_providers.json")
     private val groupsFile = File(context.filesDir, "agent_groups.json")
 
+    // Encrypted storage for API keys
+    private val securePrefs: SharedPreferences = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "bizclaw_secure_keys",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    } catch (e: Exception) {
+        Log.e("ProviderManager", "EncryptedSharedPreferences failed, fallback", e)
+        context.getSharedPreferences("bizclaw_keys_fallback", Context.MODE_PRIVATE)
+    }
+
     // ─── Providers ─────────────────────────────────────
 
     fun loadProviders(): List<AIProvider> {
-        if (!providersFile.exists()) return defaultProviders()
-        return try {
-            json.decodeFromString<List<AIProvider>>(providersFile.readText())
-        } catch (e: Exception) {
+        val providers = if (!providersFile.exists()) {
             defaultProviders()
+        } else {
+            try {
+                json.decodeFromString<List<AIProvider>>(providersFile.readText())
+            } catch (e: Exception) {
+                defaultProviders()
+            }
+        }
+        // Merge API keys from secure storage
+        return providers.map { p ->
+            val storedKey = securePrefs.getString("key_${p.id}", null)
+            if (storedKey != null && p.apiKey.isBlank()) {
+                p.copy(apiKey = storedKey)
+            } else {
+                p
+            }
         }
     }
 
     fun saveProviders(providers: List<AIProvider>) {
-        providersFile.writeText(json.encodeToString(providers))
+        // Extract API keys to secure storage, save providers WITHOUT keys
+        val editor = securePrefs.edit()
+        providers.forEach { p ->
+            if (p.apiKey.isNotBlank()) {
+                editor.putString("key_${p.id}", p.apiKey)
+            }
+        }
+        editor.apply()
+
+        // Save to JSON file WITHOUT plaintext API keys
+        val sanitized = providers.map { it.copy(apiKey = "") }
+        providersFile.writeText(json.encodeToString(sanitized))
     }
 
     fun addProvider(provider: AIProvider) {
@@ -103,6 +143,8 @@ class ProviderManager(context: Context) {
     fun deleteProvider(id: String) {
         val list = loadProviders().toMutableList()
         list.removeAll { it.id == id }
+        // Remove encrypted key too
+        securePrefs.edit().remove("key_$id").apply()
         saveProviders(list)
     }
 

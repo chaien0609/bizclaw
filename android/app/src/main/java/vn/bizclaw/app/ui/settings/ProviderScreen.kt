@@ -1,6 +1,5 @@
 package vn.bizclaw.app.ui.settings
 
-import android.util.Base64
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -429,7 +428,7 @@ private fun ProviderFormDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
                         singleLine = true,
                     )
                     ExposedDropdownMenu(

@@ -3,11 +3,8 @@ package vn.bizclaw.app.engine
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -67,14 +64,16 @@ object ProviderChat {
         systemPrompt: String,
         userMessage: String,
     ): String = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
         try {
+            validateUrl(provider.baseUrl)
             val url = URL("${provider.baseUrl.trimEnd('/')}/chat/completions")
-            val conn = url.openConnection() as HttpURLConnection
+            conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.setRequestProperty("Authorization", "Bearer ${provider.apiKey}")
-            conn.connectTimeout = 30000
-            conn.readTimeout = 60000
+            conn.connectTimeout = CONNECT_TIMEOUT
+            conn.readTimeout = READ_TIMEOUT
             conn.doOutput = true
 
             val body = buildJsonObject {
@@ -89,8 +88,8 @@ object ProviderChat {
                         put("content", userMessage)
                     }
                 }
-                put("max_tokens", 1024)
-                put("temperature", 0.7)
+                put("max_tokens", MAX_TOKENS)
+                put("temperature", TEMPERATURE)
             }
 
             conn.outputStream.use { os ->
@@ -100,9 +99,9 @@ object ProviderChat {
             val code = conn.responseCode
             if (code != 200) {
                 val errBody = try {
-                    conn.errorStream?.bufferedReader()?.readText() ?: "No error body"
+                    conn.errorStream?.bufferedReader()?.readText()?.take(200) ?: "No error body"
                 } catch (_: Exception) { "Cannot read error" }
-                Log.e(TAG, "OpenAI error $code: $errBody")
+                Log.e(TAG, "OpenAI error $code: ${errBody.take(200)}")
                 return@withContext when (code) {
                     401 -> "❌ API key không hợp lệ. Kiểm tra lại trong Cài đặt → Nguồn AI."
                     429 -> "⚠️ Đã vượt giới hạn. Thử lại sau."
@@ -112,7 +111,6 @@ object ProviderChat {
             }
 
             val respBody = conn.inputStream.bufferedReader().readText()
-            conn.disconnect()
 
             val respJson = json.parseToJsonElement(respBody).jsonObject
             val content = respJson["choices"]
@@ -122,9 +120,13 @@ object ProviderChat {
                 ?.jsonPrimitive?.content
 
             content?.trim() ?: "⚠️ Không nhận được phản hồi từ ${provider.name}"
+        } catch (e: IllegalArgumentException) {
+            "❌ URL không hợp lệ: ${provider.baseUrl}"
         } catch (e: Exception) {
-            Log.e(TAG, "OpenAI chat error", e)
+            Log.e(TAG, "OpenAI chat error: ${e.message?.take(100)}")
             "❌ Lỗi kết nối ${provider.name}: ${e.message?.take(80)}"
+        } finally {
+            conn?.disconnect()
         }
     }
 
@@ -134,16 +136,18 @@ object ProviderChat {
         systemPrompt: String,
         userMessage: String,
     ): String = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
         try {
+            validateUrl(provider.baseUrl)
             val model = provider.model.ifBlank { "gemini-2.0-flash" }
             val url = URL(
                 "${provider.baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent?key=${provider.apiKey}"
             )
-            val conn = url.openConnection() as HttpURLConnection
+            conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
-            conn.connectTimeout = 30000
-            conn.readTimeout = 60000
+            conn.connectTimeout = CONNECT_TIMEOUT
+            conn.readTimeout = READ_TIMEOUT
             conn.doOutput = true
 
             val body = buildJsonObject {
@@ -161,8 +165,8 @@ object ProviderChat {
                     }
                 }
                 putJsonObject("generationConfig") {
-                    put("maxOutputTokens", 1024)
-                    put("temperature", 0.7)
+                    put("maxOutputTokens", MAX_TOKENS)
+                    put("temperature", TEMPERATURE)
                 }
             }
 
@@ -173,9 +177,10 @@ object ProviderChat {
             val code = conn.responseCode
             if (code != 200) {
                 val errBody = try {
-                    conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    conn.errorStream?.bufferedReader()?.readText()?.take(200) ?: ""
                 } catch (_: Exception) { "" }
-                Log.e(TAG, "Gemini error $code: $errBody")
+                // Strip API key from log
+                Log.e(TAG, "Gemini error $code: ${errBody.take(200)}")
                 return@withContext when (code) {
                     400 -> "❌ API key Gemini không hợp lệ."
                     403 -> "❌ API key bị từ chối. Kiểm tra quyền."
@@ -185,7 +190,6 @@ object ProviderChat {
             }
 
             val respBody = conn.inputStream.bufferedReader().readText()
-            conn.disconnect()
 
             val respJson = json.parseToJsonElement(respBody).jsonObject
             val content = respJson["candidates"]
@@ -197,9 +201,13 @@ object ProviderChat {
                 ?.jsonPrimitive?.content
 
             content?.trim() ?: "⚠️ Không nhận được phản hồi từ Gemini"
+        } catch (e: IllegalArgumentException) {
+            "❌ URL không hợp lệ: ${provider.baseUrl}"
         } catch (e: Exception) {
-            Log.e(TAG, "Gemini chat error", e)
+            Log.e(TAG, "Gemini chat error: ${e.message?.take(100)}")
             "❌ Lỗi kết nối Gemini: ${e.message?.take(80)}"
+        } finally {
+            conn?.disconnect()
         }
     }
 
@@ -209,9 +217,11 @@ object ProviderChat {
         systemPrompt: String,
         userMessage: String,
     ): String = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
         try {
+            validateUrl(provider.baseUrl)
             val url = URL("${provider.baseUrl.trimEnd('/')}/api/chat")
-            val conn = url.openConnection() as HttpURLConnection
+            conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.connectTimeout = 10000
@@ -243,7 +253,6 @@ object ProviderChat {
             }
 
             val respBody = conn.inputStream.bufferedReader().readText()
-            conn.disconnect()
 
             val respJson = json.parseToJsonElement(respBody).jsonObject
             val content = respJson["message"]
@@ -253,9 +262,26 @@ object ProviderChat {
             content?.trim() ?: "⚠️ Ollama không trả lời"
         } catch (e: java.net.ConnectException) {
             "❌ Không kết nối được Ollama. Kiểm tra:\n• 'ollama serve' đang chạy?\n• IP ${provider.baseUrl} đúng?\n• Cùng mạng WiFi?"
+        } catch (e: IllegalArgumentException) {
+            "❌ URL không hợp lệ: ${provider.baseUrl}"
         } catch (e: Exception) {
-            Log.e(TAG, "Ollama chat error", e)
+            Log.e(TAG, "Ollama chat error: ${e.message?.take(100)}")
             "❌ Lỗi Ollama: ${e.message?.take(80)}"
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    // ─── Helpers ─────────────────────────────────
+    private const val CONNECT_TIMEOUT = 30_000
+    private const val READ_TIMEOUT = 60_000
+    private const val MAX_TOKENS = 1024
+    private const val TEMPERATURE = 0.7
+
+    /** Validate URL scheme — prevent SSRF */
+    private fun validateUrl(url: String) {
+        require(url.startsWith("http://") || url.startsWith("https://")) {
+            "URL must start with http:// or https://"
         }
     }
 }
