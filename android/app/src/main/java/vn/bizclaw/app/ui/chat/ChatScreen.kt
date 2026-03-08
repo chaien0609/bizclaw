@@ -249,12 +249,14 @@ fun ChatScreen(
                                     selectedAgentId = null
                                     selectedGroupId = null
                                     viewModel.currentAgent.value = "BizClaw"
+                                    viewModel.messages.clear() // Fresh chat
                                 } else {
                                     // Don't switch agent while generating
                                     if (isLoading || isGroupChatting) return@FilterChip
                                     selectedAgentId = agent.id
                                     selectedGroupId = null
                                     viewModel.currentAgent.value = agent.name
+                                    viewModel.messages.clear() // Fresh chat for new agent
                                     // Safe system prompt update
                                     scope.launch {
                                         try {
@@ -291,9 +293,12 @@ fun ChatScreen(
                                     selectedGroupId = null
                                     selectedAgentId = null
                                     viewModel.currentAgent.value = "BizClaw"
+                                    viewModel.messages.clear() // Fresh chat
                                 } else {
+                                    if (isLoading || isGroupChatting) return@FilterChip
                                     selectedGroupId = group.id
                                     selectedAgentId = null
+                                    viewModel.messages.clear() // Fresh chat for group
                                     val memberNames = group.agentIds.mapNotNull { id ->
                                         localAgents.find { it.id == id }?.name
                                     }.joinToString(", ")
