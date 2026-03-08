@@ -21,19 +21,45 @@ class BizClawNotificationListener : NotificationListenerService() {
     companion object {
         const val TAG = "BizClawNotify"
 
-        // App packages to monitor
+        // App packages to monitor (including clones/dual apps)
         val MONITORED_APPS = mapOf(
+            // Zalo
             "com.zing.zalo" to "Zalo",
-            "com.facebook.orca" to "Messenger",
+            "com.zing.zalo.clone" to "Zalo 2",
+            // Facebook
             "com.facebook.katana" to "Facebook",
+            "com.facebook.katana.clone" to "Facebook 2",
+            "com.facebook.lite" to "Facebook Lite",
+            // Messenger
+            "com.facebook.orca" to "Messenger",
+            "com.facebook.orca.clone" to "Messenger 2",
+            "com.facebook.mlite" to "Messenger Lite",
+            // Instagram
             "com.instagram.android" to "Instagram",
+            "com.instagram.android.clone" to "Instagram 2",
+            // Threads
             "com.instagram.barcelona" to "Threads",
+            // Gmail & Outlook
             "com.google.android.gm" to "Gmail",
             "com.microsoft.office.outlook" to "Outlook",
+            // Lark
             "com.larksuite.suite" to "Lark",
             "com.ss.android.lark" to "Lark CN",
+            // Telegram
             "org.telegram.messenger" to "Telegram",
+            "org.telegram.messenger.clone" to "Telegram 2",
+            "org.telegram.messenger.web" to "Telegram X",
+            "org.thunderdog.challegram" to "Telegram X",
         )
+
+        /** Resolve clone/dual package → app name (handles Vivo/Samsung/Xiaomi suffixes) */
+        fun resolveAppName(packageName: String): String? {
+            MONITORED_APPS[packageName]?.let { return it }
+            val basePkg = packageName
+                .removeSuffix(".clone").removeSuffix(".dual").removeSuffix("_clone")
+            MONITORED_APPS[basePkg]?.let { return "$it (Clone)" }
+            return null
+        }
 
         var instance: BizClawNotificationListener? = null
             private set
@@ -67,7 +93,7 @@ class BizClawNotificationListener : NotificationListenerService() {
         sbn ?: return
 
         val pkg = sbn.packageName
-        val appName = MONITORED_APPS[pkg] ?: return // Ignore non-monitored apps
+        val appName = resolveAppName(pkg) ?: return // Ignore non-monitored apps
 
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return

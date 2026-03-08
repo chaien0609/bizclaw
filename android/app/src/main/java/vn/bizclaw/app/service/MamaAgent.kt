@@ -75,6 +75,7 @@ class MamaAgent(private val context: Context) {
             "facebook_post", "facebook_comment",
             "messenger_reply", "messenger_read",
             "zalo_send",
+            "zalo_post", "zalo_timeline",
             "instagram_post",
             "threads_post", "threads_read",
             "lark_read_chats", "lark_send", "lark_read_mail", "lark_compose_mail",
@@ -205,6 +206,8 @@ $agentList
 - facebook_comment: Comment Facebook (cần comment)
 - messenger_reply: Trả lời Messenger (cần contact, message)
 - zalo_send: Gửi Zalo (cần contact, message)
+- zalo_post: Đăng bài Nhật ký Zalo (cần content)
+- zalo_timeline: Đọc Nhật ký Zalo
 - instagram_post: Đăng Instagram (cần caption)
 - threads_post: Đăng Threads (cần content)
 - threads_read: Đọc feed Threads
@@ -358,6 +361,11 @@ REPORT: yes
 
                 controller.zaloSendMessage(contact, message).message
             }
+            "zalo_post" -> {
+                val content = params["content"] ?: return "Missing 'content'"
+                controller.zaloPost(content).message
+            }
+            "zalo_timeline" -> controller.zaloReadTimeline().message
 
             // Instagram
             "instagram_post" -> {

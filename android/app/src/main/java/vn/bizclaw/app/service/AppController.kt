@@ -194,6 +194,77 @@ class AppController(private val context: Context) {
         }
     }
 
+    /** Post to Zalo Timeline/Nhật ký (đăng bài mạng xã hội Zalo) */
+    suspend fun zaloPost(content: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.zing.zalo")
+            delay(2000)
+
+            // Navigate to Nhật ký (Timeline) tab
+            val goToTimeline = a11y.clickByText("Nhật ký")
+                || a11y.clickByText("Timeline")
+                || a11y.clickByText("Cá nhân")
+            if (!goToTimeline) {
+                // Try tab index 3 (usually Nhật ký is the 3rd or 4th tab)
+                a11y.clickByText("Khám phá")
+            }
+            delay(1500)
+
+            // Tap compose / "Bạn đang nghĩ gì?" / create post
+            val compose = a11y.clickByText("Bạn đang nghĩ gì?")
+                || a11y.clickByText("Đăng gì đó")
+                || a11y.clickByText("Viết bài")
+                || a11y.clickByText("Tạo bài viết")
+                || a11y.clickByText("What's on your mind")
+            if (!compose) return AutomationResult.error("Không tìm thấy ô đăng bài Zalo")
+            delay(1500)
+
+            // Type post content
+            val typed = a11y.typeIntoField("Bạn đang nghĩ gì", content)
+                || a11y.typeIntoField("Hãy chia sẻ", content)
+                || a11y.typeText(content)
+            if (!typed) return AutomationResult.error("Không nhập được nội dung bài Zalo")
+            delay(500)
+
+            // Post / Đăng
+            val posted = a11y.clickByText("Đăng")
+                || a11y.clickByText("Post")
+                || a11y.clickByText("Chia sẻ")
+            if (!posted) return AutomationResult.error("Không tìm nút Đăng bài Zalo")
+
+            AutomationResult.success("📝 Zalo Timeline posted: ${content.take(50)}...")
+        } catch (e: Exception) {
+            AutomationResult.error("Zalo post failed: ${e.message}")
+        }
+    }
+
+    /** Read Zalo Timeline / Nhật ký feed */
+    suspend fun zaloReadTimeline(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.zing.zalo")
+            delay(2000)
+
+            // Navigate to Nhật ký
+            a11y.clickByText("Nhật ký")
+                || a11y.clickByText("Timeline")
+                || a11y.clickByText("Cá nhân")
+            delay(1500)
+
+            val result = readCurrentScreen()
+            if (result.success) {
+                AutomationResult.success("📝 Zalo Timeline:\n${result.message}")
+            } else {
+                AutomationResult.error("Cannot read Zalo timeline")
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Zalo timeline read failed: ${e.message}")
+        }
+    }
+
     // ─── Gmail / Email ────────────────────────────────────────────
 
     /**

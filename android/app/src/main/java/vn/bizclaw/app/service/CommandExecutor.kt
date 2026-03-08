@@ -443,6 +443,11 @@ object CommandExecutor {
                 val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
                 controller.zaloSendMessage(contact, message)
             }
+            "zalo_post" -> {
+                val content = cmd.params["content"] ?: return errorResult(cmd, "Missing 'content'")
+                controller.zaloPost(content)
+            }
+            "zalo_timeline" -> controller.zaloReadTimeline()
 
             // Instagram
             "instagram_post" -> {
@@ -490,7 +495,7 @@ object CommandExecutor {
             else -> return CommandResult(
                 id = cmd.id,
                 status = CommandStatus.unsupported,
-                error = "Unknown automation: ${cmd.action}. Available: gmail_*, facebook_*, messenger_*, zalo_send, instagram_post, threads_*, lark_*, telegram_*",
+                error = "Unknown automation: ${cmd.action}. Available: gmail_*, facebook_*, messenger_*, zalo_send, zalo_post, zalo_timeline, instagram_post, threads_*, lark_*, telegram_*",
             )
         }
 
