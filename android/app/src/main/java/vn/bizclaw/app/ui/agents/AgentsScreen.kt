@@ -17,14 +17,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vn.bizclaw.app.engine.AIProvider
 import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
 import vn.bizclaw.app.engine.LocalRAG
 import vn.bizclaw.app.engine.ProviderManager
+import vn.bizclaw.app.engine.ProviderType
 
 // ═══════════════════════════════════════════════════════════════
 // Emoji options for agent creation
@@ -79,14 +82,7 @@ fun AgentsScreen(
                 },
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-            ) {
-                Icon(Icons.Default.Add, "Tạo mới")
-            }
-        },
+        // FAB removed — use + in TopAppBar instead (FAB was blocking edit buttons)
     ) { padding ->
         if (agents.isEmpty()) {
             Box(
@@ -110,7 +106,7 @@ fun AgentsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(agents) { agent ->
@@ -381,9 +377,29 @@ private fun AgentFormDialog(
                     Switch(checked = autoReply, onCheckedChange = { autoReply = it })
                 }
 
-                // Provider selector
+                // Provider selector — show all available + app-based defaults
                 Text("⚡ Nguồn AI", style = MaterialTheme.typography.labelMedium)
-                providers.forEach { provider ->
+
+                // Built-in app providers (always available, no config needed)
+                val appDefaults = listOf(
+                    AIProvider("app_gemini", "Gemini App (Miễn phí)", ProviderType.APP_GEMINI, "📱"),
+                    AIProvider("app_chatgpt", "ChatGPT App (Miễn phí)", ProviderType.APP_CHATGPT, "📱"),
+                    AIProvider("app_grok", "Grok App (Miễn phí)", ProviderType.APP_GROK, "📱"),
+                    AIProvider("app_deepseek", "DeepSeek App (Miễn phí)", ProviderType.APP_DEEPSEEK, "📱"),
+                    AIProvider("app_notebooklm", "NotebookLM RAG (Miễn phí)", ProviderType.APP_NOTEBOOKLM, "📓"),
+                )
+                val allProviders = providers + appDefaults.filter { app ->
+                    providers.none { it.id == app.id }
+                }
+
+                allProviders.forEach { provider ->
+                    val isAppBased = provider.type.name.startsWith("APP_")
+                    val typeTag = when {
+                        isAppBased -> "🆓 Free"
+                        provider.type == ProviderType.LOCAL_GGUF -> "🧠 Local"
+                        provider.type == ProviderType.OLLAMA -> "🦙 Local"
+                        else -> "🌐 API"
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -394,13 +410,20 @@ private fun AgentFormDialog(
                             selected = selectedProvider == provider.id,
                             onClick = { selectedProvider = provider.id },
                         )
-                        Text(
-                            "${provider.emoji} ${provider.name}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (!provider.enabled && provider.apiKey.isBlank()) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                " (chưa kết nối)",
+                                "${provider.emoji} ${provider.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                typeTag,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isAppBased) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (!isAppBased && !provider.enabled && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+                            Text(
+                                "chưa kn",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
                             )

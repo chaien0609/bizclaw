@@ -158,6 +158,16 @@ fun AutomationScreen(
 
             // ─── Mama Agent Setup ──────────────────────────────
             item {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "👑 Mama Tổng Quản — Nhận Lệnh Zalo/Telegram",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF6D00),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+            item {
                 MamaSetupCard(
                     config = mamaConfig,
                     agents = agents,
