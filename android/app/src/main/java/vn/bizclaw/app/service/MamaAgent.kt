@@ -158,6 +158,9 @@ class MamaAgent(private val context: Context) {
             ?: providers.firstOrNull { it.enabled }
             ?: return "❌ Không có provider nào khả dụng"
 
+        // Ensure ProviderChat has context to open apps if needed
+        ProviderChat.appContext = context
+
         val analysis = try {
             withContext(Dispatchers.IO) {
                 ProviderChat.chat(provider, mamaSystemPrompt, analysisPrompt)
