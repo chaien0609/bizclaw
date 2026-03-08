@@ -13,6 +13,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import vn.bizclaw.app.MainActivity
 
+
 /**
  * BizClaw Daemon Service — runs the Rust engine as an Android foreground service.
  *
@@ -61,6 +62,13 @@ class BizClawDaemonService : Service() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var commandReceiver: CommandReceiver? = null
+
+    private fun getCommandServerUrl(): String {
+        val prefs = getSharedPreferences("bizclaw", MODE_PRIVATE)
+        return prefs.getString("command_server_url", null)
+            ?: "wss://bizclaw.vn/ws/device" // Default
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -92,23 +100,26 @@ class BizClawDaemonService : Service() {
             acquire(10 * 60 * 1000L) // 10 min max, renewed by engine
         }
 
-        // TODO: Call native Rust FFI
-        // NativeLib.startDaemon(
-        //     config = loadConfig(),
-        //     dataDir = filesDir.absolutePath,
-        //     host = "127.0.0.1",
-        //     port = 3001,
-        // )
+        // Start WebSocket command receiver
+        try {
+            val wsUrl = getCommandServerUrl()
+            commandReceiver = CommandReceiver(this, wsUrl)
+            commandReceiver?.connect()
+            android.util.Log.i("BizClaw", "📡 Command receiver started: $wsUrl")
+        } catch (e: Exception) {
+            android.util.Log.e("BizClaw", "⚠️ Command receiver failed: ${e.message}")
+        }
 
         isRunning = true
-        updateNotification("Đang chạy — 0 agent hoạt động")
+        updateNotification("Đang chạy — sẵn sàng nhận lệnh")
 
         android.util.Log.i("BizClaw", "🤖 Daemon started")
     }
 
     private fun stopDaemon() {
-        // TODO: Call native Rust FFI
-        // NativeLib.stopDaemon()
+        // Disconnect WebSocket
+        commandReceiver?.disconnect()
+        commandReceiver = null
 
         isRunning = false
         wakeLock?.release()

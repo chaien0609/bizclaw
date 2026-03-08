@@ -123,7 +123,11 @@ class BizClawNotificationListener : NotificationListenerService() {
                     .collect { token -> response.append(token) }
 
                 val replyText = response.toString().trim()
-                Log.i(TAG, "✅ Reply: $replyText")
+                if (replyText.isBlank()) {
+                    Log.w(TAG, "⚠️ Empty AI response — skipping reply")
+                    return@launch
+                }
+                Log.i(TAG, "✅ Reply generated: ${replyText.take(100)}")
 
                 // Update notification with reply
                 synchronized(recentNotifications) {
@@ -138,11 +142,36 @@ class BizClawNotificationListener : NotificationListenerService() {
                     }
                 }
 
-                // TODO: Use AccessibilityService to actually type the reply
-                // For now, just log it — user can copy and paste
+                // ─── SEND THE REPLY ───────────────────────
+                // Method 1: Notification inline reply (works for Zalo, Messenger, etc.)
+                val activeNotifs = getActiveNotifications()
+                val targetNotif = activeNotifs?.find { it.packageName == notif.packageName }
+                var replied = false
+
+                if (targetNotif != null) {
+                    replied = CommandExecutor.replySocialNotification(
+                        applicationContext, targetNotif, replyText
+                    )
+                }
+
+                // Method 2: Fallback to AccessibilityService
+                if (!replied) {
+                    Log.w(TAG, "📎 Inline reply failed — trying Accessibility fallback")
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        replied = CommandExecutor.replyViaAccessibility(
+                            notif.packageName, replyText
+                        )
+                    }
+                }
+
+                if (replied) {
+                    Log.i(TAG, "✅ Auto-reply SENT to ${notif.app}: ${replyText.take(60)}")
+                } else {
+                    Log.w(TAG, "⚠️ Could not send reply — user needs to enable services")
+                }
 
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Auto-reply failed: ${e.message}")
+                Log.e(TAG, "❌ Auto-reply failed: ${e.message?.take(100)}")
             }
         }
     }
