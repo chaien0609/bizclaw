@@ -187,8 +187,11 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                                 )
                                 // Set BizClaw system prompt
                                 llm.addSystemPrompt(
-                                    "Bạn là BizClaw, trợ lý AI cho doanh nghiệp. " +
-                                    "Trả lời ngắn gọn và hữu ích bằng tiếng Việt."
+                                    "Bạn tên là BizClaw, một trợ lý AI thân thiện chạy trên điện thoại. " +
+                                    "Luôn trả lời bằng tiếng Việt. " +
+                                    "Trả lời ngắn gọn, tự nhiên như người thật. " +
+                                    "Khi được chào hỏi, hãy chào lại thân thiện. " +
+                                    "Không bịa thông tin. Nếu không biết, nói thẳng là không biết."
                                 )
                                 loadedModelName = name
                                 statusMessage = "✅ $name đã sẵn sàng!"

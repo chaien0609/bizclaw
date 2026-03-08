@@ -81,7 +81,7 @@ class BizClawDaemonService : Service() {
         if (isRunning) return
 
         // Start as foreground service
-        startForeground(NOTIFICATION_ID, buildNotification("Starting..."))
+        startForeground(NOTIFICATION_ID, buildNotification("Đang khởi động..."))
 
         // Acquire WakeLock for background execution
         val pm = getSystemService(POWER_SERVICE) as PowerManager
@@ -101,7 +101,7 @@ class BizClawDaemonService : Service() {
         // )
 
         isRunning = true
-        updateNotification("Running — 0 agents active")
+        updateNotification("Đang chạy — 0 agent hoạt động")
 
         android.util.Log.i("BizClaw", "🤖 Daemon started")
     }
@@ -143,9 +143,9 @@ class BizClawDaemonService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BizClaw Agent")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_manage) // TODO: custom icon
+            .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Dừng", stopIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()
@@ -158,7 +158,7 @@ class BizClawDaemonService : Service() {
                 "BizClaw Daemon",
                 NotificationManager.IMPORTANCE_LOW, // Silent, no sound
             ).apply {
-                description = "BizClaw AI agent running in background"
+                description = "BizClaw AI agent chạy nền"
                 setShowBadge(false)
             }
             val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager

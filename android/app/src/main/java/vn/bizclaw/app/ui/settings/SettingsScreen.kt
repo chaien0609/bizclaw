@@ -55,8 +55,8 @@ fun SettingsScreen(
                 RunMode.REMOTE
         )
     }
-    val isA11yEnabled = BizClawAccessibilityService.isRunning()
-    val isDaemonRunning = BizClawDaemonService.isRunning()
+    var isA11yEnabled by remember { mutableStateOf(BizClawAccessibilityService.isRunning()) }
+    var isDaemonRunning by remember { mutableStateOf(BizClawDaemonService.isRunning()) }
 
     Scaffold(
         topBar = {
@@ -278,8 +278,13 @@ fun SettingsScreen(
                 status = if (isDaemonRunning) "Đang chạy" else "Đã dừng",
                 actionLabel = if (isDaemonRunning) "Dừng" else "Bật",
                 onClick = {
-                    if (isDaemonRunning) BizClawDaemonService.stop(context)
-                    else BizClawDaemonService.start(context)
+                    if (isDaemonRunning) {
+                        BizClawDaemonService.stop(context)
+                        isDaemonRunning = false
+                    } else {
+                        BizClawDaemonService.start(context)
+                        isDaemonRunning = true
+                    }
                 },
             )
 
