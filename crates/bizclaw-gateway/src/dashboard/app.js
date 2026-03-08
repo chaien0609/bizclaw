@@ -339,7 +339,7 @@ function ChatPage({ config, lang }) {
     }
   };
 
-  // Render markdown-ish content (code blocks, bold, links)
+  // Render markdown content (code blocks, inline code, bold, italic, headers, lists, links)
   const renderContent = (text) => {
     if (!text) return '';
     // Split by code blocks
@@ -350,13 +350,28 @@ function ChatPage({ config, lang }) {
         const firstLine = inner.indexOf('\n');
         const lang = firstLine > 0 ? inner.slice(0, firstLine).trim() : '';
         const code = firstLine > 0 ? inner.slice(firstLine + 1) : inner;
-        return html`<div key=${i} style="background:var(--bg);border:1px solid var(--border);border-radius:6px;margin:6px 0;overflow-x:auto">
-          ${lang && html`<div style="padding:4px 10px;font-size:10px;color:var(--text2);border-bottom:1px solid var(--border);text-transform:uppercase">${lang}</div>`}
-          <pre style="padding:10px 14px;font-size:12px;font-family:var(--mono);white-space:pre-wrap;word-break:break-all;margin:0;color:var(--cyan)">${code}</pre>
+        return html`<div key=${i} style="background:var(--bg);border:1px solid var(--border);border-radius:8px;margin:8px 0;overflow-x:auto">
+          ${lang && html`<div style="padding:5px 12px;font-size:10px;color:var(--text2);border-bottom:1px solid var(--border);text-transform:uppercase;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:6px">
+            <span style="color:var(--accent2)">●</span> ${lang}
+          </div>`}
+          <pre style="padding:12px 16px;font-size:12px;font-family:var(--mono);white-space:pre-wrap;word-break:break-all;margin:0;color:var(--cyan);line-height:1.6">${code}</pre>
         </div>`;
       }
-      // Inline formatting: bold
-      return html`<span key=${i} dangerouslySetInnerHTML=${{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />`;
+      // Process inline markdown
+      let processed = part
+        .replace(/#### (.+)/g, '<h4 style="font-size:13px;font-weight:700;margin:8px 0 4px;color:var(--accent2)">$1</h4>')
+        .replace(/### (.+)/g, '<h3 style="font-size:14px;font-weight:700;margin:8px 0 4px;color:var(--text)">$1</h3>')
+        .replace(/## (.+)/g, '<h2 style="font-size:15px;font-weight:700;margin:10px 0 6px;color:var(--text)">$1</h2>')
+        .replace(/# (.+)/g, '<h1 style="font-size:17px;font-weight:700;margin:10px 0 6px;color:var(--text)">$1</h1>')
+        .replace(/`([^`]+)`/g, '<code style="background:rgba(99,102,241,.1);color:var(--accent2);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px">$1</code>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
+      // Convert bullet lists
+      processed = processed.replace(/^- (.+)$/gm, '<li style="margin:2px 0;list-style:disc;margin-left:16px">$1</li>');
+      processed = processed.replace(/^\d+\. (.+)$/gm, '<li style="margin:2px 0;list-style:decimal;margin-left:16px">$1</li>');
+      processed = processed.replace(/\n/g, '<br/>');
+      return html`<span key=${i} dangerouslySetInnerHTML=${{ __html: processed }} />`;
     });
   };
 
@@ -4062,6 +4077,20 @@ export function App() {
     };
     document.addEventListener('click', handler, true);
     return () => document.removeEventListener('click', handler, true);
+  }, []);
+
+  // Card radial glow mouse-tracking
+  useEffect(() => {
+    const handler = (e) => {
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(card => {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty('--mouse-x', (e.clientX - rect.left) + 'px');
+        card.style.setProperty('--mouse-y', (e.clientY - rect.top) + 'px');
+      });
+    };
+    document.addEventListener('mousemove', handler);
+    return () => document.removeEventListener('mousemove', handler);
   }, []);
 
   // Early returns AFTER all hooks (Rules of Hooks: hooks must be called in same order every render)
