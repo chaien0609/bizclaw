@@ -48,6 +48,28 @@ class ChatViewModel : ViewModel() {
     val error = mutableStateOf<String?>(null)
 
     // ═══════════════════════════════════════════════════════════
+    // CHAT HISTORY PER AGENT/GROUP
+    // ═══════════════════════════════════════════════════════════
+    private val chatHistory = mutableMapOf<String, List<UiMessage>>()
+    private var currentConversationId = "default"
+
+    /** Save current messages, switch to new conversation (restore or fresh) */
+    fun switchToConversation(conversationId: String) {
+        // Save current
+        if (messages.isNotEmpty()) {
+            chatHistory[currentConversationId] = messages.toList()
+        }
+        // Switch
+        currentConversationId = conversationId
+        messages.clear()
+        // Restore if exists
+        val saved = chatHistory[conversationId]
+        if (saved != null) {
+            messages.addAll(saved)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // LOCAL LLM STATE — uses GlobalLLM singleton
     // ═══════════════════════════════════════════════════════════
     val localLLM: BizClawLLM get() = GlobalLLM.instance

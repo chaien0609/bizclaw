@@ -249,14 +249,14 @@ fun ChatScreen(
                                     selectedAgentId = null
                                     selectedGroupId = null
                                     viewModel.currentAgent.value = "BizClaw"
-                                    viewModel.messages.clear() // Fresh chat
+                                    viewModel.switchToConversation("default")
                                 } else {
                                     // Don't switch agent while generating
                                     if (isLoading || isGroupChatting) return@FilterChip
                                     selectedAgentId = agent.id
                                     selectedGroupId = null
                                     viewModel.currentAgent.value = agent.name
-                                    viewModel.messages.clear() // Fresh chat for new agent
+                                    viewModel.switchToConversation("agent_${agent.id}")
                                     // Safe system prompt update
                                     scope.launch {
                                         try {
@@ -293,12 +293,12 @@ fun ChatScreen(
                                     selectedGroupId = null
                                     selectedAgentId = null
                                     viewModel.currentAgent.value = "BizClaw"
-                                    viewModel.messages.clear() // Fresh chat
+                                    viewModel.switchToConversation("default")
                                 } else {
                                     if (isLoading || isGroupChatting) return@FilterChip
                                     selectedGroupId = group.id
                                     selectedAgentId = null
-                                    viewModel.messages.clear() // Fresh chat for group
+                                    viewModel.switchToConversation("group_${group.id}")
                                     val memberNames = group.agentIds.mapNotNull { id ->
                                         localAgents.find { it.id == id }?.name
                                     }.joinToString(", ")
@@ -402,32 +402,77 @@ fun ChatScreen(
                                 isGroupChatting = true
 
                                 scope.launch {
-                                    // Fire all agent calls in parallel
-                                    val results = groupAgents.map { agent ->
-                                        async {
+                                    try {
+                                        // Separate local vs remote agents
+                                        val localAgentList = mutableListOf<LocalAgent>()
+                                        val remoteAgentList = mutableListOf<LocalAgent>()
+
+                                        groupAgents.forEach { agent ->
+                                            val provider = providers.find { it.id == agent.providerId }
+                                            if (provider == null || provider.type == vn.bizclaw.app.engine.ProviderType.LOCAL_GGUF) {
+                                                localAgentList.add(agent)
+                                            } else {
+                                                remoteAgentList.add(agent)
+                                            }
+                                        }
+
+                                        // Remote agents: run in parallel
+                                        val remoteResults = remoteAgentList.map { agent ->
+                                            async {
+                                                val provider = providers.find { it.id == agent.providerId }
+                                                    ?: return@async Triple(agent, "⚠️ Không tìm thấy nguồn AI", "Unknown")
+                                                val prompt = agentManager.buildPromptForAgent(agent, msg)
+                                                val response = try {
+                                                    ProviderChat.chat(provider, prompt, msg)
+                                                } catch (e: Exception) {
+                                                    "❌ Lỗi: ${e.message?.take(60)}"
+                                                }
+                                                Triple(agent, response, provider.name)
+                                            }
+                                        }.awaitAll()
+
+                                        // Add remote results
+                                        remoteResults.forEach { (agent, response, providerName) ->
+                                            viewModel.addGroupResponse(
+                                                agentEmoji = agent.emoji,
+                                                agentName = agent.name,
+                                                providerName = providerName,
+                                                content = response,
+                                            )
+                                        }
+
+                                        // Local agents: run SEQUENTIALLY (GlobalLLM is single-threaded)
+                                        localAgentList.forEach { agent ->
                                             val provider = providers.find { it.id == agent.providerId }
                                                 ?: providers.find { it.id == "local_gguf" }
-                                                ?: return@async Pair(agent, "⚠️ Không tìm thấy nguồn AI")
-
                                             val prompt = agentManager.buildPromptForAgent(agent, msg)
                                             val response = try {
-                                                ProviderChat.chat(provider, prompt, msg)
+                                                ProviderChat.chat(
+                                                    provider ?: vn.bizclaw.app.engine.AIProvider(
+                                                        id = "local_gguf",
+                                                        name = "AI Cục Bộ",
+                                                        type = vn.bizclaw.app.engine.ProviderType.LOCAL_GGUF,
+                                                        emoji = "🧠",
+                                                    ),
+                                                    prompt,
+                                                    msg,
+                                                )
                                             } catch (e: Exception) {
-                                                "❌ Lỗi: ${e.message?.take(60)}"
+                                                "❌ Lỗi cục bộ: ${e.message?.take(60)}"
                                             }
-                                            Pair(agent, response)
+                                            viewModel.addGroupResponse(
+                                                agentEmoji = agent.emoji,
+                                                agentName = agent.name,
+                                                providerName = provider?.name ?: "AI Cục Bộ",
+                                                content = response,
+                                            )
                                         }
-                                    }.awaitAll()
-
-                                    // Add each agent's response
-                                    results.forEach { (agent, response) ->
-                                        val providerName = providers
-                                            .find { it.id == agent.providerId }?.name ?: "Local"
+                                    } catch (e: Exception) {
                                         viewModel.addGroupResponse(
-                                            agentEmoji = agent.emoji,
-                                            agentName = agent.name,
-                                            providerName = providerName,
-                                            content = response,
+                                            agentEmoji = "⚠️",
+                                            agentName = "Hệ thống",
+                                            providerName = "Error",
+                                            content = "❌ Lỗi nhóm chat: ${e.message?.take(80)}",
                                         )
                                     }
                                     isGroupChatting = false
