@@ -63,6 +63,7 @@ class BizClawDaemonService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var commandReceiver: CommandReceiver? = null
+    private var jobScheduler: AutomationJobScheduler? = null
 
     private fun getCommandServerUrl(): String {
         val prefs = getSharedPreferences("bizclaw", MODE_PRIVATE)
@@ -110,6 +111,11 @@ class BizClawDaemonService : Service() {
             android.util.Log.e("BizClaw", "⚠️ Command receiver failed: ${e.message}")
         }
 
+        // Start automation job scheduler
+        jobScheduler = AutomationJobScheduler(this)
+        jobScheduler?.start()
+        android.util.Log.i("BizClaw", "⏰ Job scheduler started")
+
         isRunning = true
         updateNotification("Đang chạy — sẵn sàng nhận lệnh")
 
@@ -117,6 +123,10 @@ class BizClawDaemonService : Service() {
     }
 
     private fun stopDaemon() {
+        // Stop automation scheduler
+        jobScheduler?.stop()
+        jobScheduler = null
+
         // Disconnect WebSocket
         commandReceiver?.disconnect()
         commandReceiver = null

@@ -42,6 +42,7 @@ enum class CommandType {
     device,
     social_reply,
     automation,
+    schedule,
     flow,
 }
 

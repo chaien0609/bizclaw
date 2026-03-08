@@ -35,6 +35,7 @@ object CommandExecutor {
                 CommandType.app -> executeApp(context, cmd)
                 CommandType.social_reply -> executeSocialReply(context, cmd)
                 CommandType.automation -> executeAutomation(context, cmd)
+                CommandType.schedule -> executeSchedule(context, cmd)
                 CommandType.device -> executeDeviceInfo(context, cmd)
                 CommandType.flow -> executeFlow(context, cmd)
             }
@@ -471,6 +472,129 @@ object CommandExecutor {
     }
 
     // ─── Helpers ─────────────────────────────────
+    // ═══════════════════════════════════════════════════════
+    // Schedule — manage automation jobs
+    // ═══════════════════════════════════════════════════════
+
+    private suspend fun executeSchedule(context: Context, cmd: DeviceCommand): CommandResult {
+        val manager = AutomationJobManager(context)
+
+        return when (cmd.action) {
+            "list" -> {
+                val jobs = manager.loadJobs()
+                val summary = if (jobs.isEmpty()) {
+                    "Chưa có job nào"
+                } else {
+                    jobs.joinToString("\n") { job ->
+                        "${job.emoji} ${job.name} [${if (job.enabled) "ON" else "OFF"}] " +
+                        "| Agent: ${job.agentId} | Every ${job.intervalMinutes}m | " +
+                        "Runs: ${job.runCount} | Deliver: ${job.delivery.method} → ${job.delivery.target}"
+                    }
+                }
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "count" to jobs.size.toString(),
+                        "jobs" to summary,
+                    ),
+                )
+            }
+
+            "create" -> {
+                val name = cmd.params["name"] ?: return errorResult(cmd, "Missing 'name'")
+                val agentId = cmd.params["agent_id"] ?: return errorResult(cmd, "Missing 'agent_id'")
+                val interval = cmd.params["interval_minutes"]?.toIntOrNull() ?: 240
+                val deliveryMethod = cmd.params["delivery_method"] ?: "ZALO"
+                val deliveryTarget = cmd.params["delivery_target"] ?: ""
+                val emoji = cmd.params["emoji"] ?: "📊"
+
+                // Parse sources
+                val sourceTypes = cmd.params["sources"]?.split(",") ?: listOf("NOTIFICATIONS")
+                val sourceTarget = cmd.params["source_target"] ?: ""
+                val sources = sourceTypes.map { sourceStr ->
+                    DataSource(
+                        type = try { SourceType.valueOf(sourceStr.trim()) } catch (_: Exception) { SourceType.NOTIFICATIONS },
+                        target = sourceTarget,
+                    )
+                }
+
+                // Parse schedule times if provided
+                val scheduleTimes = cmd.params["schedule_times"]
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?: emptyList()
+
+                val job = AutomationJob(
+                    id = java.util.UUID.randomUUID().toString().take(8),
+                    name = name,
+                    emoji = emoji,
+                    agentId = agentId,
+                    sources = sources,
+                    intervalMinutes = interval,
+                    scheduleTimes = scheduleTimes,
+                    delivery = DeliveryConfig(
+                        method = try { DeliveryMethod.valueOf(deliveryMethod) } catch (_: Exception) { DeliveryMethod.ZALO },
+                        target = deliveryTarget,
+                    ),
+                )
+
+                manager.addJob(job)
+
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "job_id" to job.id,
+                        "message" to "✅ Job '${job.name}' created — runs every ${interval}m, delivers via $deliveryMethod",
+                    ),
+                )
+            }
+
+            "run" -> {
+                val jobId = cmd.params["job_id"] ?: return errorResult(cmd, "Missing 'job_id'")
+                val job = manager.getJob(jobId) ?: return errorResult(cmd, "Job not found: $jobId")
+
+                val report = manager.executeJob(job)
+
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf("report" to report),
+                )
+            }
+
+            "delete" -> {
+                val jobId = cmd.params["job_id"] ?: return errorResult(cmd, "Missing 'job_id'")
+                manager.deleteJob(jobId)
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf("message" to "🗑️ Job $jobId deleted"),
+                )
+            }
+
+            "toggle" -> {
+                val jobId = cmd.params["job_id"] ?: return errorResult(cmd, "Missing 'job_id'")
+                val job = manager.getJob(jobId) ?: return errorResult(cmd, "Job not found: $jobId")
+                val updated = job.copy(enabled = !job.enabled)
+                manager.updateJob(updated)
+                CommandResult(
+                    id = cmd.id,
+                    status = CommandStatus.success,
+                    result = mapOf(
+                        "message" to "${if (updated.enabled) "✅ ON" else "🚫 OFF"}: ${job.name}",
+                    ),
+                )
+            }
+
+            else -> CommandResult(
+                id = cmd.id,
+                status = CommandStatus.unsupported,
+                error = "Unknown schedule action: ${cmd.action}. Available: list, create, run, delete, toggle",
+            )
+        }
+    }
 
     private fun errorResult(cmd: DeviceCommand, error: String) = CommandResult(
         id = cmd.id,
