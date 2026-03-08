@@ -561,10 +561,11 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 32.dp),
+            .padding(vertical = 24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         ),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Column(
             modifier = Modifier
@@ -572,32 +573,91 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(if (isLocalMode) "🧠" else "🤖", fontSize = 48.sp)
+            // Logo
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.size(64.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(if (isLocalMode) "🧠" else "🤖", fontSize = 36.sp)
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
+
             Text(
-                if (isLocalMode) "BizClaw AI Cục Bộ"
-                else "Chào mừng đến với BizClaw",
+                "BizClaw",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (isLocalMode)
-                    "Trên thiết bị • ${localModelName ?: "Chưa tải mô hình"} • Miễn phí"
+
+            // Status badge
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (isLocalMode && localModelName != null)
+                    Color(0xFF00E676).copy(alpha = 0.15f)
                 else
-                    "AI Agent Platform — Nhẹ, Nhanh, Tiết Kiệm",
-                style = MaterialTheme.typography.bodyMedium,
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+            ) {
+                Text(
+                    if (isLocalMode && localModelName != null)
+                        "🧠 $localModelName • Offline • Miễn phí"
+                    else if (isLocalMode)
+                        "📦 Chưa tải mô hình — Bấm 🧠"
+                    else
+                        "🌐 AI Agent Platform",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isLocalMode && localModelName != null)
+                        Color(0xFF00E676)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                "Chọn Agent ở thanh cuộn bên trên, hoặc hỏi trực tiếp:",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                if (isLocalMode)
-                    "100% ngoại tuyến, không cần API key. Dữ liệu hoàn toàn trên điện thoại."
-                else
-                    "Gửi tin nhắn để bắt đầu trò chuyện với agent.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+
+            Spacer(Modifier.height(12.dp))
+
+            // Quick action chips
+            val suggestions = listOf(
+                "💡 Viết caption FB",
+                "📊 Phân tích báo cáo",
+                "📧 Soạn email",
+                "💬 Tư vấn CSKH",
             )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                suggestions.take(2).forEach { text ->
+                    SuggestionChip(
+                        onClick = { /* TODO: set as input */ },
+                        label = { Text(text, style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                suggestions.drop(2).forEach { text ->
+                    SuggestionChip(
+                        onClick = { /* TODO: set as input */ },
+                        label = { Text(text, style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
