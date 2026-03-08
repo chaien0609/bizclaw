@@ -1,6 +1,44 @@
 # Changelog
 
-## [0.3.2] — 2026-03-06
+## [0.3.2] — 2026-03-08
+
+### Added
+- **🖥️ Desktop App**: `bizclaw-desktop` binary — single 13MB executable
+  - Auto-opens browser to dashboard on startup
+  - Random port allocation (or `--port N`)
+  - Data stored in `~/.bizclaw/` (cross-platform)
+  - Zero configuration — works out of the box
+  - CLI: `--port`, `--no-open`, `--help` flags
+- **🔑 JWT SSO**: Gateway accepts Platform JWT tokens for seamless auth
+  - 3 methods: `Authorization: Bearer`, Cookie `bizclaw_token`, URL `?token=`
+  - Shared `JWT_SECRET` env var between Platform and Gateway
+  - `JwtClaims` struct: sub, email, role, tenant_id, exp
+  - `validate_jwt()` helper function using HS256
+  - `verify-pairing` endpoint accepts both `{token:JWT}` and `{code:PIN}`
+- **🔨 GitHub Actions CI/CD**: `.github/workflows/release-desktop.yml`
+  - macOS Apple Silicon (.dmg) — ~20MB
+  - macOS Intel (.dmg) — cross-compiled
+  - Windows x64 (.zip) — ~15MB
+  - Linux x64 (.deb) — ~26MB
+  - Auto-creates GitHub Release on tag push
+
+### Changed
+- **Pairing code**: `require_pairing` now defaults to `false` (JWT is primary auth)
+- **Dashboard frontend**: Auth helpers support both JWT and legacy pairing code
+  - `getJwtToken()`: extracts from URL `?token=`, cookie, or sessionStorage
+  - `authFetch()`: sends Bearer token or X-Pairing-Code header
+  - WebSocket: passes JWT via `?token=` query param
+- **README**: 5 deployment modes (Desktop, Source, Docker, Cloud, PaaS)
+  - Download table with release links for macOS/Windows/Linux
+  - New features documented: Desktop App, Cloud Platform, JWT SSO
+- **Architecture docs**: Updated to v0.3.2 with 3-mode deployment diagram
+
+### Security
+- JWT validation using constant-time comparison
+- Brute-force protection for auth attempts
+- Token cleanup on 401 response (clear sessionStorage)
+
+## [0.3.2-pre] — 2026-03-06
 
 ### Added
 - **Dropdown Selects**: Provider/Model selection now uses `<select>` dropdown populated from `/api/v1/providers`

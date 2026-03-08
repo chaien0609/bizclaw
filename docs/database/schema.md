@@ -148,7 +148,7 @@ system_prompt = "You are BizClaw, a helpful AI."
 [gateway]
 port = 3000
 host = "127.0.0.1"
-require_pairing = true
+require_pairing = false          # Disabled by default — use JWT SSO instead
 
 # Brain (local LLM)
 [brain]

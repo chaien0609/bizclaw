@@ -1,25 +1,44 @@
 # BizClaw — API Reference
 
-> **Version**: 0.2.0  
+> **Version**: 0.3.2  
 > **Base URL**: `http://{host}:{port}`  
-> **Auth**: `X-Pairing-Code` header (or `?code=` query param for WebSocket)
+> **Auth**: JWT Bearer token (primary) or `X-Pairing-Code` header (legacy)
 
 ---
 
 ## Authentication
 
-All protected endpoints require the `X-Pairing-Code` header:
+### Method 1: JWT Bearer Token (Recommended)
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+```
+
+JWT tokens are obtained by logging into the Platform admin dashboard.
+The token contains `sub` (user ID), `email`, `role`, `tenant_id`, and `exp` claims.
+
+### Method 2: Legacy Pairing Code
 
 ```
 X-Pairing-Code: your-pairing-code
 Content-Type: application/json
 ```
 
-### Verify Pairing (Public)
+### Method 3: Cookie / URL Token
+
+```
+Cookie: bizclaw_token=<jwt-token>
+# or
+GET /api/v1/info?token=<jwt-token>
+```
+
+### Verify Authentication (Public)
 ```
 POST /api/v1/verify-pairing
-Body: {"code": "your-pairing-code"}
-Response: {"ok": true}
+Body: {"token": "jwt-token-here"}     # JWT auth
+  or: {"code": "your-pairing-code"}    # Legacy pairing
+Response: {"ok": true, "email": "user@example.com", "role": "admin"}
 ```
 
 ---
@@ -278,7 +297,8 @@ Response: {"ok": true, "saved": ["SOUL.md", "IDENTITY.md", "USER.md"]}
 
 ### Connect
 ```
-ws://{host}:{port}/ws?code=pairing-code
+ws://{host}:{port}/ws?token=jwt-token-here     # JWT auth (recommended)
+ws://{host}:{port}/ws?code=pairing-code        # Legacy pairing
 ```
 
 ### Message Types

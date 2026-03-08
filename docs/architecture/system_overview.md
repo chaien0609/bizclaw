@@ -1,9 +1,10 @@
-# BizClaw System Architecture — v0.3.0
+# BizClaw System Architecture — v0.3.2
 
 ## Overview
 
 BizClaw is a self-hosted AI Agent platform built 100% in Rust.
-Single binary (~12MB) runs on any device from Raspberry Pi (512MB RAM) to cloud VPS.
+Single binary (~13MB) runs on any device from Raspberry Pi (512MB RAM) to cloud VPS.
+Now available as **Desktop App** for macOS, Windows, and Linux.
 
 ## Architecture Diagram
 
@@ -58,7 +59,7 @@ Single binary (~12MB) runs on any device from Raspberry Pi (512MB RAM) to cloud 
 | `bizclaw-mcp` | ~1,800 | MCP client (JSON-RPC 2.0) | — |
 | `bizclaw-security` | ~1,200 | AES-256-CBC, Sandbox, Injection | **Core security module** |
 | `bizclaw-agent` | ~2,800 | Think-Act-Observe loop | **Injection guardrail** |
-| `bizclaw-gateway` | ~6,800 | HTTP + WS + Dashboard | **Headers, CORS, Rate limit** |
+| `bizclaw-gateway` | ~7,200 | HTTP + WS + Dashboard + JWT | **Headers, CORS, Rate limit, JWT SSO** |
 | `bizclaw-knowledge` | ~1,500 | Hybrid RAG (FTS5 + Vector) | FTS5 query sanitization |
 | `bizclaw-scheduler` | ~2,400 | Cron tasks + Workflow rules | — |
 | `bizclaw-runtime` | ~800 | Agent lifecycle management | — |
@@ -69,7 +70,7 @@ Single binary (~12MB) runs on any device from Raspberry Pi (512MB RAM) to cloud 
 | `bizclaw-skills` | ~400 | Agent skill modules | — |
 | `bizclaw-ffi` | ~300 | Android FFI layer | — |
 
-## Security Architecture (v0.3.0)
+## Security Architecture (v0.3.2)
 
 ### Defense-in-Depth Layers
 
@@ -80,7 +81,11 @@ Layer 1: Network
   └── Rate limiting (60 req/min per IP)
 
 Layer 2: Authentication 
-  ├── Pairing code (constant-time comparison)
+  ├── JWT SSO (HS256, shared secret between Platform ↔ Gateway)
+  │   ├── Authorization: Bearer <token>
+  │   ├── Cookie: bizclaw_token=<token>
+  │   └── Query: ?token=<token>
+  ├── Legacy pairing code (constant-time comparison, disabled by default)
   ├── JWT HS256 (24h expiry, persistent secret)
   └── bcrypt (cost=12) password hashing
 
@@ -113,29 +118,80 @@ Layer 6: Data at Rest
 | Secrets store | AES-256-CBC | HMAC-SHA256(hostname+username) |
 | API keys | AES-256 (in secrets.enc) | Same as above |
 | Passwords | bcrypt cost=12 | Salt per hash |
-| JWT tokens | HS256 | Random 256-bit secret |
+| JWT tokens | HS256 | Shared JWT_SECRET env var |
 
-## Deployment Architecture
+## Deployment Architecture — 3 Modes
 
-### Single-Tenant (Public Repo)
+### Mode 1: Desktop App (NEW — v0.3.2)
+```
+macOS / Windows / Linux
+  └── bizclaw-desktop (13MB single executable)
+        ├── Embedded gateway server
+        ├── SQLite databases
+        ├── Auto-opens browser to http://127.0.0.1:<port>
+        ├── Data dir: ~/.bizclaw/
+        └── Zero configuration required
+```
+
+### Mode 2: Single-Tenant (Standalone)
 ```
 Device (Pi/Laptop/VPS)
-  └── bizclaw binary (12MB)
+  └── bizclaw binary (13MB)
         ├── SQLite databases (embedded)
         ├── config.toml
         └── secrets.enc (AES-256-CBC)
 ```
 
-### Multi-Tenant (Private Repo)  
+### Mode 3: Multi-Tenant Cloud + PaaS (Hybrid)
 ```
-VPS (116.118.2.98)
+Cloud VPS (apps.bizclaw.vn)
   ├── Nginx (SSL, reverse proxy)
   ├── Docker
   │   ├── bizclaw-platform (port 3001)
   │   │   ├── Admin Dashboard
-  │   │   ├── Tenant Manager
+  │   │   ├── Tenant Manager (spawn/stop/restart)
+  │   │   ├── Server Provisioner (SSH to remote VPS)
+  │   │   ├── Health Monitor (60s interval)
+  │   │   ├── JWT SSO (shared secret with gateways)
   │   │   └── bizclaw serve (per tenant, ports 10001+)
-  │   └── PostgreSQL (port 5432)
-  ├── bizclaw.vn landing (/var/www/bizclaw-landing)
-  └── viagent.vn landing (/var/www/viagent-landing)
+  │   └── PostgreSQL 16 (port 5432)
+  ├── bizclaw.vn landing
+  └── viagent.vn landing
+
+PaaS Remote Nodes (customer VPS)
+  └── bizclaw (standalone, installed via SSH)
+        ├── Provisioned from Cloud Platform
+        ├── JWT SSO (shared JWT_SECRET)
+        ├── Health monitored every 60s
+        └── Admin manages via Cloud dashboard
 ```
+
+## Environment Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `BIZCLAW_CONFIG` | Path to config.toml | ❌ | `~/.bizclaw/config.toml` |
+| `DATABASE_URL` | PostgreSQL connection (multi-tenant) | ❌ | SQLite |
+| `JWT_SECRET` | Shared JWT secret (Platform ↔ Gateway) | ❌ | Auto-generated |
+| `RUST_LOG` | Log level | ❌ | `info` |
+| `BIZCLAW_BIND_ALL` | Bind 0.0.0.0 (Docker) | ❌ | `false` |
+| `TZ` | Timezone | ❌ | System |
+
+## Cross-Platform Build Targets
+
+| Platform | Binary | Format | Size |
+|----------|--------|--------|------|
+| macOS (ARM64) | `bizclaw-desktop` | `.dmg` | ~20MB |
+| macOS (Intel) | `bizclaw-desktop` | `.dmg` | ~20MB |
+| Windows x64 | `bizclaw-desktop.exe` | `.zip` | ~15MB |
+| Linux x64 | `bizclaw-desktop` | `.deb` | ~26MB |
+| Docker | `bizclaw-platform` | Container | ~100MB |
+| Android | BizClaw App | `.apk` | ~25MB |
+
+## CI/CD Pipeline
+
+GitHub Actions workflow: `.github/workflows/release-desktop.yml`
+- Triggered by tag push (`v*`)
+- Builds 4 platform targets in parallel
+- Creates GitHub Release with all artifacts
+- Docker build via manual deploy to VPS
