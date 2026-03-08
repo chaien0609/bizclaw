@@ -14,6 +14,7 @@ import vn.bizclaw.app.ui.agents.AgentsScreen
 import vn.bizclaw.app.ui.chat.ChatScreen
 import vn.bizclaw.app.ui.chat.ChatViewModel
 import vn.bizclaw.app.ui.dashboard.DashboardScreen
+import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.ui.localllm.LocalLLMScreen
 import vn.bizclaw.app.ui.settings.SettingsScreen
 import vn.bizclaw.app.ui.theme.BizClawTheme
@@ -47,10 +48,16 @@ fun BizClawNavHost() {
     var serverUrl by remember { mutableStateOf("http://127.0.0.1:3001") }
     var apiKey by remember { mutableStateOf("") }
 
-    // Initialize — connect to LOCAL daemon + check local models
+    // Initialize — check local models first, only check server if no local model
     LaunchedEffect(Unit) {
-        chatViewModel.updateServer(serverUrl, apiKey)
         chatViewModel.refreshLocalModels(context)
+        // Only check server if local model not available
+        if (!GlobalLLM.instance.isLoaded) {
+            chatViewModel.updateServer(serverUrl, apiKey)
+        } else {
+            // Sync GlobalLLM state to chat view model
+            chatViewModel.checkConnection()
+        }
     }
 
     when (currentScreen) {

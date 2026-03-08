@@ -12,6 +12,7 @@ import vn.bizclaw.app.data.api.BizClawClient
 import vn.bizclaw.app.data.model.AgentInfo
 import vn.bizclaw.app.data.model.ChatMessage
 import vn.bizclaw.app.engine.BizClawLLM
+import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.ModelDownloadManager
 import vn.bizclaw.app.service.AgentToken
 import vn.bizclaw.app.service.LocalAgentLoop
@@ -47,11 +48,11 @@ class ChatViewModel : ViewModel() {
     val error = mutableStateOf<String?>(null)
 
     // ═══════════════════════════════════════════════════════════
-    // LOCAL LLM STATE
+    // LOCAL LLM STATE — uses GlobalLLM singleton
     // ═══════════════════════════════════════════════════════════
-    val localLLM = BizClawLLM()
-    val isLocalMode = mutableStateOf(false)
-    val localModelName = mutableStateOf<String?>(null)
+    val localLLM: BizClawLLM get() = GlobalLLM.instance
+    val isLocalMode = mutableStateOf(GlobalLLM.instance.isLoaded)
+    val localModelName = mutableStateOf(GlobalLLM.loadedModelName)
     val localModelLoading = mutableStateOf(false)
     val localGenSpeed = mutableStateOf(0f)
     val localContextUsed = mutableStateOf(0)
@@ -69,12 +70,19 @@ class ChatViewModel : ViewModel() {
     }
 
     fun checkConnection() {
+        // Auto-sync local state from GlobalLLM
+        if (GlobalLLM.instance.isLoaded) {
+            isLocalMode.value = true
+            localModelName.value = GlobalLLM.loadedModelName
+            currentAgent.value = "local"
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val result = client.healthCheck()
             isConnected.value = result.getOrDefault(false)
             if (isConnected.value) {
                 loadAgents()
             }
+            // Don't show error if local model available
         }
     }
 
@@ -173,13 +181,15 @@ class ChatViewModel : ViewModel() {
     fun sendMessage(text: String) {
         if (text.isBlank() || isLoading.value) return
 
-        // Determine: use local or cloud?
-        val useLocal = isLocalMode.value || currentAgent.value == "local"
+        // Auto-detect: if GlobalLLM loaded, prefer local
+        val globalLoaded = GlobalLLM.instance.isLoaded
+        val useLocal = isLocalMode.value || currentAgent.value == "local" || globalLoaded
 
         if (useLocal && localLLM.isLoaded) {
+            isLocalMode.value = true
             sendLocalMessage(text)
         } else if (useLocal && !localLLM.isLoaded) {
-            error.value = "⚠️ Local model not loaded. Tap 🧠 to load a model."
+            error.value = "⚠️ Chưa tải mô hình. Bấm 🧠 để tải."
         } else {
             sendCloudMessage(text)
         }
@@ -442,6 +452,6 @@ class ChatViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        localLLM.close()
+        // Don't close GlobalLLM — it persists across screens
     }
 }
