@@ -33,7 +33,6 @@ You have access to these tools to control the Android device:
 - `facebook_post(content: string)` — Post content to Facebook feed
 - `facebook_comment(comment: string)` — Comment on the current visible post
 - `messenger_reply(contact_name: string, message: string)` — Reply in Messenger
-- `messenger_read()` — Read last messages in current Messenger chat
 - `zalo_send(contact_name: string, message: string)` — Send Zalo message
 
 ### Screen Control Tools
@@ -75,7 +74,6 @@ When you're done and have the final answer, respond normally without tool_call t
                 "facebook_post" -> facebookPost(args)
                 "facebook_comment" -> facebookComment(args)
                 "messenger_reply" -> messengerReply(args)
-                "messenger_read" -> messengerRead()
                 "zalo_send" -> zaloSend(args)
 
                 // Screen control
@@ -130,12 +128,6 @@ When you're done and have the final answer, respond normally without tool_call t
         val msg = args["message"]?.jsonPrimitive?.content ?: return ToolResult(false, "Missing 'message'")
         val ctrl = AppController(context)
         val result = ctrl.messengerReply(name, msg)
-        return ToolResult(result.success, result.message)
-    }
-
-    private fun messengerRead(): ToolResult {
-        val ctrl = AppController(context)
-        val result = ctrl.messengerReadMessages()
         return ToolResult(result.success, result.message)
     }
 

@@ -200,25 +200,16 @@ Bạn là MAMA — tổng quản AI. Sếp "$sender" vừa gửi lệnh qua Zalo
 $agentList
 
 🔧 Các hành động có thể thực hiện:
-- gmail_read: Đọc inbox email
 - gmail_compose: Gửi email (cần to, subject, body)
-- gmail_search: Tìm email (cần query)
-- gmail_archive: Archive email
-- gmail_label: Dán nhãn email (cần label)
 - facebook_post: Đăng bài Facebook (cần content)
 - facebook_comment: Comment Facebook (cần comment)
 - messenger_reply: Trả lời Messenger (cần contact, message)
 - zalo_send: Gửi Zalo (cần contact, message)
 - zalo_post: Đăng bài Nhật ký Zalo (cần content)
-- zalo_timeline: Đọc Nhật ký Zalo
 - instagram_post: Đăng Instagram (cần caption)
 - threads_post: Đăng Threads (cần content)
-- threads_read: Đọc feed Threads
-- lark_read_chats: Đọc chat Lark
 - lark_send: Gửi tin nhắn Lark (cần contact, message)
-- lark_read_mail: Đọc mail Lark
 - lark_compose_mail: Gửi mail Lark (cần to, subject, body)
-- telegram_read: Đọc chat Telegram
 - telegram_send: Gửi Telegram (cần contact, message)
 - schedule_create: Tạo lịch tự động
 - delegate_task: Giao việc cho Agent khác suy nghĩ, tư vấn, viết lách (cần agent_id, task)
@@ -231,7 +222,7 @@ REPORT: [yes/no — có cần báo cáo lại không]
 
 Ví dụ:
 INTENT: Tổng hợp email và gửi báo cáo qua Zalo
-ACTIONS: [gmail_read], [zalo_send|contact=Khách hàng|message=REPORT]
+ACTIONS: [zalo_send|contact=Khách hàng|message=Chương trình khuyến mãi giảm 50% bắt đầu vào ngày mai]
 AGENT: secretary
 REPORT: yes
         """.trimIndent()
@@ -313,26 +304,12 @@ REPORT: yes
 
         return when (action) {
             // Gmail
-            "gmail_read" -> {
-                val result = controller.gmailReadInbox()
-                result.message
-            }
             "gmail_compose" -> {
                 val to = params["to"] ?: return "Missing 'to'"
                 val subject = params["subject"] ?: "Từ BizClaw"
                 val body = params["body"] ?: params["message"] ?: ""
                 val result = controller.gmailCompose(to, subject, body)
                 result.message
-            }
-            "gmail_search" -> {
-                val query = params["query"] ?: return "Missing 'query'"
-                val result = controller.gmailSearch(query)
-                result.message
-            }
-            "gmail_archive" -> controller.gmailArchive().message
-            "gmail_label" -> {
-                val label = params["label"] ?: return "Missing 'label'"
-                controller.gmailLabel(label).message
             }
 
             // Facebook
@@ -351,7 +328,6 @@ REPORT: yes
                 val message = params["message"] ?: return "Missing 'message'"
                 controller.messengerReply(contact, message).message
             }
-            "messenger_read" -> controller.messengerReadMessages().message
 
             // Zalo
             "zalo_send" -> {
@@ -369,7 +345,6 @@ REPORT: yes
                 val content = params["content"] ?: return "Missing 'content'"
                 controller.zaloPost(content).message
             }
-            "zalo_timeline" -> controller.zaloReadTimeline().message
 
             // Instagram
             "instagram_post" -> {
@@ -382,10 +357,6 @@ REPORT: yes
                 val content = params["content"] ?: return "Missing 'content'"
                 controller.threadsPost(content).message
             }
-            "threads_read" -> controller.threadsReadFeed().message
-
-            // Screen
-            "read_screen" -> controller.readCurrentScreen().message
 
             // Schedule
             "schedule_create" -> {
@@ -406,13 +377,11 @@ REPORT: yes
             }
 
             // Lark
-            "lark_read_chats" -> controller.larkReadChats().message
             "lark_send" -> {
                 val contact = params["contact"] ?: return "Missing 'contact'"
                 val message = params["message"] ?: return "Missing 'message'"
                 controller.larkSendMessage(contact, message).message
             }
-            "lark_read_mail" -> controller.larkReadMail().message
             "lark_compose_mail" -> {
                 val to = params["to"] ?: return "Missing 'to'"
                 val subject = params["subject"] ?: "Từ BizClaw"
@@ -421,7 +390,6 @@ REPORT: yes
             }
 
             // Telegram
-            "telegram_read" -> controller.telegramReadChats().message
             "telegram_send" -> {
                 val contact = params["contact"] ?: return "Missing 'contact'"
                 val message = params["message"] ?: return "Missing 'message'"

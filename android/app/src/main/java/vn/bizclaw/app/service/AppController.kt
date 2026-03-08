@@ -144,28 +144,6 @@ class AppController(private val context: Context) {
         }
     }
 
-    /**
-     * Read the last messages in the current Messenger conversation.
-     */
-    fun messengerReadMessages(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        val screen = a11y.readScreen() ?: return AutomationResult.error("Cannot read screen")
-
-        if (!screen.packageName.contains("facebook.orca")) {
-            return AutomationResult.error("Messenger is not open")
-        }
-
-        val messages = screen.elements
-            .filter { it.text.isNotEmpty() && !it.isClickable && !it.isEditable }
-            .map { it.text }
-            .takeLast(10)
-
-        return AutomationResult.success(
-            "Messages:\n${messages.joinToString("\n")}"
-        )
-    }
-
     // ─── Zalo ─────────────────────────────────────────────────────
 
     /**
@@ -244,80 +222,7 @@ class AppController(private val context: Context) {
         }
     }
 
-    /** Read Zalo Timeline / Nhật ký feed */
-    suspend fun zaloReadTimeline(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
 
-        return try {
-            openApp("com.zing.zalo")
-            delay(2000)
-
-            // Navigate to Nhật ký
-            a11y.clickByText("Nhật ký")
-                || a11y.clickByText("Timeline")
-                || a11y.clickByText("Cá nhân")
-            delay(1500)
-
-            val result = readCurrentScreen()
-            if (result.success) {
-                AutomationResult.success("📝 Zalo Timeline:\n${result.message}")
-            } else {
-                AutomationResult.error("Cannot read Zalo timeline")
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Zalo timeline read failed: ${e.message}")
-        }
-    }
-
-    // ─── Gmail / Email ────────────────────────────────────────────
-
-    /**
-     * Read the Gmail inbox — returns subject lines + senders of visible emails.
-     *
-     * Flow:
-     * 1. Open Gmail app
-     * 2. Wait for inbox to load
-     * 3. Read screen content to extract email subjects and senders
-     */
-    suspend fun gmailReadInbox(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp("com.google.android.gm")
-            delay(2500) // Gmail can be slow to load
-
-            val screen = a11y.readScreen()
-                ?: return AutomationResult.error("Cannot read Gmail screen")
-
-            if (!screen.packageName.contains("android.gm")) {
-                return AutomationResult.error("Gmail is not open (current: ${screen.packageName})")
-            }
-
-            // Extract email items from screen elements
-            val emails = screen.elements
-                .filter { it.text.isNotEmpty() && !it.isEditable }
-                .map { it.text }
-                .filter { text ->
-                    // Filter out UI chrome, keep email content
-                    text.length > 3 &&
-                    !text.startsWith("Gmail") &&
-                    !text.startsWith("Search") &&
-                    !text.startsWith("Compose") &&
-                    !text.contains("Navigation")
-                }
-                .take(20)
-
-            if (emails.isEmpty()) {
-                AutomationResult.success("Inbox trống hoặc không đọc được nội dung.")
-            } else {
-                AutomationResult.success(
-                    "📧 Gmail Inbox (${emails.size} items):\n${emails.joinToString("\n") { "• $it" }}"
-                )
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Gmail read failed: ${e.message}")
-        }
-    }
 
     /**
      * Compose and send an email via Gmail.
@@ -370,129 +275,6 @@ class AppController(private val context: Context) {
             AutomationResult.success("📧 Email sent to $to: $subject")
         } catch (e: Exception) {
             AutomationResult.error("Gmail compose failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Search emails in Gmail.
-     * Returns subjects of matching emails visible on screen.
-     */
-    suspend fun gmailSearch(query: String): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp("com.google.android.gm")
-            delay(2000)
-
-            // Tap search
-            val tapped = a11y.clickByText("Search in mail")
-                || a11y.clickByText("Tìm trong thư")
-                || a11y.clickByText("Search")
-            if (!tapped) return AutomationResult.error("Cannot find Search field")
-            delay(800)
-
-            // Type search query
-            val typed = a11y.typeText(query)
-            if (!typed) return AutomationResult.error("Cannot type search query")
-            delay(300)
-
-            // Submit search
-            a11y.pressEnter()
-            delay(2000) // Wait for results
-
-            // Read results
-            val screen = a11y.readScreen()
-                ?: return AutomationResult.error("Cannot read search results")
-
-            val results = screen.elements
-                .filter { it.text.isNotEmpty() && it.text.length > 5 }
-                .map { it.text }
-                .take(15)
-
-            AutomationResult.success(
-                "🔍 Search '$query' (${results.size} results):\n${results.joinToString("\n") { "• $it" }}"
-            )
-        } catch (e: Exception) {
-            AutomationResult.error("Gmail search failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Archive the currently open email in Gmail.
-     */
-    suspend fun gmailArchive(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            val archived = a11y.clickByText("Archive")
-                || a11y.clickByText("Lưu trữ")
-            if (archived) {
-                AutomationResult.success("📥 Email archived")
-            } else {
-                AutomationResult.error("Cannot find Archive button — is an email open?")
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Gmail archive failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Label/categorize the currently open email.
-     * Taps "Label" menu and selects the specified label.
-     */
-    suspend fun gmailLabel(label: String): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            // Tap the 3-dot menu or Label button
-            val menuTapped = a11y.clickByText("More options")
-                || a11y.clickByText("Thêm tùy chọn")
-                || a11y.clickByText("⋮")
-            if (!menuTapped) return AutomationResult.error("Cannot open menu")
-            delay(500)
-
-            // Tap Label
-            val labelTapped = a11y.clickByText("Label")
-                || a11y.clickByText("Nhãn")
-                || a11y.clickByText("Move to")
-                || a11y.clickByText("Di chuyển tới")
-            if (!labelTapped) return AutomationResult.error("Cannot find Label option")
-            delay(500)
-
-            // Select the target label
-            val selected = a11y.clickByText(label)
-            if (!selected) return AutomationResult.error("Label not found: $label")
-            delay(300)
-
-            // Confirm
-            a11y.clickByText("OK") || a11y.clickByText("Apply") || a11y.clickByText("Áp dụng")
-
-            AutomationResult.success("🏷️ Email labeled: $label")
-        } catch (e: Exception) {
-            AutomationResult.error("Gmail label failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Mark the current email as read/unread.
-     */
-    suspend fun gmailMarkRead(markAsRead: Boolean = true): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            val text = if (markAsRead) {
-                a11y.clickByText("Mark as read") || a11y.clickByText("Đánh dấu là đã đọc")
-            } else {
-                a11y.clickByText("Mark as unread") || a11y.clickByText("Đánh dấu là chưa đọc")
-            }
-
-            if (text) {
-                AutomationResult.success(if (markAsRead) "✅ Marked as read" else "📧 Marked as unread")
-            } else {
-                AutomationResult.error("Cannot find mark read/unread option")
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Gmail mark failed: ${e.message}")
         }
     }
 
@@ -586,24 +368,6 @@ class AppController(private val context: Context) {
         }
     }
 
-    /** Read Threads feed */
-    suspend fun threadsReadFeed(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp("com.instagram.barcelona")
-            delay(2000)
-            val result = readCurrentScreen()
-            if (result.success) {
-                AutomationResult.success("🧵 Threads Feed:\n${result.message}")
-            } else {
-                AutomationResult.error("Cannot read Threads feed")
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Threads read failed: ${e.message}")
-        }
-    }
-
     // ─── Lark (Feishu) ────────────────────────────────────────
 
     /** Lark package — international version; CN = com.ss.android.lark */
@@ -613,45 +377,6 @@ class AppController(private val context: Context) {
             val intent = context.packageManager.getLaunchIntentForPackage("com.larksuite.suite")
             return if (intent != null) "com.larksuite.suite" else "com.ss.android.lark"
         }
-
-    /**
-     * Read Lark chat inbox — returns visible chat names and last messages.
-     */
-    suspend fun larkReadChats(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp(larkPackage)
-            delay(2500)
-
-            // Tap "消息" / "Messaging" tab if not already there
-            a11y.clickByText("Messaging") || a11y.clickByText("消息")
-                || a11y.clickByText("Tin nhắn") || a11y.clickByText("Chat")
-            delay(1000)
-
-            val screen = a11y.readScreen()
-                ?: return AutomationResult.error("Cannot read Lark screen")
-
-            val chats = screen.elements
-                .filter { it.text.isNotEmpty() && !it.isEditable }
-                .map { it.text }
-                .filter { text ->
-                    text.length > 2 &&
-                    !text.equals("Messaging", ignoreCase = true) &&
-                    !text.equals("消息") &&
-                    !text.contains("Search") &&
-                    !text.contains("搜索") &&
-                    !text.contains("Navigation")
-                }
-                .take(20)
-
-            AutomationResult.success(
-                "💬 Lark Chats (${chats.size}):\n${chats.joinToString("\n") { "• $it" }}"
-            )
-        } catch (e: Exception) {
-            AutomationResult.error("Lark read chats failed: ${e.message}")
-        }
-    }
 
     /**
      * Send a Lark message to a contact/group.
@@ -686,52 +411,6 @@ class AppController(private val context: Context) {
             AutomationResult.success("💬 Lark sent to $contactName: ${message.take(50)}...")
         } catch (e: Exception) {
             AutomationResult.error("Lark send failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Read Lark Mail inbox.
-     */
-    suspend fun larkReadMail(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp(larkPackage)
-            delay(2000)
-
-            // Navigate to Mail tab
-            val mailTapped = a11y.clickByText("Mail")
-                || a11y.clickByText("邮箱")
-                || a11y.clickByText("Hộp thư")
-                || a11y.clickByText("Email")
-            if (!mailTapped) return AutomationResult.error("Cannot find Lark Mail tab")
-            delay(2000)
-
-            val screen = a11y.readScreen()
-                ?: return AutomationResult.error("Cannot read Lark Mail screen")
-
-            val emails = screen.elements
-                .filter { it.text.isNotEmpty() && !it.isEditable }
-                .map { it.text }
-                .filter { text ->
-                    text.length > 3 &&
-                    !text.equals("Mail", ignoreCase = true) &&
-                    !text.equals("邮箱") &&
-                    !text.contains("Compose") &&
-                    !text.contains("写邮件") &&
-                    !text.contains("Navigation")
-                }
-                .take(20)
-
-            if (emails.isEmpty()) {
-                AutomationResult.success("📭 Lark Mail: Hộp thư trống hoặc không đọc được.")
-            } else {
-                AutomationResult.success(
-                    "📧 Lark Mail (${emails.size}):\n${emails.joinToString("\n") { "• $it" }}"
-                )
-            }
-        } catch (e: Exception) {
-            AutomationResult.error("Lark mail read failed: ${e.message}")
         }
     }
 
@@ -824,62 +503,7 @@ class AppController(private val context: Context) {
         }
     }
 
-    /**
-     * Read Telegram chat list.
-     */
-    suspend fun telegramReadChats(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        return try {
-            openApp("org.telegram.messenger")
-            delay(2500)
-
-            val screen = a11y.readScreen()
-                ?: return AutomationResult.error("Cannot read Telegram screen")
-
-            val chats = screen.elements
-                .filter { it.text.isNotEmpty() && !it.isEditable }
-                .map { it.text }
-                .filter { it.length > 2 && !it.contains("Telegram") && !it.contains("Search") }
-                .take(20)
-
-            AutomationResult.success(
-                "✈️ Telegram (${chats.size}):\n${chats.joinToString("\n") { "• $it" }}"
-            )
-        } catch (e: Exception) {
-            AutomationResult.error("Telegram read failed: ${e.message}")
-        }
-    }
-
     // ─── Generic App Control ──────────────────────────────────────
-
-    /**
-     * Read what's on the current screen (any app).
-     */
-    fun readCurrentScreen(): AutomationResult {
-        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
-
-        val screen = a11y.readScreen() ?: return AutomationResult.error("Cannot read screen")
-
-        val summary = buildString {
-            appendLine("App: ${screen.packageName}")
-            appendLine("Elements: ${screen.elementCount}")
-            appendLine("---")
-            for (element in screen.elements) {
-                if (element.text.isNotEmpty()) {
-                    val type = when {
-                        element.isEditable -> "[INPUT]"
-                        element.isClickable -> "[BUTTON]"
-                        element.isScrollable -> "[SCROLL]"
-                        else -> "[TEXT]"
-                    }
-                    appendLine("$type ${element.text}")
-                }
-            }
-        }
-
-        return AutomationResult.success(summary)
-    }
 
     /**
      * Click any button/element by its text on the current screen.

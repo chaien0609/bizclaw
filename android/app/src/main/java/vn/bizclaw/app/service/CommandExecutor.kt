@@ -400,24 +400,18 @@ object CommandExecutor {
 
         val automationResult = when (cmd.action) {
             // Gmail
-            "gmail_read" -> controller.gmailReadInbox()
+            "gmail_read" -> AutomationResult.error("gmail_read is no longer supported")
             "gmail_compose" -> {
                 val to = cmd.params["to"] ?: return errorResult(cmd, "Missing 'to'")
                 val subject = cmd.params["subject"] ?: return errorResult(cmd, "Missing 'subject'")
                 val body = cmd.params["body"] ?: ""
                 controller.gmailCompose(to, subject, body)
             }
-            "gmail_search" -> {
-                val query = cmd.params["query"] ?: return errorResult(cmd, "Missing 'query'")
-                controller.gmailSearch(query)
-            }
-            "gmail_archive" -> controller.gmailArchive()
-            "gmail_label" -> {
-                val label = cmd.params["label"] ?: return errorResult(cmd, "Missing 'label'")
-                controller.gmailLabel(label)
-            }
-            "gmail_mark_read" -> controller.gmailMarkRead(true)
-            "gmail_mark_unread" -> controller.gmailMarkRead(false)
+            "gmail_search" -> AutomationResult.error("gmail_search is no longer supported")
+            "gmail_archive" -> AutomationResult.error("gmail_archive is no longer supported")
+            "gmail_label" -> AutomationResult.error("gmail_label is no longer supported")
+            "gmail_mark_read" -> AutomationResult.error("gmail_mark_read is no longer supported")
+            "gmail_mark_unread" -> AutomationResult.error("gmail_mark_unread is no longer supported")
 
             // Facebook
             "facebook_post" -> {
@@ -435,7 +429,7 @@ object CommandExecutor {
                 val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
                 controller.messengerReply(contact, message)
             }
-            "messenger_read" -> controller.messengerReadMessages()
+            "messenger_read" -> AutomationResult.error("messenger_read is no longer supported")
 
             // Zalo
             "zalo_send" -> {
@@ -447,7 +441,7 @@ object CommandExecutor {
                 val content = cmd.params["content"] ?: return errorResult(cmd, "Missing 'content'")
                 controller.zaloPost(content)
             }
-            "zalo_timeline" -> controller.zaloReadTimeline()
+            "zalo_timeline" -> AutomationResult.error("zalo_timeline is no longer supported")
 
             // Instagram
             "instagram_post" -> {
@@ -456,13 +450,13 @@ object CommandExecutor {
             }
 
             // Lark
-            "lark_read_chats" -> controller.larkReadChats()
+            "lark_read_chats" -> AutomationResult.error("lark_read_chats is no longer supported")
             "lark_send" -> {
                 val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
                 val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
                 controller.larkSendMessage(contact, message)
             }
-            "lark_read_mail" -> controller.larkReadMail()
+            "lark_read_mail" -> AutomationResult.error("lark_read_mail is no longer supported")
             "lark_compose_mail" -> {
                 val to = cmd.params["to"] ?: return errorResult(cmd, "Missing 'to'")
                 val subject = cmd.params["subject"] ?: return errorResult(cmd, "Missing 'subject'")
@@ -471,7 +465,7 @@ object CommandExecutor {
             }
 
             // Telegram
-            "telegram_read" -> controller.telegramReadChats()
+            "telegram_read" -> AutomationResult.error("telegram_read is no longer supported")
             "telegram_send" -> {
                 val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
                 val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
@@ -483,10 +477,10 @@ object CommandExecutor {
                 val content = cmd.params["content"] ?: return errorResult(cmd, "Missing 'content'")
                 controller.threadsPost(content)
             }
-            "threads_read" -> controller.threadsReadFeed()
+            "threads_read" -> AutomationResult.error("threads_read is no longer supported")
 
             // Screen reading
-            "read_screen" -> controller.readCurrentScreen()
+            "read_screen" -> AutomationResult.error("read_screen is no longer supported")
             "click" -> {
                 val text = cmd.params["text"] ?: return errorResult(cmd, "Missing 'text'")
                 controller.clickElement(text)

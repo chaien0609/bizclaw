@@ -236,12 +236,7 @@ class AutomationJobManager(private val context: Context) {
                     .take(source.maxItems)
 
                 if (zaloNotifs.isEmpty()) {
-                    // Try reading from app via Accessibility
-                    val controller = AppController(context)
-                    val result = withContext(Dispatchers.Main) {
-                        controller.readCurrentScreen()
-                    }
-                    return if (result.success) result.message else ""
+                    return ""
                 }
 
                 zaloNotifs.joinToString("\n") { "[${it.sender}] ${it.message}" }
@@ -261,10 +256,7 @@ class AutomationJobManager(private val context: Context) {
             }
 
             SourceType.GMAIL_INBOX -> {
-                // Use AppController to read Gmail inbox
-                val controller = AppController(context)
-                val result = controller.gmailReadInbox()
-                if (result.success) result.message else ""
+                "" // Unsupported without A11y UI scraping
             }
 
             SourceType.LARK_CHATS -> {
@@ -280,18 +272,13 @@ class AutomationJobManager(private val context: Context) {
                     .take(source.maxItems)
 
                 if (larkNotifs.isEmpty()) {
-                    // Fallback: read Lark screen
-                    val controller = AppController(context)
-                    val result = controller.larkReadChats()
-                    return if (result.success) result.message else ""
+                    return ""
                 }
                 larkNotifs.joinToString("\n") { "[Lark] ${it.sender}: ${it.message}" }
             }
 
             SourceType.LARK_MAIL -> {
-                val controller = AppController(context)
-                val result = controller.larkReadMail()
-                if (result.success) result.message else ""
+                "" // Unsupported without A11y UI scraping
             }
 
             SourceType.TELEGRAM_MESSAGES -> {
@@ -303,19 +290,13 @@ class AutomationJobManager(private val context: Context) {
                     .take(source.maxItems)
 
                 if (tgNotifs.isEmpty()) {
-                    val controller = AppController(context)
-                    val result = controller.telegramReadChats()
-                    return if (result.success) result.message else ""
+                    return ""
                 }
                 tgNotifs.joinToString("\n") { "[Telegram] ${it.sender}: ${it.message}" }
             }
 
             SourceType.SCREEN_CONTENT -> {
-                val controller = AppController(context)
-                val result = withContext(Dispatchers.Main) {
-                    controller.readCurrentScreen()
-                }
-                if (result.success) result.message else ""
+                "" // Unsupported without A11y UI scraping
             }
         }
     }
