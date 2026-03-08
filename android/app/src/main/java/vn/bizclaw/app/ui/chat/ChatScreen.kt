@@ -247,13 +247,24 @@ fun ChatScreen(
                             onClick = {
                                 if (isSelected) {
                                     selectedAgentId = null
+                                    selectedGroupId = null
                                     viewModel.currentAgent.value = "BizClaw"
                                 } else {
+                                    // Don't switch agent while generating
+                                    if (isLoading || isGroupChatting) return@FilterChip
                                     selectedAgentId = agent.id
+                                    selectedGroupId = null
                                     viewModel.currentAgent.value = agent.name
-                                    if (GlobalLLM.instance.isLoaded) {
-                                        val prompt = agentManager.buildPromptForAgent(agent, "")
-                                        GlobalLLM.instance.addSystemPrompt(prompt)
+                                    // Safe system prompt update
+                                    scope.launch {
+                                        try {
+                                            if (GlobalLLM.instance.isLoaded) {
+                                                val prompt = agentManager.buildPromptForAgent(agent, "")
+                                                GlobalLLM.instance.addSystemPrompt(prompt)
+                                            }
+                                        } catch (e: Exception) {
+                                            // Ignore — model might be busy
+                                        }
                                     }
                                 }
                             },
@@ -318,7 +329,15 @@ fun ChatScreen(
                 // Welcome message
                 if (messages.isEmpty()) {
                     item {
-                        WelcomeCard(isLocalMode = isLocalMode, localModelName = localModelName)
+                        WelcomeCard(
+                            isLocalMode = isLocalMode,
+                            localModelName = localModelName,
+                            onSuggestionClick = { suggestion ->
+                                inputText = suggestion
+                                viewModel.sendMessage(suggestion)
+                                inputText = ""
+                            },
+                        )
                     }
                 }
 
@@ -630,7 +649,11 @@ fun ChatBubble(message: UiMessage) {
 }
 
 @Composable
-fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
+fun WelcomeCard(
+    isLocalMode: Boolean = false,
+    localModelName: String? = null,
+    onSuggestionClick: (String) -> Unit = {},
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -692,28 +715,34 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "Chọn Agent ở thanh cuộn bên trên, hoặc hỏi trực tiếp:",
+                "Chọn Agent ở thanh cuộn bên trên, hoặc bấm gợi ý:",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(Modifier.height(12.dp))
 
-            // Quick action chips
+            // Quick action chips — NOW FUNCTIONAL
             val suggestions = listOf(
-                "💡 Viết caption FB",
-                "📊 Phân tích báo cáo",
-                "📧 Soạn email",
-                "💬 Tư vấn CSKH",
+                "Viết caption FB bán hàng cho sản phẩm mới",
+                "Phân tích báo cáo doanh thu tháng này",
+                "Soạn email gửi khách hàng",
+                "Tư vấn CSKH cho khách hỏi giá",
+            )
+            val labels = listOf(
+                "💡 Caption FB",
+                "📊 Báo cáo",
+                "📧 Email",
+                "💬 CSKH",
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                suggestions.take(2).forEach { text ->
+                suggestions.take(2).forEachIndexed { idx, text ->
                     SuggestionChip(
-                        onClick = { /* TODO: set as input */ },
-                        label = { Text(text, style = MaterialTheme.typography.labelSmall) },
+                        onClick = { onSuggestionClick(text) },
+                        label = { Text(labels[idx], style = MaterialTheme.typography.labelSmall) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -723,10 +752,10 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                suggestions.drop(2).forEach { text ->
+                suggestions.drop(2).forEachIndexed { idx, text ->
                     SuggestionChip(
-                        onClick = { /* TODO: set as input */ },
-                        label = { Text(text, style = MaterialTheme.typography.labelSmall) },
+                        onClick = { onSuggestionClick(text) },
+                        label = { Text(labels[idx + 2], style = MaterialTheme.typography.labelSmall) },
                         modifier = Modifier.weight(1f),
                     )
                 }
