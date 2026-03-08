@@ -76,6 +76,12 @@ enum class SourceType {
     FACEBOOK_COMMENTS,
     /** Collect Gmail inbox emails */
     GMAIL_INBOX,
+    /** Collect Lark chat messages */
+    LARK_CHATS,
+    /** Collect Lark Mail */
+    LARK_MAIL,
+    /** Collect Telegram messages */
+    TELEGRAM_MESSAGES,
     /** Collect all recent notifications */
     NOTIFICATIONS,
     /** Read current screen content */
@@ -95,6 +101,8 @@ data class DeliveryConfig(
 enum class DeliveryMethod {
     ZALO,
     GMAIL,
+    LARK,
+    TELEGRAM,
     LOG_ONLY,
 }
 
@@ -259,6 +267,49 @@ class AutomationJobManager(private val context: Context) {
                 if (result.success) result.message else ""
             }
 
+            SourceType.LARK_CHATS -> {
+                // Collect Lark notifications
+                val larkNotifs = BizClawNotificationListener.recentNotifications
+                    .filter {
+                        it.packageName == "com.larksuite.suite" ||
+                        it.packageName == "com.ss.android.lark"
+                    }
+                    .filter { notif ->
+                        source.target.isBlank() || notif.sender.contains(source.target, ignoreCase = true)
+                    }
+                    .take(source.maxItems)
+
+                if (larkNotifs.isEmpty()) {
+                    // Fallback: read Lark screen
+                    val controller = AppController(context)
+                    val result = controller.larkReadChats()
+                    return if (result.success) result.message else ""
+                }
+                larkNotifs.joinToString("\n") { "[Lark] ${it.sender}: ${it.message}" }
+            }
+
+            SourceType.LARK_MAIL -> {
+                val controller = AppController(context)
+                val result = controller.larkReadMail()
+                if (result.success) result.message else ""
+            }
+
+            SourceType.TELEGRAM_MESSAGES -> {
+                val tgNotifs = BizClawNotificationListener.recentNotifications
+                    .filter { it.packageName == "org.telegram.messenger" }
+                    .filter { notif ->
+                        source.target.isBlank() || notif.sender.contains(source.target, ignoreCase = true)
+                    }
+                    .take(source.maxItems)
+
+                if (tgNotifs.isEmpty()) {
+                    val controller = AppController(context)
+                    val result = controller.telegramReadChats()
+                    return if (result.success) result.message else ""
+                }
+                tgNotifs.joinToString("\n") { "[Telegram] ${it.sender}: ${it.message}" }
+            }
+
             SourceType.SCREEN_CONTENT -> {
                 val controller = AppController(context)
                 val result = withContext(Dispatchers.Main) {
@@ -349,6 +400,30 @@ Hãy tạo báo cáo tổng hợp.
                     Log.i(TAG, "✅ Report sent via Gmail to ${delivery.target}")
                 } else {
                     Log.e(TAG, "❌ Gmail delivery failed: ${result.message}")
+                }
+            }
+
+            DeliveryMethod.LARK -> {
+                if (delivery.target.isBlank()) return
+                val controller = AppController(context)
+                val fullReport = "${job.emoji} ${job.name}\n\n$report"
+                val result = controller.larkSendMessage(delivery.target, fullReport)
+                if (result.success) {
+                    Log.i(TAG, "✅ Report sent via Lark to ${delivery.target}")
+                } else {
+                    Log.e(TAG, "❌ Lark delivery failed: ${result.message}")
+                }
+            }
+
+            DeliveryMethod.TELEGRAM -> {
+                if (delivery.target.isBlank()) return
+                val controller = AppController(context)
+                val fullReport = "${job.emoji} ${job.name}\n\n$report"
+                val result = controller.telegramSendMessage(delivery.target, fullReport)
+                if (result.success) {
+                    Log.i(TAG, "✅ Report sent via Telegram to ${delivery.target}")
+                } else {
+                    Log.e(TAG, "❌ Telegram delivery failed: ${result.message}")
                 }
             }
 

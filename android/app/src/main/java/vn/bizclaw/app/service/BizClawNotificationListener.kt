@@ -29,6 +29,9 @@ class BizClawNotificationListener : NotificationListenerService() {
             "com.instagram.android" to "Instagram",
             "com.google.android.gm" to "Gmail",
             "com.microsoft.office.outlook" to "Outlook",
+            "com.larksuite.suite" to "Lark",
+            "com.ss.android.lark" to "Lark CN",
+            "org.telegram.messenger" to "Telegram",
         )
 
         var instance: BizClawNotificationListener? = null

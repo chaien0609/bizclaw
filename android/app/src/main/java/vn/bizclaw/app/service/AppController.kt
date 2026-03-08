@@ -472,6 +472,253 @@ class AppController(private val context: Context) {
         }
     }
 
+    // ─── Lark (Feishu) ────────────────────────────────────────
+
+    /** Lark package — international version; CN = com.ss.android.lark */
+    private val larkPackage: String
+        get() {
+            // Try international first, fall back to CN
+            val intent = context.packageManager.getLaunchIntentForPackage("com.larksuite.suite")
+            return if (intent != null) "com.larksuite.suite" else "com.ss.android.lark"
+        }
+
+    /**
+     * Read Lark chat inbox — returns visible chat names and last messages.
+     */
+    suspend fun larkReadChats(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp(larkPackage)
+            delay(2500)
+
+            // Tap "消息" / "Messaging" tab if not already there
+            a11y.clickByText("Messaging") || a11y.clickByText("消息")
+                || a11y.clickByText("Tin nhắn") || a11y.clickByText("Chat")
+            delay(1000)
+
+            val screen = a11y.readScreen()
+                ?: return AutomationResult.error("Cannot read Lark screen")
+
+            val chats = screen.elements
+                .filter { it.text.isNotEmpty() && !it.isEditable }
+                .map { it.text }
+                .filter { text ->
+                    text.length > 2 &&
+                    !text.equals("Messaging", ignoreCase = true) &&
+                    !text.equals("消息") &&
+                    !text.contains("Search") &&
+                    !text.contains("搜索") &&
+                    !text.contains("Navigation")
+                }
+                .take(20)
+
+            AutomationResult.success(
+                "💬 Lark Chats (${chats.size}):\n${chats.joinToString("\n") { "• $it" }}"
+            )
+        } catch (e: Exception) {
+            AutomationResult.error("Lark read chats failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Send a Lark message to a contact/group.
+     */
+    suspend fun larkSendMessage(contactName: String, message: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp(larkPackage)
+            delay(2000)
+
+            // Find and tap conversation
+            val found = a11y.clickByText(contactName)
+            if (!found) return AutomationResult.error("Cannot find Lark chat: $contactName")
+            delay(1500)
+
+            // Type message
+            val typed = a11y.typeIntoField("Message", message)
+                || a11y.typeIntoField("Tin nhắn", message)
+                || a11y.typeIntoField("输入消息", message)
+                || a11y.typeText(message)
+            if (!typed) return AutomationResult.error("Cannot type message in Lark")
+            delay(300)
+
+            // Send
+            val sent = a11y.clickByText("Send")
+                || a11y.clickByText("Gửi")
+                || a11y.clickByText("发送")
+                || a11y.pressEnter()
+            if (!sent) return AutomationResult.error("Cannot send Lark message")
+
+            AutomationResult.success("💬 Lark sent to $contactName: ${message.take(50)}...")
+        } catch (e: Exception) {
+            AutomationResult.error("Lark send failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Read Lark Mail inbox.
+     */
+    suspend fun larkReadMail(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp(larkPackage)
+            delay(2000)
+
+            // Navigate to Mail tab
+            val mailTapped = a11y.clickByText("Mail")
+                || a11y.clickByText("邮箱")
+                || a11y.clickByText("Hộp thư")
+                || a11y.clickByText("Email")
+            if (!mailTapped) return AutomationResult.error("Cannot find Lark Mail tab")
+            delay(2000)
+
+            val screen = a11y.readScreen()
+                ?: return AutomationResult.error("Cannot read Lark Mail screen")
+
+            val emails = screen.elements
+                .filter { it.text.isNotEmpty() && !it.isEditable }
+                .map { it.text }
+                .filter { text ->
+                    text.length > 3 &&
+                    !text.equals("Mail", ignoreCase = true) &&
+                    !text.equals("邮箱") &&
+                    !text.contains("Compose") &&
+                    !text.contains("写邮件") &&
+                    !text.contains("Navigation")
+                }
+                .take(20)
+
+            if (emails.isEmpty()) {
+                AutomationResult.success("📭 Lark Mail: Hộp thư trống hoặc không đọc được.")
+            } else {
+                AutomationResult.success(
+                    "📧 Lark Mail (${emails.size}):\n${emails.joinToString("\n") { "• $it" }}"
+                )
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Lark mail read failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Compose and send a Lark Mail.
+     */
+    suspend fun larkComposeMail(to: String, subject: String, body: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp(larkPackage)
+            delay(2000)
+
+            // Go to Mail
+            a11y.clickByText("Mail") || a11y.clickByText("邮箱")
+                || a11y.clickByText("Hộp thư")
+            delay(1500)
+
+            // Tap Compose
+            val composeTapped = a11y.clickByText("Compose")
+                || a11y.clickByText("写邮件")
+                || a11y.clickByText("Soạn thư")
+                || a11y.clickByText("✏️")
+            if (!composeTapped) return AutomationResult.error("Cannot find Compose in Lark Mail")
+            delay(1500)
+
+            // Fill To
+            val toFilled = a11y.typeIntoField("To", to)
+                || a11y.typeIntoField("收件人", to)
+                || a11y.typeIntoField("Tới", to)
+            if (!toFilled) return AutomationResult.error("Cannot fill To field")
+            delay(300)
+
+            // Fill Subject
+            val subFilled = a11y.typeIntoField("Subject", subject)
+                || a11y.typeIntoField("主题", subject)
+                || a11y.typeIntoField("Chủ đề", subject)
+            if (!subFilled) return AutomationResult.error("Cannot fill Subject")
+            delay(300)
+
+            // Fill Body
+            val bodyFilled = a11y.typeIntoField("Content", body)
+                || a11y.typeIntoField("正文", body)
+                || a11y.typeText(body)
+            if (!bodyFilled) return AutomationResult.error("Cannot fill mail body")
+            delay(300)
+
+            // Send
+            val sent = a11y.clickByText("Send")
+                || a11y.clickByText("发送")
+                || a11y.clickByText("Gửi")
+            if (!sent) return AutomationResult.error("Cannot find Send in Lark Mail")
+
+            AutomationResult.success("📧 Lark Mail sent to $to: $subject")
+        } catch (e: Exception) {
+            AutomationResult.error("Lark mail compose failed: ${e.message}")
+        }
+    }
+
+    // ─── Telegram ─────────────────────────────────────────────
+
+    /**
+     * Send a Telegram message to a contact/group.
+     */
+    suspend fun telegramSendMessage(contactName: String, message: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("org.telegram.messenger")
+            delay(2000)
+
+            // Find and tap conversation
+            val found = a11y.clickByText(contactName)
+            if (!found) return AutomationResult.error("Cannot find Telegram chat: $contactName")
+            delay(1500)
+
+            // Type message
+            val typed = a11y.typeIntoField("Message", message)
+                || a11y.typeIntoField("Tin nhắn", message)
+                || a11y.typeText(message)
+            if (!typed) return AutomationResult.error("Cannot type Telegram message")
+            delay(300)
+
+            // Send
+            a11y.clickByText("Send") || a11y.pressEnter()
+
+            AutomationResult.success("✈️ Telegram sent to $contactName: ${message.take(50)}...")
+        } catch (e: Exception) {
+            AutomationResult.error("Telegram send failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Read Telegram chat list.
+     */
+    suspend fun telegramReadChats(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("org.telegram.messenger")
+            delay(2500)
+
+            val screen = a11y.readScreen()
+                ?: return AutomationResult.error("Cannot read Telegram screen")
+
+            val chats = screen.elements
+                .filter { it.text.isNotEmpty() && !it.isEditable }
+                .map { it.text }
+                .filter { it.length > 2 && !it.contains("Telegram") && !it.contains("Search") }
+                .take(20)
+
+            AutomationResult.success(
+                "✈️ Telegram (${chats.size}):\n${chats.joinToString("\n") { "• $it" }}"
+            )
+        } catch (e: Exception) {
+            AutomationResult.error("Telegram read failed: ${e.message}")
+        }
+    }
+
     // ─── Generic App Control ──────────────────────────────────────
 
     /**

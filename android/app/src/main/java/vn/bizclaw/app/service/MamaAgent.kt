@@ -76,6 +76,8 @@ class MamaAgent(private val context: Context) {
             "messenger_reply", "messenger_read",
             "zalo_send",
             "instagram_post",
+            "lark_read_chats", "lark_send", "lark_read_mail", "lark_compose_mail",
+            "telegram_read", "telegram_send",
             "read_screen",
             "schedule_list", "schedule_create", "schedule_run",
         )
@@ -203,6 +205,12 @@ $agentList
 - messenger_reply: Trả lời Messenger (cần contact, message)
 - zalo_send: Gửi Zalo (cần contact, message)
 - instagram_post: Đăng Instagram (cần caption)
+- lark_read_chats: Đọc chat Lark
+- lark_send: Gửi tin nhắn Lark (cần contact, message)
+- lark_read_mail: Đọc mail Lark
+- lark_compose_mail: Gửi mail Lark (cần to, subject, body)
+- telegram_read: Đọc chat Telegram
+- telegram_send: Gửi Telegram (cần contact, message)
 - schedule_create: Tạo lịch tự động
 
 Hãy phân tích lệnh và trả lời CHÍNH XÁC theo format:
@@ -373,6 +381,29 @@ REPORT: yes
                 )
                 jobManager.addJob(job)
                 "✅ Đã tạo lịch '${job.name}' — ${job.intervalMinutes} phút/lần"
+            }
+
+            // Lark
+            "lark_read_chats" -> controller.larkReadChats().message
+            "lark_send" -> {
+                val contact = params["contact"] ?: return "Missing 'contact'"
+                val message = params["message"] ?: return "Missing 'message'"
+                controller.larkSendMessage(contact, message).message
+            }
+            "lark_read_mail" -> controller.larkReadMail().message
+            "lark_compose_mail" -> {
+                val to = params["to"] ?: return "Missing 'to'"
+                val subject = params["subject"] ?: "Từ BizClaw"
+                val body = params["body"] ?: ""
+                controller.larkComposeMail(to, subject, body).message
+            }
+
+            // Telegram
+            "telegram_read" -> controller.telegramReadChats().message
+            "telegram_send" -> {
+                val contact = params["contact"] ?: return "Missing 'contact'"
+                val message = params["message"] ?: return "Missing 'message'"
+                controller.telegramSendMessage(contact, message).message
             }
 
             else -> "⚠️ Hành động không rõ: $action"

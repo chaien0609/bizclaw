@@ -450,6 +450,29 @@ object CommandExecutor {
                 controller.instagramCaption(caption)
             }
 
+            // Lark
+            "lark_read_chats" -> controller.larkReadChats()
+            "lark_send" -> {
+                val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
+                val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
+                controller.larkSendMessage(contact, message)
+            }
+            "lark_read_mail" -> controller.larkReadMail()
+            "lark_compose_mail" -> {
+                val to = cmd.params["to"] ?: return errorResult(cmd, "Missing 'to'")
+                val subject = cmd.params["subject"] ?: return errorResult(cmd, "Missing 'subject'")
+                val body = cmd.params["body"] ?: ""
+                controller.larkComposeMail(to, subject, body)
+            }
+
+            // Telegram
+            "telegram_read" -> controller.telegramReadChats()
+            "telegram_send" -> {
+                val contact = cmd.params["contact"] ?: return errorResult(cmd, "Missing 'contact'")
+                val message = cmd.params["message"] ?: return errorResult(cmd, "Missing 'message'")
+                controller.telegramSendMessage(contact, message)
+            }
+
             // Screen reading
             "read_screen" -> controller.readCurrentScreen()
             "click" -> {
@@ -460,7 +483,7 @@ object CommandExecutor {
             else -> return CommandResult(
                 id = cmd.id,
                 status = CommandStatus.unsupported,
-                error = "Unknown automation: ${cmd.action}. Available: gmail_read, gmail_compose, gmail_search, gmail_archive, gmail_label, facebook_post, facebook_comment, messenger_reply, zalo_send, instagram_post",
+                error = "Unknown automation: ${cmd.action}. Available: gmail_*, facebook_*, messenger_*, zalo_send, instagram_post, lark_*, telegram_*",
             )
         }
 
