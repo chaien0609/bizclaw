@@ -46,6 +46,8 @@ fun ProviderScreen(
     var providers by remember { mutableStateOf(manager.loadProviders()) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingProvider by remember { mutableStateOf<AIProvider?>(null) }
+    var deletingProvider by remember { mutableStateOf<AIProvider?>(null) }
+    var testingProviderId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -120,19 +122,16 @@ fun ProviderScreen(
                         manager.updateProvider(provider.copy(enabled = enabled))
                         providers = manager.loadProviders()
                     },
-                    onDelete = {
-                        manager.deleteProvider(provider.id)
-                        providers = manager.loadProviders()
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Đã xoá ${provider.name}")
-                        }
-                    },
+                    onDelete = { deletingProvider = provider },
                     onTest = {
+                        testingProviderId = provider.id
                         scope.launch {
                             val result = testProvider(provider)
+                            testingProviderId = null
                             snackbarHostState.showSnackbar(result)
                         }
                     },
+                    isTesting = testingProviderId == provider.id,
                 )
             }
 
@@ -235,6 +234,7 @@ private fun ProviderCard(
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit,
     onTest: () -> Unit,
+    isTesting: Boolean = false,
 ) {
     val typeLabel = when (provider.type) {
         ProviderType.LOCAL_GGUF -> "Cục bộ (GGUF)"
@@ -321,8 +321,20 @@ private fun ProviderCard(
                 if (provider.type != ProviderType.LOCAL_GGUF) {
                     OutlinedButton(
                         onClick = onTest,
+                        enabled = !isTesting,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    ) { Text("🔍 Test", style = MaterialTheme.typography.labelSmall) }
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Testing...", style = MaterialTheme.typography.labelSmall)
+                        } else {
+                            Text("🔍 Test", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
 
                     OutlinedButton(
                         onClick = onEdit,

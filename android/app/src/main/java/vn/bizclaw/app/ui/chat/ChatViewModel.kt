@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.*
 import vn.bizclaw.app.data.api.BizClawClient
 import vn.bizclaw.app.data.model.AgentInfo
 import vn.bizclaw.app.data.model.ChatMessage
@@ -48,25 +49,88 @@ class ChatViewModel : ViewModel() {
     val error = mutableStateOf<String?>(null)
 
     // ═══════════════════════════════════════════════════════════
-    // CHAT HISTORY PER AGENT/GROUP
+    // CHAT HISTORY PER AGENT/GROUP — persisted to disk
     // ═══════════════════════════════════════════════════════════
     private val chatHistory = mutableMapOf<String, List<UiMessage>>()
     private var currentConversationId = "default"
+    private var historyDir: java.io.File? = null
+    private val historyJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    /** Initialize persistence directory (call from Composable with context) */
+    fun initHistoryDir(context: Context) {
+        if (historyDir == null) {
+            historyDir = java.io.File(context.filesDir, "chat_history").also {
+                it.mkdirs()
+            }
+        }
+    }
 
     /** Save current messages, switch to new conversation (restore or fresh) */
     fun switchToConversation(conversationId: String) {
-        // Save current
+        // Save current to memory + disk
         if (messages.isNotEmpty()) {
             chatHistory[currentConversationId] = messages.toList()
+            saveHistoryToDisk(currentConversationId, messages.toList())
         }
         // Switch
         currentConversationId = conversationId
         messages.clear()
-        // Restore if exists
-        val saved = chatHistory[conversationId]
+        // Restore from memory, fallback to disk
+        val saved = chatHistory[conversationId] ?: loadHistoryFromDisk(conversationId)
         if (saved != null) {
+            chatHistory[conversationId] = saved
             messages.addAll(saved)
         }
+    }
+
+    /** Auto-save current conversation (call after AI responds) */
+    fun autoSave() {
+        if (messages.isNotEmpty()) {
+            chatHistory[currentConversationId] = messages.toList()
+            saveHistoryToDisk(currentConversationId, messages.toList())
+        }
+    }
+
+    private fun saveHistoryToDisk(id: String, msgs: List<UiMessage>) {
+        try {
+            val dir = historyDir ?: return
+            val file = java.io.File(dir, "${id.replace("/", "_")}.json")
+            val jsonArr = buildJsonArray {
+                msgs.forEach { msg ->
+                    addJsonObject {
+                        put("role", msg.role)
+                        put("content", msg.content)
+                        put("agentName", msg.agentName)
+                        put("isLocal", msg.isLocal.toString())
+                        put("toolActions", msg.toolActions)
+                    }
+                }
+            }
+            file.writeText(jsonArr.toString())
+        } catch (_: Exception) { /* silent */ }
+    }
+
+    private fun loadHistoryFromDisk(id: String): List<UiMessage>? {
+        return try {
+            val dir = historyDir ?: return null
+            val file = java.io.File(dir, "${id.replace("/", "_")}.json")
+            if (!file.exists()) return null
+            val arr = historyJson.parseToJsonElement(file.readText())
+                .jsonArray
+            arr.map { elem ->
+                val obj = elem.jsonObject
+                UiMessage(
+                    role = obj["role"]?.jsonPrimitive?.content ?: "user",
+                    content = obj["content"]?.jsonPrimitive?.content ?: "",
+                    agentName = obj["agentName"]?.jsonPrimitive?.content ?: "",
+                    isLocal = obj["isLocal"]?.jsonPrimitive?.content == "true",
+                    toolActions = obj["toolActions"]?.jsonPrimitive?.content ?: "",
+                )
+            }
+        } catch (_: Exception) { null }
     }
 
     // ═══════════════════════════════════════════════════════════

@@ -22,15 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import androidx.compose.ui.platform.LocalContext
 import vn.bizclaw.app.engine.GlobalLLM
-import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
 import vn.bizclaw.app.engine.ProviderManager
 import vn.bizclaw.app.engine.ProviderChat
-import vn.bizclaw.app.engine.AgentGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +61,16 @@ fun ChatScreen(
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
     var isGroupChatting by remember { mutableStateOf(false) }
 
-    // Auto-scroll to bottom on new messages
+    // Initialize chat history persistence
+    LaunchedEffect(Unit) {
+        viewModel.initHistoryDir(context)
+    }
+
+    // Auto-scroll to bottom on new messages + auto-save
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+            viewModel.autoSave()
         }
     }
 
@@ -403,70 +405,14 @@ fun ChatScreen(
 
                                 scope.launch {
                                     try {
-                                        // Separate local vs remote agents
-                                        val localAgentList = mutableListOf<LocalAgent>()
-                                        val remoteAgentList = mutableListOf<LocalAgent>()
-
-                                        groupAgents.forEach { agent ->
-                                            val provider = providers.find { it.id == agent.providerId }
-                                            if (provider == null || provider.type == vn.bizclaw.app.engine.ProviderType.LOCAL_GGUF) {
-                                                localAgentList.add(agent)
-                                            } else {
-                                                remoteAgentList.add(agent)
-                                            }
-                                        }
-
-                                        // Remote agents: run in parallel
-                                        val remoteResults = remoteAgentList.map { agent ->
-                                            async {
-                                                val provider = providers.find { it.id == agent.providerId }
-                                                    ?: return@async Triple(agent, "⚠️ Không tìm thấy nguồn AI", "Unknown")
-                                                val prompt = agentManager.buildPromptForAgent(agent, msg)
-                                                val response = try {
-                                                    ProviderChat.chat(provider, prompt, msg)
-                                                } catch (e: Exception) {
-                                                    "❌ Lỗi: ${e.message?.take(60)}"
-                                                }
-                                                Triple(agent, response, provider.name)
-                                            }
-                                        }.awaitAll()
-
-                                        // Add remote results
-                                        remoteResults.forEach { (agent, response, providerName) ->
-                                            viewModel.addGroupResponse(
-                                                agentEmoji = agent.emoji,
-                                                agentName = agent.name,
-                                                providerName = providerName,
-                                                content = response,
-                                            )
-                                        }
-
-                                        // Local agents: run SEQUENTIALLY (GlobalLLM is single-threaded)
-                                        localAgentList.forEach { agent ->
-                                            val provider = providers.find { it.id == agent.providerId }
-                                                ?: providers.find { it.id == "local_gguf" }
-                                            val prompt = agentManager.buildPromptForAgent(agent, msg)
-                                            val response = try {
-                                                ProviderChat.chat(
-                                                    provider ?: vn.bizclaw.app.engine.AIProvider(
-                                                        id = "local_gguf",
-                                                        name = "AI Cục Bộ",
-                                                        type = vn.bizclaw.app.engine.ProviderType.LOCAL_GGUF,
-                                                        emoji = "🧠",
-                                                    ),
-                                                    prompt,
-                                                    msg,
-                                                )
-                                            } catch (e: Exception) {
-                                                "❌ Lỗi cục bộ: ${e.message?.take(60)}"
-                                            }
-                                            viewModel.addGroupResponse(
-                                                agentEmoji = agent.emoji,
-                                                agentName = agent.name,
-                                                providerName = provider?.name ?: "AI Cục Bộ",
-                                                content = response,
-                                            )
-                                        }
+                                        sendGroupMessage(
+                                            msg = msg,
+                                            group = activeGroup,
+                                            agents = localAgents,
+                                            providers = providers,
+                                            agentManager = agentManager,
+                                            viewModel = viewModel,
+                                        )
                                     } catch (e: Exception) {
                                         viewModel.addGroupResponse(
                                             agentEmoji = "⚠️",
@@ -506,66 +452,14 @@ fun ChatScreen(
         }
     }
 
-    // ─── Group Creation Dialog ───────────────────────
     if (showGroupDialog) {
-        var groupName by remember { mutableStateOf("") }
-        var groupEmoji by remember { mutableStateOf("👥") }
-        var selectedMembers by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-        AlertDialog(
-            onDismissRequest = { showGroupDialog = false },
-            title = { Text("Tạo nhóm Agent", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = groupName,
-                        onValueChange = { groupName = it },
-                        label = { Text("Tên nhóm") },
-                        placeholder = { Text("VD: Nhóm CSKH") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                    Text("Chọn agent vào nhóm:", style = MaterialTheme.typography.labelMedium)
-                    localAgents.forEach { agent ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Checkbox(
-                                checked = agent.id in selectedMembers,
-                                onCheckedChange = {
-                                    selectedMembers = if (it)
-                                        selectedMembers + agent.id
-                                    else
-                                        selectedMembers - agent.id
-                                },
-                            )
-                            Text("${agent.emoji} ${agent.name}")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (groupName.isNotBlank() && selectedMembers.isNotEmpty()) {
-                            providerManager.addGroup(
-                                AgentGroup(
-                                    id = "group_${System.currentTimeMillis()}",
-                                    name = groupName,
-                                    emoji = groupEmoji,
-                                    agentIds = selectedMembers.toList(),
-                                )
-                            )
-                            groups = providerManager.loadGroups()
-                            showGroupDialog = false
-                        }
-                    },
-                    enabled = groupName.isNotBlank() && selectedMembers.isNotEmpty(),
-                ) { Text("Tạo nhóm") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showGroupDialog = false }) { Text("Huỷ") }
+        GroupCreationDialog(
+            agents = localAgents,
+            onDismiss = { showGroupDialog = false },
+            onCreate = { group ->
+                providerManager.addGroup(group)
+                groups = providerManager.loadGroups()
+                showGroupDialog = false
             },
         )
     }
