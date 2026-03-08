@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
 import vn.bizclaw.app.engine.LocalRAG
+import vn.bizclaw.app.engine.ProviderManager
 
 // ═══════════════════════════════════════════════════════════════
 // Emoji options for agent creation
@@ -283,6 +284,10 @@ private fun AgentFormDialog(
     var systemPrompt by remember { mutableStateOf(agent?.systemPrompt ?: "") }
     var selectedKBs by remember { mutableStateOf(agent?.knowledgeBaseIds?.toSet() ?: emptySet()) }
     var autoReply by remember { mutableStateOf(agent?.autoReply ?: false) }
+    var selectedProvider by remember { mutableStateOf(agent?.providerId ?: "local_gguf") }
+
+    val context = LocalContext.current
+    val providers = remember { ProviderManager(context).loadProviders() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -375,6 +380,33 @@ private fun AgentFormDialog(
                     }
                     Switch(checked = autoReply, onCheckedChange = { autoReply = it })
                 }
+
+                // Provider selector
+                Text("⚡ Nguồn AI", style = MaterialTheme.typography.labelMedium)
+                providers.forEach { provider ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedProvider = provider.id },
+                    ) {
+                        RadioButton(
+                            selected = selectedProvider == provider.id,
+                            onClick = { selectedProvider = provider.id },
+                        )
+                        Text(
+                            "${provider.emoji} ${provider.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        if (!provider.enabled && provider.apiKey.isBlank()) {
+                            Text(
+                                " (chưa kết nối)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -389,6 +421,7 @@ private fun AgentFormDialog(
                             systemPrompt = systemPrompt,
                             knowledgeBaseIds = selectedKBs.toList(),
                             autoReply = autoReply,
+                            providerId = selectedProvider,
                             createdAt = agent?.createdAt ?: System.currentTimeMillis(),
                         )
                         onSave(newAgent)

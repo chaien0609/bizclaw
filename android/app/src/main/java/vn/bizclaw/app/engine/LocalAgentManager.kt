@@ -25,6 +25,8 @@ data class LocalAgent(
     val knowledgeBaseIds: List<String> = emptyList(), // RAG IDs attached
     val triggerApps: List<String> = emptyList(), // e.g. ["com.zing.zalo", "com.facebook.orca"]
     val autoReply: Boolean = false,
+    val providerId: String = "local_gguf", // AI provider to use
+    val groupId: String? = null, // Agent group membership
     val createdAt: Long = System.currentTimeMillis(),
 )
 

@@ -42,6 +42,8 @@ val SOCIAL_APPS = listOf(
     SocialApp("💙", "Messenger", "com.facebook.orca", Color(0xFF0084FF)),
     SocialApp("📘", "Facebook", "com.facebook.katana", Color(0xFF1877F2)),
     SocialApp("📸", "Instagram", "com.instagram.android", Color(0xFFE4405F)),
+    SocialApp("📧", "Gmail", "com.google.android.gm", Color(0xFFEA4335)),
+    SocialApp("📧", "Outlook", "com.microsoft.office.outlook", Color(0xFF0078D4)),
 )
 
 // ═══════════════════════════════════════════════════════════════
@@ -86,7 +88,7 @@ fun AutomationScreen(
                     Column {
                         Text("⚡ Tự Động Hoá", fontWeight = FontWeight.Bold)
                         Text(
-                            "Zalo • Facebook • Messenger",
+                            "Zalo • Facebook • Messenger • Email",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -349,6 +351,46 @@ val FLOW_TEMPLATES = listOf(
             "Trả lời tin nhắn từ Zalo, Facebook, Messenger. " +
             "Tư vấn sản phẩm, giải đáp thắc mắc, hỗ trợ đặt hàng. " +
             "Chuyên nghiệp nhưng thân thiện.",
+    ),
+    // ─── Email Flows ──────────────────────────────
+    FlowTemplate(
+        emoji = "📧",
+        name = "Kiểm tra & Trả lời Email",
+        description = "Tự động đọc email mới, phân loại và soạn trả lời",
+        targetApps = listOf("com.google.android.gm", "com.microsoft.office.outlook"),
+        systemPrompt = "Bạn là trợ lý email chuyên nghiệp. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Khi nhận email, hãy: " +
+            "1) Tóm tắt nội dung chính, " +
+            "2) Phân loại: Quan trọng/Bình thường/Spam, " +
+            "3) Soạn reply lịch sự, chuyên nghiệp. " +
+            "Nếu email spam/quảng cáo, ghi chú: 'Bỏ qua—spam'.",
+    ),
+    FlowTemplate(
+        emoji = "📋",
+        name = "Phân loại Email tự động",
+        description = "Tự động phân loại email: Quan trọng, Công việc, Spam",
+        targetApps = listOf("com.google.android.gm"),
+        systemPrompt = "Bạn là hệ thống phân loại email. CHỈ trả lời bằng tiếng Việt. " +
+            "Phân loại email thành các nhóm: " +
+            "🔴 KHẨN CẤP — cần trả lời ngay, " +
+            "🟡 QUAN TRỌNG — trả lời trong ngày, " +
+            "🟢 BÌNH THƯỜNG — trả lời khi rảnh, " +
+            "⚪ SPAM — bỏ qua. " +
+            "Kèm tóm tắt 1 dòng cho mỗi email.",
+    ),
+    FlowTemplate(
+        emoji = "📊",
+        name = "Tóm tắt Email hàng ngày",
+        description = "Cuối ngày tổng hợp tất cả email chưa đọc",
+        targetApps = listOf("com.google.android.gm", "com.microsoft.office.outlook"),
+        systemPrompt = "Bạn là trợ lý tổng hợp email hàng ngày. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Tổng hợp tất cả email thành báo cáo ngắn gọn: " +
+            "- Bao nhiêu email mới, " +
+            "- Bao nhiêu cần trả lời, " +
+            "- Tóm tắt email quan trọng nhất, " +
+            "- Đề xuất hành động tiếp theo.",
     ),
 )
 
