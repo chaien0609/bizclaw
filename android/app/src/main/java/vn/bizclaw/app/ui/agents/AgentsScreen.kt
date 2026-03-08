@@ -1,38 +1,87 @@
 package vn.bizclaw.app.ui.agents
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import vn.bizclaw.app.data.model.AgentInfo
+import vn.bizclaw.app.engine.LocalAgent
+import vn.bizclaw.app.engine.LocalAgentManager
+import vn.bizclaw.app.engine.LocalRAG
+
+// ═══════════════════════════════════════════════════════════════
+// Emoji options for agent creation
+// ═══════════════════════════════════════════════════════════════
+private val EMOJI_OPTIONS = listOf(
+    "🤖", "📝", "📊", "🎯", "💬", "🧠", "🔥", "⚡", "🎨", "📱",
+    "💼", "🏪", "📦", "🛒", "📣", "🎤", "📞", "✈️", "🏥", "🎓",
+)
+
+// ═══════════════════════════════════════════════════════════════
+// Main Agents Screen
+// ═══════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentsScreen(
-    agents: List<AgentInfo>,
-    currentAgent: String,
-    onSelectAgent: (String) -> Unit,
+    onSelectAgent: (LocalAgent) -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val manager = remember { LocalAgentManager(context) }
+    var agents by remember { mutableStateOf(manager.loadAgents()) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var editingAgent by remember { mutableStateOf<LocalAgent?>(null) }
+    var showRagManager by remember { mutableStateOf<LocalAgent?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Trợ Lý AI", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Trợ Lý AI", fontWeight = FontWeight.Bold)
+                        Text(
+                            "${agents.size} agent",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { showCreateDialog = true }) {
+                        Icon(Icons.Default.Add, "Tạo agent mới")
+                    }
+                },
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showCreateDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Icon(Icons.Default.Add, "Tạo mới")
+            }
         },
     ) { padding ->
         if (agents.isEmpty()) {
@@ -43,18 +92,15 @@ fun AgentsScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🤖", fontSize = 48.sp)
+                    Text("🤖", fontSize = 64.sp)
                     Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Chưa có agent nào",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "Kiểm tra kết nối server",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
+                    Text("Chưa có agent nào", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { showCreateDialog = true }) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tạo agent đầu tiên")
+                    }
                 }
             }
         } else {
@@ -64,62 +110,102 @@ fun AgentsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(agents) { agent ->
-                    AgentCard(
+                    LocalAgentCard(
                         agent = agent,
-                        isSelected = agent.name == currentAgent,
-                        onClick = {
-                            onSelectAgent(agent.name)
-                            onBack()
+                        onSelect = { onSelectAgent(agent) },
+                        onEdit = { editingAgent = agent },
+                        onRag = { showRagManager = agent },
+                        onDelete = {
+                            manager.deleteAgent(agent.id)
+                            agents = manager.loadAgents()
                         },
                     )
                 }
             }
         }
     }
+
+    // Create dialog
+    if (showCreateDialog) {
+        AgentFormDialog(
+            title = "Tạo Agent Mới",
+            agent = null,
+            knowledgeBases = LocalRAG.listKnowledgeBases(context),
+            onDismiss = { showCreateDialog = false },
+            onSave = { agent ->
+                manager.addAgent(agent)
+                agents = manager.loadAgents()
+                showCreateDialog = false
+            },
+        )
+    }
+
+    // Edit dialog
+    editingAgent?.let { agent ->
+        AgentFormDialog(
+            title = "Sửa Agent",
+            agent = agent,
+            knowledgeBases = LocalRAG.listKnowledgeBases(context),
+            onDismiss = { editingAgent = null },
+            onSave = { updated ->
+                manager.updateAgent(updated)
+                agents = manager.loadAgents()
+                editingAgent = null
+            },
+        )
+    }
+
+    // RAG Manager
+    showRagManager?.let { agent ->
+        RagManagerDialog(
+            agent = agent,
+            onDismiss = { showRagManager = null },
+            onSave = { updated ->
+                manager.updateAgent(updated)
+                agents = manager.loadAgents()
+                showRagManager = null
+            },
+        )
+    }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Agent Card
+// ═══════════════════════════════════════════════════════════════
+
 @Composable
-fun AgentCard(
-    agent: AgentInfo,
-    isSelected: Boolean,
-    onClick: () -> Unit,
+private fun LocalAgentCard(
+    agent: LocalAgent,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onRag: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        onClick = onSelect,
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Avatar
+            // Emoji avatar
             Surface(
                 shape = CircleShape,
-                color = if (isSelected)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(48.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        agent.name.take(2).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.onPrimary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text(agent.emoji, fontSize = 24.sp)
                 }
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -127,40 +213,356 @@ fun AgentCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (agent.role.isNotEmpty()) {
-                    Text(
-                        agent.role,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Text(
+                    agent.role.ifEmpty { "Agent" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // RAG badges
+                if (agent.knowledgeBaseIds.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        agent.knowledgeBaseIds.forEach { kbId ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                            ) {
+                                Text(
+                                    "📚 $kbId",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                )
+                            }
+                        }
+                    }
                 }
-                if (agent.model.isNotEmpty()) {
+                // Auto-reply
+                if (agent.autoReply) {
                     Text(
-                        "⚡ ${agent.model}",
+                        "🔔 Tự động trả lời",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }
             }
 
-            // Status badge
-            Surface(
-                shape = CircleShape,
-                color = when (agent.status) {
-                    "active" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
-                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                },
-            ) {
-                Text(
-                    text = if (agent.status == "active") "●" else "○",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = if (agent.status == "active")
-                        MaterialTheme.colorScheme.secondary
-                    else
-                        MaterialTheme.colorScheme.error,
-                    fontSize = 10.sp,
-                )
+            // Menu
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.MoreVert, "Menu")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("✏️ Sửa") },
+                        onClick = { showMenu = false; onEdit() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📚 Quản lý kiến thức (RAG)") },
+                        onClick = { showMenu = false; onRag() },
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("🗑 Xoá", color = MaterialTheme.colorScheme.error) },
+                        onClick = { showMenu = false; onDelete() },
+                    )
+                }
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Agent Create/Edit Dialog
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun AgentFormDialog(
+    title: String,
+    agent: LocalAgent?,
+    knowledgeBases: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (LocalAgent) -> Unit,
+) {
+    var name by remember { mutableStateOf(agent?.name ?: "") }
+    var emoji by remember { mutableStateOf(agent?.emoji ?: "🤖") }
+    var role by remember { mutableStateOf(agent?.role ?: "") }
+    var systemPrompt by remember { mutableStateOf(agent?.systemPrompt ?: "") }
+    var selectedKBs by remember { mutableStateOf(agent?.knowledgeBaseIds?.toSet() ?: emptySet()) }
+    var autoReply by remember { mutableStateOf(agent?.autoReply ?: false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Emoji picker
+                Text("Biểu tượng", style = MaterialTheme.typography.labelMedium)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    items(EMOJI_OPTIONS) { e ->
+                        FilterChip(
+                            selected = emoji == e,
+                            onClick = { emoji = e },
+                            label = { Text(e, fontSize = 20.sp) },
+                        )
+                    }
+                }
+
+                // Name
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên agent") },
+                    placeholder = { Text("VD: CSKH Zalo") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                // Role
+                OutlinedTextField(
+                    value = role,
+                    onValueChange = { role = it },
+                    label = { Text("Vai trò") },
+                    placeholder = { Text("VD: Trả lời tin nhắn khách hàng") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                // System prompt
+                OutlinedTextField(
+                    value = systemPrompt,
+                    onValueChange = { systemPrompt = it },
+                    label = { Text("System Prompt") },
+                    placeholder = { Text("Hướng dẫn cho AI: cách trả lời, phong cách, quy tắc...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    maxLines = 8,
+                )
+
+                // Knowledge base selection
+                if (knowledgeBases.isNotEmpty()) {
+                    Text("📚 Kiến thức (RAG)", style = MaterialTheme.typography.labelMedium)
+                    knowledgeBases.forEach { kbId ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedKBs = if (kbId in selectedKBs) selectedKBs - kbId
+                                    else selectedKBs + kbId
+                                },
+                        ) {
+                            Checkbox(
+                                checked = kbId in selectedKBs,
+                                onCheckedChange = {
+                                    selectedKBs = if (it) selectedKBs + kbId else selectedKBs - kbId
+                                },
+                            )
+                            Text("📚 $kbId", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                // Auto-reply toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("🔔 Tự động trả lời", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "Tự trả lời khi nhận tin nhắn mới",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = autoReply, onCheckedChange = { autoReply = it })
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank() && systemPrompt.isNotBlank()) {
+                        val newAgent = LocalAgent(
+                            id = agent?.id ?: "agent_${System.currentTimeMillis()}",
+                            emoji = emoji,
+                            name = name,
+                            role = role,
+                            systemPrompt = systemPrompt,
+                            knowledgeBaseIds = selectedKBs.toList(),
+                            autoReply = autoReply,
+                            createdAt = agent?.createdAt ?: System.currentTimeMillis(),
+                        )
+                        onSave(newAgent)
+                    }
+                },
+                enabled = name.isNotBlank() && systemPrompt.isNotBlank(),
+            ) {
+                Text("Lưu")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Huỷ") }
+        },
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RAG Manager Dialog
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun RagManagerDialog(
+    agent: LocalAgent,
+    onDismiss: () -> Unit,
+    onSave: (LocalAgent) -> Unit,
+) {
+    val context = LocalContext.current
+    var existingKBs by remember { mutableStateOf(LocalRAG.listKnowledgeBases(context)) }
+    var selectedKBs by remember { mutableStateOf(agent.knowledgeBaseIds.toSet()) }
+    var newKBName by remember { mutableStateOf("") }
+    var showAddDocs by remember { mutableStateOf<String?>(null) }
+    var newDocContent by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "${agent.emoji} ${agent.name} — Kiến thức",
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Existing RAG
+                Text("Kho kiến thức hiện có:", style = MaterialTheme.typography.labelMedium)
+
+                if (existingKBs.isEmpty() && selectedKBs.isEmpty()) {
+                    Text(
+                        "Chưa có kho kiến thức nào. Tạo mới bên dưới!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                existingKBs.forEach { kbId ->
+                    val rag = remember(kbId) { LocalRAG(context, kbId) }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (kbId in selectedKBs)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = kbId in selectedKBs,
+                                    onCheckedChange = {
+                                        selectedKBs = if (it) selectedKBs + kbId else selectedKBs - kbId
+                                    },
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("📚 $kbId", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${rag.size()} tài liệu",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    showAddDocs = if (showAddDocs == kbId) null else kbId
+                                }) {
+                                    Icon(Icons.Default.Add, "Thêm tài liệu")
+                                }
+                            }
+
+                            // Inline add document
+                            AnimatedVisibility(visible = showAddDocs == kbId) {
+                                Column {
+                                    OutlinedTextField(
+                                        value = newDocContent,
+                                        onValueChange = { newDocContent = it },
+                                        label = { Text("Nội dung kiến thức") },
+                                        placeholder = { Text("VD: Giá sản phẩm A là 500.000đ") },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(100.dp),
+                                        maxLines = 5,
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Button(
+                                        onClick = {
+                                            if (newDocContent.isNotBlank()) {
+                                                rag.addDocument(newDocContent)
+                                                newDocContent = ""
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = newDocContent.isNotBlank(),
+                                    ) {
+                                        Text("➕ Thêm vào kho")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+
+                // Create new KB
+                Text("Tạo kho kiến thức mới:", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = newKBName,
+                        onValueChange = { newKBName = it.lowercase().replace(" ", "_") },
+                        label = { Text("Tên kho") },
+                        placeholder = { Text("san_pham") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    Button(
+                        onClick = {
+                            if (newKBName.isNotBlank()) {
+                                LocalRAG(context, newKBName) // Creates the file
+                                selectedKBs = selectedKBs + newKBName
+                                existingKBs = LocalRAG.listKnowledgeBases(context)
+                                newKBName = ""
+                            }
+                        },
+                        enabled = newKBName.isNotBlank(),
+                    ) {
+                        Text("Tạo")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onSave(agent.copy(knowledgeBaseIds = selectedKBs.toList()))
+            }) {
+                Text("Lưu")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Huỷ") }
+        },
+    )
 }

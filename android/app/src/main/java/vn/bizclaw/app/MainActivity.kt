@@ -15,6 +15,7 @@ import vn.bizclaw.app.ui.chat.ChatScreen
 import vn.bizclaw.app.ui.chat.ChatViewModel
 import vn.bizclaw.app.ui.dashboard.DashboardScreen
 import vn.bizclaw.app.engine.GlobalLLM
+import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.ui.localllm.LocalLLMScreen
 import vn.bizclaw.app.ui.settings.SettingsScreen
 import vn.bizclaw.app.ui.theme.BizClawTheme
@@ -73,9 +74,13 @@ fun BizClawNavHost() {
 
         Screen.Agents -> {
             AgentsScreen(
-                agents = chatViewModel.agents,
-                currentAgent = chatViewModel.currentAgent.value,
-                onSelectAgent = { chatViewModel.selectAgent(it) },
+                onSelectAgent = { agent ->
+                    // When user selects an agent, go to LocalLLM chat with that prompt
+                    if (GlobalLLM.instance.isLoaded) {
+                        GlobalLLM.instance.addSystemPrompt(agent.systemPrompt)
+                    }
+                    currentScreen = Screen.LocalLLM
+                },
                 onBack = { currentScreen = Screen.Chat },
             )
         }
