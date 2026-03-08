@@ -27,7 +27,7 @@
 | 🧑‍💼 **Doanh nhân nhỏ** | AI trả lời khách hàng 24/7 qua Zalo, Telegram, Email |
 | 💻 **Developer** | Self-hosted AI agent với 16 providers, 13 tools, MCP support |
 | 🏪 **Cửa hàng / Quán** | AI hỗ trợ báo giá, lịch hẹn — chạy trên Raspberry Pi $0/tháng |
-| 📱 **Người dùng Android** | Agent tự post Facebook, reply Messenger — offline 100% |
+| 📱 **Người dùng Android** | Nhắn tin nhờ Mama làm việc, Auto-Reply Zalo/Messenger/Telegram 24/7 — offline 100% |
 
 > 🔒 **Không telemetry. Không tracking. Không tạo tài khoản trên server trung gian.** Dữ liệu chat, API Keys mã hoá AES-256 trên ổ cứng của bạn.
 
@@ -247,7 +247,14 @@ ollama pull llama3.2       # 3.8GB — phổ biến nhất
 | 🌐 REMOTE | Kết nối agent từ xa, chat & điều khiển |
 | 🔀 HYBRID | Engine local + agent cloud cùng lúc |
 
-**20 Device Tools:**
+| Tính Năng Nổi Bật | Mô tả |
+|-------------------|-------|
+| 💬 **Auto-Reply CSKH** | Tự động trả lời khách trên Zalo, Messenger, Telegram qua thông báo (chạy nền, không cướp màn hình). |
+| 👑 **Mama Tổng Quản** | Nhắn tin cho chính mình (hoặc cho Mama) trên Zalo để ra lệnh cho AI làm việc thay bạn từ xa. |
+| 👁️ **Thân thiện AI** | Chụp màn hình, truyền ảnh qua Social Apps, AI hiểu và trả lời trong nháy mắt. |
+| 📱 **Điều khiển trọn vẹn** | Tự động mở app, lướt feed, post bài, thả tim, gửi tin nhắn theo kịch bản. |
+
+**20 Device Tools tích hợp sẵn:**
 
 | Category | Tools |
 |----------|-------|
