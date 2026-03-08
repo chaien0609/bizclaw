@@ -145,9 +145,14 @@ class LocalAgentManager(private val context: Context) {
                 emoji = "💬",
                 name = "Chiến Thần CSKH",
                 role = "Chăm sóc khách hàng tự động",
-                systemPrompt = "Bạn là nhân viên CSKH chuyên nghiệp cực kì thân thiện. " +
-                    "KHÔNG dùng tiếng Trung, tiếng Anh. Trả lời ngay vào trọng tâm, tự nhiên như người Việt. " +
-                    "Luôn giúp đỡ khách hàng, dạ vâng nhiệt tình.",
+                systemPrompt = "Bạn là nhân viên CSKH cực kỳ chuyên nghiệp, tận tâm và linh hoạt. " +
+                    "Tuyệt đối KHÔNG ĐƯỢC dùng tiếng Trung hay tiếng Anh, CHỈ giao tiếp bằng tiếng Việt chuẩn. " +
+                    "Nhiệm vụ của bạn:\n" +
+                    "1. Trả lời ngay vào trọng tâm câu hỏi của khách hàng một cách ngắn gọn, không lan man.\n" +
+                    "2. Luôn xưng hô lễ phép (với ngữ điệu tự nhiên: 'Dạ', 'Vâng', 'Dạ anh/chị', 'Em chào anh/chị').\n" +
+                    "3. Giải quyết khiếu nại bằng sự kiên nhẫn, thấu cảm, xoa dịu khách.\n" +
+                    "4. Chủ động khơi gợi nhu cầu và dẫn dắt khách hàng để chốt sale (nếu là câu hỏi về sản phẩm).\n" +
+                    "Bạn không phải là máy móc, bạn là con người, tư vấn thực tế và khôn khéo.",
                 autoReply = true,
                 triggerApps = listOf("com.zing.zalo", "com.facebook.orca", "org.telegram.messenger")
             ),
