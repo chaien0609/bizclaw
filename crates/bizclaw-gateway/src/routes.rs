@@ -3144,6 +3144,7 @@ mod tests {
             config_path: std::path::PathBuf::from("/tmp/test_config.toml"),
             start_time: std::time::Instant::now(),
             pairing_code: Arc::new(Mutex::new(String::new())),
+            jwt_secret: String::new(),
             auth_failures: Arc::new(tokio::sync::Mutex::new((0, std::time::Instant::now()))),
             agent: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             orchestrator: std::sync::Arc::new(tokio::sync::Mutex::new(

@@ -30,3 +30,4 @@ hmac.workspace = true
 rusqlite.workspace = true
 futures.workspace = true
 bizclaw-db.workspace = true
+jsonwebtoken = "9"

@@ -542,6 +542,7 @@ dependencies = [
  "chrono",
  "futures",
  "hmac",
+ "jsonwebtoken",
  "reqwest",
  "rusqlite",
  "serde",

@@ -23,6 +23,9 @@ pub struct AppState {
     pub config_path: PathBuf,
     pub start_time: std::time::Instant,
     pub pairing_code: Arc<Mutex<String>>,
+    /// JWT secret — shared with Platform for token validation.
+    /// When set, Gateway accepts `Authorization: Bearer <JWT>` from Platform login.
+    pub jwt_secret: String,
     /// Brute-force protection — (failed_count, last_failed_at)
     pub auth_failures: Arc<tokio::sync::Mutex<(u32, std::time::Instant)>>,
     /// The Agent engine — handles chat with tools, memory, and all providers.
@@ -101,15 +104,59 @@ async fn dashboard_static(
     }
 }
 
-/// Pairing code auth middleware — validates X-Pairing-Code header or ?code= query.
+/// Auth middleware — accepts Platform JWT token OR legacy pairing code.
+/// Priority: 1) Authorization: Bearer <JWT>  2) X-Pairing-Code header  3) ?code= query
 async fn require_pairing(
     State(state): State<Arc<AppState>>,
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    // If no pairing code configured, allow all
+    // If no pairing code configured AND no JWT secret, allow all (dev mode)
     let expected = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    if expected.is_empty() && state.jwt_secret.is_empty() {
+        return next.run(req).await;
+    }
+
+    // ── Priority 1: JWT Bearer token from Platform login ──
+    if !state.jwt_secret.is_empty() {
+        // Check Authorization header
+        let auth_header = req.headers()
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            if let Ok(_claims) = validate_jwt(token, &state.jwt_secret) {
+                return next.run(req).await;
+            }
+        }
+        // Check cookie: bizclaw_token=<JWT>
+        let cookie_header = req.headers()
+            .get("Cookie")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        for part in cookie_header.split(';') {
+            let part = part.trim();
+            if let Some(token) = part.strip_prefix("bizclaw_token=") {
+                if let Ok(_claims) = validate_jwt(token.trim(), &state.jwt_secret) {
+                    return next.run(req).await;
+                }
+            }
+        }
+        // Check query param ?token=<JWT>
+        if let Some(query) = req.uri().query() {
+            for pair in query.split('&') {
+                if let Some(token) = pair.strip_prefix("token=") {
+                    if let Ok(_claims) = validate_jwt(token, &state.jwt_secret) {
+                        return next.run(req).await;
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Priority 2: Legacy pairing code ──
     if expected.is_empty() {
+        // No pairing code set and JWT didn't match → allow (pairing disabled)
         return next.run(req).await;
     }
 
@@ -129,20 +176,19 @@ async fn require_pairing(
         }
     }
 
-    // Check header first
+    // Check X-Pairing-Code header
     let from_header = req
         .headers()
         .get("X-Pairing-Code")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if constant_time_eq(from_header, &expected) {
-        // Reset failures on success
         let mut failures = state.auth_failures.lock().await;
         *failures = (0, std::time::Instant::now());
         return next.run(req).await;
     }
 
-    // Check query param ?code=
+    // Check ?code= query param
     if let Some(query) = req.uri().query() {
         for pair in query.split('&') {
             if let Some(code) = pair.strip_prefix("code=")
@@ -163,7 +209,7 @@ async fn require_pairing(
         .status(axum::http::StatusCode::UNAUTHORIZED)
         .header("Content-Type", "application/json")
         .body(axum::body::Body::from(
-            serde_json::json!({"ok": false, "error": "Unauthorized — invalid or missing pairing code"}).to_string()
+            serde_json::json!({"ok": false, "error": "Unauthorized — invalid or missing token"}).to_string()
         ))
         .unwrap()
 }
@@ -213,18 +259,52 @@ async fn rate_limit(
     next.run(req).await
 }
 
-/// Verify pairing code endpoint (public).
+/// Verify auth endpoint (public) — accepts pairing code OR JWT token.
 async fn verify_pairing(
     State(state): State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
+    // Accept JWT token
+    if let Some(token) = body["token"].as_str() {
+        if !state.jwt_secret.is_empty() {
+            if let Ok(claims) = validate_jwt(token, &state.jwt_secret) {
+                return Json(serde_json::json!({
+                    "ok": true,
+                    "auth": "jwt",
+                    "email": claims.email,
+                    "role": claims.role
+                }));
+            }
+        }
+    }
+    // Legacy pairing code
     let code = body["code"].as_str().unwrap_or("");
     let expected = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
     if expected.is_empty() || constant_time_eq(code, &expected) {
         Json(serde_json::json!({"ok": true}))
     } else {
-        Json(serde_json::json!({"ok": false, "error": "Invalid pairing code"}))
+        Json(serde_json::json!({"ok": false, "error": "Invalid credentials"}))
     }
+}
+
+/// Validate JWT token using the shared secret with Platform.
+fn validate_jwt(token: &str, secret: &str) -> std::result::Result<JwtClaims, String> {
+    use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+    let validation = Validation::new(Algorithm::HS256);
+    decode::<JwtClaims>(token, &DecodingKey::from_secret(secret.as_bytes()), &validation)
+        .map(|data| data.claims)
+        .map_err(|e| format!("JWT validation failed: {e}"))
+}
+
+/// JWT claims structure — mirrors Platform's auth::Claims.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct JwtClaims {
+    sub: String,
+    email: String,
+    role: String,
+    #[serde(default)]
+    tenant_id: Option<String>,
+    exp: usize,
 }
 
 /// Constant-time string comparison to prevent timing attacks (M3).
@@ -881,6 +961,7 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         } else {
             String::new()
         })),
+        jwt_secret: std::env::var("JWT_SECRET").unwrap_or_default(),
         auth_failures: Arc::new(tokio::sync::Mutex::new((0, std::time::Instant::now()))),
         agent: Arc::new(tokio::sync::Mutex::new(agent)),
         orchestrator: orchestrator_arc.clone(),

@@ -21,20 +21,51 @@ const AppContext = createContext({});
 export function useApp() { return useContext(AppContext); }
 
 // ═══ API HELPERS ═══
+// Auth: JWT token from Platform login (priority) or legacy pairing code
 let pairingCode = sessionStorage.getItem('bizclaw_pairing') || '';
 
+// Try to get JWT token from: 1) URL ?token=  2) cookie bizclaw_token  3) sessionStorage
+function getJwtToken() {
+  // 1. URL param
+  const url = new URL(location.href);
+  const tokenParam = url.searchParams.get('token');
+  if (tokenParam) {
+    sessionStorage.setItem('bizclaw_jwt', tokenParam);
+    // Clean URL
+    url.searchParams.delete('token');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    return tokenParam;
+  }
+  // 2. Cookie
+  const match = document.cookie.match(/bizclaw_token=([^;]+)/);
+  if (match) return match[1];
+  // 3. SessionStorage
+  return sessionStorage.getItem('bizclaw_jwt') || '';
+}
+
+let jwtToken = getJwtToken();
+
 function authHeaders(extra = {}) {
+  if (jwtToken) {
+    return { ...extra, 'Authorization': 'Bearer ' + jwtToken, 'Content-Type': 'application/json' };
+  }
   return { ...extra, 'X-Pairing-Code': pairingCode, 'Content-Type': 'application/json' };
 }
 
 async function authFetch(url, opts = {}) {
   if (!opts.headers) opts.headers = {};
-  opts.headers['X-Pairing-Code'] = pairingCode;
+  if (jwtToken) {
+    opts.headers['Authorization'] = 'Bearer ' + jwtToken;
+  } else {
+    opts.headers['X-Pairing-Code'] = pairingCode;
+  }
   const res = await fetch(url, opts);
   if (res.status === 401) {
     sessionStorage.removeItem('bizclaw_pairing');
+    sessionStorage.removeItem('bizclaw_jwt');
     pairingCode = '';
-    throw new Error('Invalid pairing code');
+    jwtToken = '';
+    throw new Error('Unauthorized');
   }
   return res;
 }
@@ -3911,22 +3942,28 @@ export function App() {
   }, [theme]);
   const wsRef = useRef(null);
 
-  // Check pairing — if server has require_pairing=false, verify-pairing returns ok for empty code
+  // Check auth — JWT token (from Platform login) or legacy pairing code
   useEffect(() => {
     (async () => {
       try {
+        // Build verify body: prefer JWT token, fallback to pairing code
+        const verifyBody = jwtToken
+          ? { token: jwtToken }
+          : { code: pairingCode || '' };
         const res = await fetch('/api/v1/verify-pairing', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: pairingCode || '' })
+          body: JSON.stringify(verifyBody)
         });
         const r = await res.json();
         if (r.ok) {
           setPaired(true);
         }
-        // If not ok and we have a stored code that didn't work, clear it
-        else if (pairingCode) {
+        // If not ok, clear stale credentials
+        else {
           sessionStorage.removeItem('bizclaw_pairing');
+          sessionStorage.removeItem('bizclaw_jwt');
           pairingCode = '';
+          jwtToken = '';
         }
       } catch (e) { setPaired(true); } // if API fails, assume no pairing required
       setCheckingPairing(false);
@@ -3956,8 +3993,11 @@ export function App() {
     function connect() {
       if (cancelled) return;
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const codeParam = pairingCode ? '?code=' + encodeURIComponent(pairingCode) : '';
-      const url = proto + '//' + location.host + '/ws' + codeParam;
+      // Prefer JWT token for WebSocket auth, fallback to pairing code
+      let authParam = '';
+      if (jwtToken) authParam = '?token=' + encodeURIComponent(jwtToken);
+      else if (pairingCode) authParam = '?code=' + encodeURIComponent(pairingCode);
+      const url = proto + '//' + location.host + '/ws' + authParam;
       
       try {
         const socket = new WebSocket(url);
