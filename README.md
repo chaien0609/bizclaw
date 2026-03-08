@@ -33,23 +33,43 @@
 
 ---
 
-## 🚀 Cài đặt — 3 cách
+## 🚀 Cài đặt — 5 cách
 
-### Cách 1: Build từ Source (Khuyên dùng)
+### 🖥️ Cách 1: Desktop App (macOS / Windows / Linux)
+
+> **Tải về, mở, dùng luôn — Zero config!**
+
+| Platform | Download | Size |
+|----------|----------|------|
+| 🍎 **macOS** (Apple Silicon) | [📥 bizclaw-desktop-macos-arm64.dmg](https://github.com/nguyenduchoai/bizclaw/releases/latest/download/bizclaw-desktop-macos-arm64.dmg) | ~13MB |
+| 🍎 **macOS** (Intel) | [📥 bizclaw-desktop-macos-x64.dmg](https://github.com/nguyenduchoai/bizclaw/releases/latest/download/bizclaw-desktop-macos-x64.dmg) | ~13MB |
+| 🪟 **Windows** | [📥 bizclaw-desktop-windows-x64.zip](https://github.com/nguyenduchoai/bizclaw/releases/latest/download/bizclaw-desktop-windows-x64.zip) | ~12MB |
+| 🐧 **Linux** (.deb) | [📥 bizclaw-desktop-linux-x64.deb](https://github.com/nguyenduchoai/bizclaw/releases/latest/download/bizclaw-desktop-linux-x64.deb) | ~12MB |
+
+```bash
+# macOS: Tải .dmg → Kéo vào Applications → Mở
+# Windows: Giải nén → Chạy bizclaw-desktop.exe
+# Linux:
+sudo dpkg -i bizclaw-desktop-linux-x64.deb
+bizclaw-desktop
+# → Dashboard tự mở tại http://127.0.0.1:<port>
+```
+
+### 🔧 Cách 2: Build từ Source
 
 ```bash
 git clone https://github.com/nguyenduchoai/bizclaw.git
 cd bizclaw && cargo build --release
 
-# Cài đặt (wizard tương tác — chọn provider, API key)
-./target/release/bizclaw init
+# Chạy Desktop app (auto-open browser)
+./target/release/bizclaw-desktop
 
-# Chạy agent + dashboard
-./target/release/bizclaw serve
+# Hoặc chạy CLI agent
+./target/release/bizclaw init && ./target/release/bizclaw serve
 # → Dashboard tại http://localhost:3000
 ```
 
-### Cách 2: Docker Standalone
+### 🐳 Cách 3: Docker Standalone (1 Tenant)
 
 ```bash
 git clone https://github.com/nguyenduchoai/bizclaw.git
@@ -57,12 +77,25 @@ cd bizclaw && docker-compose -f docker-compose.standalone.yml up -d
 # → Dashboard tại http://localhost:3000
 ```
 
-### Cách 3: One-Click Install (VPS / Raspberry Pi)
+### ☁️ Cách 4: Cloud Multi-Tenant (SaaS / Enterprise)
 
 ```bash
-curl -sSL https://bizclaw.vn/install.sh | sudo bash
-# → Dashboard tại http://<IP>:3000
+git clone https://github.com/nguyenduchoai/bizclaw.git
+cd bizclaw && docker-compose up -d
+# → Admin Platform tại http://localhost:3001
+# → Tạo tenant → Auto-provision gateway port
 ```
+
+### 🌐 Cách 5: One-Click Install (VPS / Raspberry Pi / PaaS)
+
+```bash
+curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
+  --domain bot.company.vn \
+  --admin-email admin@company.vn
+# → Dashboard tại https://bot.company.vn
+```
+
+> 💡 **PaaS Mode**: Cloud platform có thể quản lý remote VPS nodes — chỉ cần IP + root password, hệ thống tự SSH cài đặt, monitor health, và SSO qua JWT token.
 
 > 💡 **Chỉ cần 1 file `config.toml`** — không cần PostgreSQL, không cần Nginx, không cần domain.
 > Database sử dụng SQLite embedded, mọi thứ chạy trong 1 binary duy nhất.
@@ -86,6 +119,9 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
 | **🌐 Web Dashboard** | 20+ trang UI (VI/EN), WebSocket real-time, Full CRUD, Dark/Light mode |
 | **🔒 Bảo mật** | AES-256, Command allowlist, Runtime sandbox, HMAC-SHA256, rate limiting |
+| **🖥️ Desktop App** | macOS (.dmg), Windows (.exe), Linux (.deb) — 13MB, auto-open browser, zero config |
+| **☁️ Cloud Platform** | Multi-tenant SaaS, PaaS remote nodes, JWT SSO, PostgreSQL, Nginx auto-config |
+| **🔑 JWT SSO** | Đăng nhập 1 lần từ Platform → vào thẳng mọi tenant dashboard, không cần pairing code |
 
 ---
 

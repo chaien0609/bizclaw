@@ -1,0 +1,202 @@
+name: '🖥️ Release Desktop Apps'
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.3.1)'
+        required: true
+        default: 'v0.3.1'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Intel
+          - os: macos-13
+            target: x86_64-apple-darwin
+            name: bizclaw-desktop-macos-x64
+            ext: ''
+          # macOS Apple Silicon
+          - os: macos-14
+            target: aarch64-apple-darwin
+            name: bizclaw-desktop-macos-arm64
+            ext: ''
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: bizclaw-desktop-windows-x64
+            ext: '.exe'
+          # Linux x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: bizclaw-desktop-linux-x64
+            ext: ''
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.target }}-cargo-
+
+      - name: Build release (bizclaw-desktop)
+        run: cargo build --release --bin bizclaw-desktop --target ${{ matrix.target }}
+
+      - name: Build release (bizclaw CLI)
+        run: cargo build --release --bin bizclaw --target ${{ matrix.target }}
+
+      - name: Rename binaries
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/bizclaw-desktop${{ matrix.ext }} dist/${{ matrix.name }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/bizclaw${{ matrix.ext }} dist/bizclaw-${{ matrix.target }}${{ matrix.ext }}
+
+      # macOS: Create .dmg
+      - name: Create DMG (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dmg_contents
+          cp dist/${{ matrix.name }} dmg_contents/BizClaw
+          chmod +x dmg_contents/BizClaw
+          
+          # Create Applications symlink
+          ln -s /Applications dmg_contents/Applications
+          
+          # Create DMG
+          hdiutil create -volname "BizClaw Desktop" \
+            -srcfolder dmg_contents \
+            -ov -format UDZO \
+            dist/${{ matrix.name }}.dmg
+
+      # Windows: Create installer with NSIS-like packaging
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Just zip it for now — MSI requires WiX which is complex
+          cd dist
+          7z a ${{ matrix.name }}.zip ${{ matrix.name }}.exe
+
+      # Linux: Create .deb package
+      - name: Create DEB (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/usr/local/bin
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/usr/share/icons/hicolor/256x256/apps
+          
+          cp dist/${{ matrix.name }} deb/usr/local/bin/bizclaw-desktop
+          chmod +x deb/usr/local/bin/bizclaw-desktop
+          
+          # Desktop entry
+          cat > deb/usr/share/applications/bizclaw.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=BizClaw Desktop
+          Comment=AI Agent Platform for your desktop
+          Exec=/usr/local/bin/bizclaw-desktop
+          Icon=bizclaw
+          Type=Application
+          Categories=Development;Office;
+          Terminal=false
+          DESKTOP
+          
+          # Control file
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          cat > deb/DEBIAN/control << CONTROL
+          Package: bizclaw-desktop
+          Version: ${VERSION:-0.3.1}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: BizClaw Team <team@bizclaw.vn>
+          Description: BizClaw Desktop — AI Agent Platform
+           Fast, autonomous AI assistant with local brain,
+           multi-agent orchestration, knowledge base, and
+           channels integration (Zalo, Telegram, Messenger).
+          Homepage: https://bizclaw.vn
+          CONTROL
+          
+          dpkg-deb --build deb dist/${{ matrix.name }}.deb
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+          retention-days: 30
+
+  # Create GitHub Release with all artifacts
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List artifacts
+        run: find artifacts/ -type f | sort
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "BizClaw ${{ github.ref_name }}"
+          body: |
+            ## ⚡ BizClaw Desktop ${{ github.ref_name }}
+            
+            ### Downloads
+            
+            | Platform | Download |
+            |----------|----------|
+            | 🍎 macOS (Apple Silicon) | `bizclaw-desktop-macos-arm64.dmg` |
+            | 🍎 macOS (Intel) | `bizclaw-desktop-macos-x64.dmg` |
+            | 🪟 Windows | `bizclaw-desktop-windows-x64.zip` |
+            | 🐧 Linux (Debian/Ubuntu) | `bizclaw-desktop-linux-x64.deb` |
+            
+            ### Quick Start
+            
+            **macOS**: Download `.dmg` → Drag to Applications → Open
+            **Windows**: Download `.zip` → Extract → Run `bizclaw-desktop.exe`
+            **Linux**: `sudo dpkg -i bizclaw-desktop-linux-x64.deb && bizclaw-desktop`
+            
+            Dashboard opens automatically in your browser at `http://127.0.0.1:<port>`
+          files: artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

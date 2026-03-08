@@ -146,6 +146,7 @@ reqwest.workspace = true
 shellexpand.workspace = true
 rand.workspace = true
 chrono.workspace = true
+open = "5"
 
 [[bin]]
 name = "bizclaw"
@@ -154,6 +155,10 @@ path = "src/main.rs"
 [[bin]]
 name = "bizclaw-platform"
 path = "src/platform_main.rs"
+
+[[bin]]
+name = "bizclaw-desktop"
+path = "src/desktop_main.rs"
 
 [profile.release]
 opt-level = 3
