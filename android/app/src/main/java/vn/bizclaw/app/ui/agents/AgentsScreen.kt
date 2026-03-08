@@ -432,6 +432,7 @@ private fun AgentFormDialog(
                             systemPrompt = systemPrompt,
                             knowledgeBaseIds = selectedKBs.toList(),
                             autoReply = autoReply,
+                            triggerApps = agent?.triggerApps ?: listOf("com.zing.zalo", "com.facebook.orca", "org.telegram.messenger"),
                             providerId = selectedProvider,
                             createdAt = agent?.createdAt ?: System.currentTimeMillis(),
                         )

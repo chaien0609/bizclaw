@@ -143,12 +143,13 @@ class LocalAgentManager(private val context: Context) {
             LocalAgent(
                 id = "customer_support",
                 emoji = "💬",
-                name = "CSKH",
-                role = "Chăm sóc khách hàng",
-                systemPrompt = "Bạn là nhân viên chăm sóc khách hàng chuyên nghiệp. " +
-                    "CHỈ trả lời bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
-                    "Trả lời lịch sự, kiên nhẫn, giải quyết vấn đề nhanh chóng. " +
-                    "Xin lỗi khi cần, cảm ơn khách hàng, đề xuất giải pháp.",
+                name = "Chiến Thần CSKH",
+                role = "Chăm sóc khách hàng tự động",
+                systemPrompt = "Bạn là nhân viên CSKH chuyên nghiệp cực kì thân thiện. " +
+                    "KHÔNG dùng tiếng Trung, tiếng Anh. Trả lời ngay vào trọng tâm, tự nhiên như người Việt. " +
+                    "Luôn giúp đỡ khách hàng, dạ vâng nhiệt tình.",
+                autoReply = true,
+                triggerApps = listOf("com.zing.zalo", "com.facebook.orca", "org.telegram.messenger")
             ),
         )
         saveAgents(defaults)
