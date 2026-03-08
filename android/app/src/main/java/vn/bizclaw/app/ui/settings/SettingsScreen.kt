@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import vn.bizclaw.app.engine.GlobalLLM
 import androidx.compose.ui.unit.sp
 import vn.bizclaw.app.service.BizClawAccessibilityService
 import vn.bizclaw.app.service.BizClawDaemonService
@@ -143,12 +144,19 @@ fun SettingsScreen(
 
             // ─── Connection Status ────────────────────────────────
 
+            val localModelLoaded = GlobalLLM.instance.isLoaded
+            val effectiveConnected = when (selectedMode) {
+                RunMode.LOCAL -> localModelLoaded
+                RunMode.REMOTE -> isConnected
+                RunMode.HYBRID -> isConnected || localModelLoaded
+            }
+
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isConnected)
+                    containerColor = if (effectiveConnected)
                         MaterialTheme.colorScheme.secondaryContainer
                     else
-                        MaterialTheme.colorScheme.errorContainer,
+                        MaterialTheme.colorScheme.surfaceVariant,
                 ),
             ) {
                 Row(
@@ -158,24 +166,36 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        if (isConnected) Icons.Default.CheckCircle else Icons.Default.Error,
+                        when {
+                            effectiveConnected -> Icons.Default.CheckCircle
+                            selectedMode == RunMode.LOCAL -> Icons.Default.Memory
+                            else -> Icons.Default.Error
+                        },
                         contentDescription = null,
-                        tint = if (isConnected)
-                            MaterialTheme.colorScheme.secondary
-                        else
-                            MaterialTheme.colorScheme.error,
+                        tint = when {
+                            effectiveConnected -> MaterialTheme.colorScheme.secondary
+                            selectedMode == RunMode.LOCAL -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.error
+                        },
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            if (isConnected) "Đã kết nối" else "Mất kết nối",
+                            when {
+                                selectedMode == RunMode.LOCAL && localModelLoaded ->
+                                    "AI cục bộ sẵn sàng"
+                                selectedMode == RunMode.LOCAL ->
+                                    "Chưa tải mô hình — Vào 🧠 AI Cục Bộ"
+                                effectiveConnected -> "Đã kết nối"
+                                else -> "Chưa kết nối máy chủ"
+                            },
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             when (selectedMode) {
-                                RunMode.LOCAL -> "Engine local (127.0.0.1:3001)"
+                                RunMode.LOCAL -> GlobalLLM.loadedModelName ?: "Bấm 🧠 để tải mô hình"
                                 RunMode.REMOTE -> url
-                                RunMode.HYBRID -> "Local + $url"
+                                RunMode.HYBRID -> "Cục bộ + $url"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
