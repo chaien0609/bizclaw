@@ -41,6 +41,63 @@ import java.io.File
 private enum class LLMTab { Models, Chat, Benchmark }
 
 // ═══════════════════════════════════════════════════════════════
+// Demo Agent Personas
+// ═══════════════════════════════════════════════════════════════
+data class AgentPersona(
+    val emoji: String,
+    val name: String,
+    val role: String,
+    val systemPrompt: String,
+)
+
+val DEMO_AGENTS = listOf(
+    AgentPersona(
+        emoji = "🤖",
+        name = "BizClaw",
+        role = "Trợ lý tổng hợp",
+        systemPrompt = "Bạn tên là BizClaw, một trợ lý AI thân thiện chạy trên điện thoại. " +
+            "Luôn trả lời bằng tiếng Việt. Trả lời ngắn gọn, tự nhiên. " +
+            "Khi được chào, hãy chào lại thân thiện. Không bịa thông tin.",
+    ),
+    AgentPersona(
+        emoji = "📝",
+        name = "Copywriter",
+        role = "Viết nội dung & quảng cáo",
+        systemPrompt = "Bạn là chuyên gia viết nội dung marketing tiếng Việt. " +
+            "Viết caption Facebook, mô tả sản phẩm, email marketing, bài blog. " +
+            "Phong cách sáng tạo, thu hút, phù hợp thị trường Việt Nam. " +
+            "Luôn trả lời bằng tiếng Việt.",
+    ),
+    AgentPersona(
+        emoji = "📊",
+        name = "Phân tích",
+        role = "Phân tích dữ liệu & báo cáo",
+        systemPrompt = "Bạn là chuyên gia phân tích kinh doanh. " +
+            "Giúp phân tích số liệu, đưa ra nhận xét và đề xuất. " +
+            "Trả lời có cấu trúc, dùng bullet points. " +
+            "Luôn trả lời bằng tiếng Việt.",
+    ),
+    AgentPersona(
+        emoji = "🎯",
+        name = "Chiến lược",
+        role = "Tư vấn chiến lược kinh doanh",
+        systemPrompt = "Bạn là cố vấn chiến lược kinh doanh cho SME Việt Nam. " +
+            "Tư vấn marketing, bán hàng, vận hành, nhân sự. " +
+            "Đưa lời khuyên thực tế, áp dụng được ngay. " +
+            "Luôn trả lời bằng tiếng Việt.",
+    ),
+    AgentPersona(
+        emoji = "💬",
+        name = "CSKH",
+        role = "Chăm sóc khách hàng",
+        systemPrompt = "Bạn là nhân viên chăm sóc khách hàng chuyên nghiệp. " +
+            "Trả lời lịch sự, kiên nhẫn, giải quyết vấn đề nhanh chóng. " +
+            "Xin lỗi khi cần, cảm ơn khách hàng, đề xuất giải pháp. " +
+            "Luôn trả lời bằng tiếng Việt.",
+    ),
+)
+
+// ═══════════════════════════════════════════════════════════════
 // Main Screen
 // ═══════════════════════════════════════════════════════════════
 
@@ -67,6 +124,7 @@ fun LocalLLMScreen(onBack: () -> Unit) {
     var isGenerating by remember { mutableStateOf(false) }
     var generationSpeed by remember { mutableStateOf(0f) }
     var contextUsed by remember { mutableStateOf(0) }
+    var selectedAgent by remember { mutableStateOf(DEMO_AGENTS[0]) }
 
     // Benchmark state
     var benchResult by remember { mutableStateOf("") }
@@ -185,14 +243,8 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                                             .coerceAtMost(8),
                                     ),
                                 )
-                                // Set BizClaw system prompt
-                                llm.addSystemPrompt(
-                                    "Bạn tên là BizClaw, một trợ lý AI thân thiện chạy trên điện thoại. " +
-                                    "Luôn trả lời bằng tiếng Việt. " +
-                                    "Trả lời ngắn gọn, tự nhiên như người thật. " +
-                                    "Khi được chào hỏi, hãy chào lại thân thiện. " +
-                                    "Không bịa thông tin. Nếu không biết, nói thẳng là không biết."
-                                )
+                                // Set agent system prompt
+                                llm.addSystemPrompt(selectedAgent.systemPrompt)
                                 loadedModelName = name
                                 statusMessage = "✅ $name đã sẵn sàng!"
                                 chatMessages.clear()
@@ -217,6 +269,14 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                     generationSpeed = generationSpeed,
                     contextUsed = contextUsed,
                     loadedModelName = loadedModelName,
+                    selectedAgent = selectedAgent,
+                    onAgentChange = { agent ->
+                        selectedAgent = agent
+                        if (llm.isLoaded) {
+                            llm.addSystemPrompt(agent.systemPrompt)
+                            chatMessages.clear()
+                        }
+                    },
                     onInputChange = { chatInput = it },
                     onSend = { query ->
                         if (llm.isLoaded && query.isNotBlank()) {
@@ -228,20 +288,27 @@ fun LocalLLMScreen(onBack: () -> Unit) {
 
                             scope.launch {
                                 try {
-                                    val responseBuilder = StringBuilder()
+                                    val rawBuilder = StringBuilder()
                                     llm.getResponseAsFlow(query)
                                         .flowOn(Dispatchers.IO)
                                         .collect { token ->
-                                            responseBuilder.append(token)
-                                            // Update last message in-place
+                                            rawBuilder.append(token)
+                                            val raw = rawBuilder.toString()
+
+                                            // Parse <think>...</think> tags
+                                            val parsed = parseThinking(raw)
                                             chatMessages[chatMessages.size - 1] =
-                                                assistantMsg.copy(content = responseBuilder.toString())
+                                                assistantMsg.copy(
+                                                    content = parsed.response,
+                                                    thinking = parsed.thinking,
+                                                    isThinking = parsed.isStillThinking,
+                                                )
                                         }
                                     generationSpeed = llm.getGenerationSpeed()
                                     contextUsed = llm.getContextUsed()
                                 } catch (e: Exception) {
                                     chatMessages[chatMessages.size - 1] =
-                                        assistantMsg.copy(content = "⚠️ Error: ${e.message}")
+                                        assistantMsg.copy(content = "⚠️ Lỗi: ${e.message}")
                                 }
                                 isGenerating = false
                             }
@@ -272,7 +339,40 @@ fun LocalLLMScreen(onBack: () -> Unit) {
 // ═══════════════════════════════════════════════════════════════
 // Chat message data
 // ═══════════════════════════════════════════════════════════════
-data class ChatMsg(val role: String, val content: String)
+data class ChatMsg(
+    val role: String,
+    val content: String,
+    val thinking: String = "",
+    val isThinking: Boolean = false,
+)
+
+/** Parse <think>...</think> tags from model output */
+private data class ThinkParsed(
+    val thinking: String,
+    val response: String,
+    val isStillThinking: Boolean,
+)
+
+private fun parseThinking(raw: String): ThinkParsed {
+    val thinkStart = raw.indexOf("<think>")
+    val thinkEnd = raw.indexOf("</think>")
+
+    return when {
+        // No think tags at all
+        thinkStart < 0 -> ThinkParsed("", raw.trim(), false)
+        // Still inside <think>...</think> — hasn't closed yet
+        thinkEnd < 0 -> {
+            val thinking = raw.substring(thinkStart + 7).trim()
+            ThinkParsed(thinking, "", true)
+        }
+        // Think tag is closed — split thinking and response
+        else -> {
+            val thinking = raw.substring(thinkStart + 7, thinkEnd).trim()
+            val response = raw.substring(thinkEnd + 8).trim()
+            ThinkParsed(thinking, response, false)
+        }
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Models Tab
@@ -482,6 +582,8 @@ private fun ChatTab(
     generationSpeed: Float,
     contextUsed: Int,
     loadedModelName: String?,
+    selectedAgent: AgentPersona,
+    onAgentChange: (AgentPersona) -> Unit,
     onInputChange: (String) -> Unit,
     onSend: (String) -> Unit,
 ) {
@@ -516,6 +618,33 @@ private fun ChatTab(
                 }
             }
         } else {
+            // Agent selector chips
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    DEMO_AGENTS.forEach { agent ->
+                        val isSelected = agent.name == selectedAgent.name
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onAgentChange(agent) },
+                            label = {
+                                Text(
+                                    "${agent.emoji} ${agent.name}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                            modifier = Modifier.height(32.dp),
+                        )
+                    }
+                }
+            }
+
             // Performance stats
             if (generationSpeed > 0) {
                 Surface(
@@ -553,7 +682,7 @@ private fun ChatTab(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 32.dp),
+                                .padding(vertical = 24.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
                                     alpha = 0.5f
@@ -566,16 +695,22 @@ private fun ChatTab(
                                     .fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text("🧠", fontSize = 48.sp)
+                                Text(selectedAgent.emoji, fontSize = 48.sp)
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    "AI Trên Thiết Bị — $loadedModelName",
+                                    "${selectedAgent.name} — $loadedModelName",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Text(
-                                    "100% ngoại tuyến • Không cần API key • Miễn phí",
+                                    selectedAgent.role,
                                     style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "100% ngoại tuyến • Miễn phí",
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -626,6 +761,8 @@ private fun ChatTab(
 @Composable
 private fun LLMChatBubble(msg: ChatMsg, isGenerating: Boolean) {
     val isUser = msg.role == "user"
+    var showThinking by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -662,13 +799,88 @@ private fun LLMChatBubble(msg: ChatMsg, isGenerating: Boolean) {
                     )
                     Spacer(Modifier.height(2.dp))
                 }
-                Text(
-                    text = msg.content.ifEmpty { "..." },
-                    color = if (isUser) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (isGenerating && !isUser) {
+
+                // Thinking indicator — while model is still in <think> mode
+                if (msg.isThinking) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🤔", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Đang suy nghĩ...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+
+                // Collapsible thinking block — after thinking is done
+                if (!msg.isThinking && msg.thinking.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showThinking = !showThinking },
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("💭", fontSize = 14.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (showThinking) "Ẩn suy nghĩ" else "Xem suy nghĩ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    if (showThinking) "▲" else "▼",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                )
+                            }
+                            AnimatedVisibility(visible = showThinking) {
+                                Column {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        msg.thinking,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        lineHeight = 16.sp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                // Actual response content
+                if (msg.content.isNotEmpty()) {
+                    Text(
+                        text = msg.content,
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else if (!msg.isThinking) {
+                    Text(
+                        text = "...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                if (isGenerating && !isUser && !msg.isThinking) {
                     Spacer(Modifier.height(4.dp))
                     LinearProgressIndicator(
                         modifier = Modifier
