@@ -51,6 +51,8 @@ enum class ProviderType {
     APP_GEMINI,      // Use Gemini app on device (free, slower)
     APP_CHATGPT,     // Use ChatGPT app on device (free, slower)
     APP_GROK,        // Use Grok app on device (free, slower)
+    APP_DEEPSEEK,    // Use DeepSeek app on device (free, slower)
+    APP_NOTEBOOKLM,  // Use NotebookLM app as RAG (free, grounded answers)
 }
 
 /**

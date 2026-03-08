@@ -27,6 +27,7 @@ class BizClawNotificationListener : NotificationListenerService() {
             "com.facebook.orca" to "Messenger",
             "com.facebook.katana" to "Facebook",
             "com.instagram.android" to "Instagram",
+            "com.instagram.barcelona" to "Threads",
             "com.google.android.gm" to "Gmail",
             "com.microsoft.office.outlook" to "Outlook",
             "com.larksuite.suite" to "Lark",

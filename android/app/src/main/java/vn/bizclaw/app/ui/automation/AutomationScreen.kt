@@ -46,6 +46,7 @@ val SOCIAL_APPS = listOf(
     SocialApp("💙", "Messenger", "com.facebook.orca", Color(0xFF0084FF)),
     SocialApp("📘", "Facebook", "com.facebook.katana", Color(0xFF1877F2)),
     SocialApp("📸", "Instagram", "com.instagram.android", Color(0xFFE4405F)),
+    SocialApp("🧵", "Threads", "com.instagram.barcelona", Color(0xFF000000)),
     SocialApp("📧", "Gmail", "com.google.android.gm", Color(0xFFEA4335)),
     SocialApp("📧", "Outlook", "com.microsoft.office.outlook", Color(0xFF0078D4)),
     SocialApp("💬", "Lark", "com.larksuite.suite", Color(0xFF3370FF)),
@@ -751,6 +752,38 @@ val FLOW_TEMPLATES = listOf(
             "CHỈ trả lời bằng tiếng Việt. " +
             "Trả lời tin nhắn thân thiện, nhanh gọn. " +
             "Nếu không biết, nói: 'Mình sẽ kiểm tra và trả lời sau nhé.'",
+    ),
+    // ─── Threads Flows ──────────────────────────────
+    FlowTemplate(
+        emoji = "🧵",
+        name = "Đăng bài Threads tự động",
+        description = "Tự động đăng bài lên Threads từ lệnh Mama",
+        targetApps = listOf("com.instagram.barcelona"),
+        systemPrompt = "Bạn là content creator cho Threads. " +
+            "CHỈ viết bằng tiếng Việt. " +
+            "Viết nội dung ngắn gọn, viral, hay. " +
+            "Thêm emoji, hashtag phù hợp. " +
+            "Phong cách trẻ trung, sáng tạo.",
+    ),
+    // ─── Đa kênh mở rộng ──────────────────────────────
+    FlowTemplate(
+        emoji = "🌐",
+        name = "Đa kênh toàn diện",
+        description = "FB + IG + Threads + Zalo + Mess + Lark + Telegram",
+        targetApps = listOf(
+            "com.zing.zalo",
+            "com.facebook.orca",
+            "com.facebook.katana",
+            "com.instagram.android",
+            "com.instagram.barcelona",
+            "com.larksuite.suite",
+            "org.telegram.messenger",
+        ),
+        systemPrompt = "Bạn là trợ lý đa kênh toàn diện. " +
+            "CHỈ trả lời bằng tiếng Việt. " +
+            "Trả lời tin nhắn từ MỌI kênh: Zalo, Facebook, Messenger, Instagram, Threads, Lark, Telegram. " +
+            "Tư vấn sản phẩm, giải đáp thắc mắc, hỗ trợ đặt hàng. " +
+            "Chuyên nghiệp nhưng thân thiện.",
     ),
 )
 

@@ -473,6 +473,13 @@ object CommandExecutor {
                 controller.telegramSendMessage(contact, message)
             }
 
+            // Threads
+            "threads_post" -> {
+                val content = cmd.params["content"] ?: return errorResult(cmd, "Missing 'content'")
+                controller.threadsPost(content)
+            }
+            "threads_read" -> controller.threadsReadFeed()
+
             // Screen reading
             "read_screen" -> controller.readCurrentScreen()
             "click" -> {
@@ -483,7 +490,7 @@ object CommandExecutor {
             else -> return CommandResult(
                 id = cmd.id,
                 status = CommandStatus.unsupported,
-                error = "Unknown automation: ${cmd.action}. Available: gmail_*, facebook_*, messenger_*, zalo_send, instagram_post, lark_*, telegram_*",
+                error = "Unknown automation: ${cmd.action}. Available: gmail_*, facebook_*, messenger_*, zalo_send, instagram_post, threads_*, lark_*, telegram_*",
             )
         }
 

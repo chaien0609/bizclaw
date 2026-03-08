@@ -472,6 +472,63 @@ class AppController(private val context: Context) {
         }
     }
 
+    // ─── Threads (Meta) ─────────────────────────────────────
+
+    /** Post to Threads */
+    suspend fun threadsPost(content: String): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.instagram.barcelona")
+            delay(2000)
+
+            // Tap compose/new post button
+            val newPost = a11y.clickByText("New thread")
+                || a11y.clickByText("Tạo thread mới")
+                || a11y.clickByText("+")
+                || a11y.clickByText("Đăng")
+            if (!newPost) {
+                // Try tapping the FAB/compose icon at bottom
+                a11y.clickByText("Compose")
+                    || a11y.clickByText("Soạn")
+            }
+            delay(1500)
+
+            // Type content
+            val typed = a11y.typeText(content)
+            if (!typed) return AutomationResult.error("Cannot type in Threads")
+            delay(300)
+
+            // Post
+            val posted = a11y.clickByText("Post")
+                || a11y.clickByText("Đăng")
+                || a11y.clickByText("Share")
+            if (!posted) return AutomationResult.error("Cannot find Post button")
+
+            AutomationResult.success("🧵 Threads posted: ${content.take(50)}...")
+        } catch (e: Exception) {
+            AutomationResult.error("Threads post failed: ${e.message}")
+        }
+    }
+
+    /** Read Threads feed */
+    suspend fun threadsReadFeed(): AutomationResult {
+        if (!a11y.isRunning()) return AutomationResult.error("Accessibility service not enabled")
+
+        return try {
+            openApp("com.instagram.barcelona")
+            delay(2000)
+            val result = readCurrentScreen()
+            if (result.success) {
+                AutomationResult.success("🧵 Threads Feed:\n${result.message}")
+            } else {
+                AutomationResult.error("Cannot read Threads feed")
+            }
+        } catch (e: Exception) {
+            AutomationResult.error("Threads read failed: ${e.message}")
+        }
+    }
+
     // ─── Lark (Feishu) ────────────────────────────────────────
 
     /** Lark package — international version; CN = com.ss.android.lark */

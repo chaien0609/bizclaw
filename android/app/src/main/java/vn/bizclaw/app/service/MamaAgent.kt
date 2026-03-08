@@ -76,6 +76,7 @@ class MamaAgent(private val context: Context) {
             "messenger_reply", "messenger_read",
             "zalo_send",
             "instagram_post",
+            "threads_post", "threads_read",
             "lark_read_chats", "lark_send", "lark_read_mail", "lark_compose_mail",
             "telegram_read", "telegram_send",
             "read_screen",
@@ -205,6 +206,8 @@ $agentList
 - messenger_reply: Trả lời Messenger (cần contact, message)
 - zalo_send: Gửi Zalo (cần contact, message)
 - instagram_post: Đăng Instagram (cần caption)
+- threads_post: Đăng Threads (cần content)
+- threads_read: Đọc feed Threads
 - lark_read_chats: Đọc chat Lark
 - lark_send: Gửi tin nhắn Lark (cần contact, message)
 - lark_read_mail: Đọc mail Lark
@@ -361,6 +364,13 @@ REPORT: yes
                 val caption = params["caption"] ?: return "Missing 'caption'"
                 controller.instagramCaption(caption).message
             }
+
+            // Threads
+            "threads_post" -> {
+                val content = params["content"] ?: return "Missing 'content'"
+                controller.threadsPost(content).message
+            }
+            "threads_read" -> controller.threadsReadFeed().message
 
             // Screen
             "read_screen" -> controller.readCurrentScreen().message

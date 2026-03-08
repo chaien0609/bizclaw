@@ -246,12 +246,14 @@ private fun ProviderCard(
         ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
         ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
         ProviderType.APP_GROK -> "📱 Grok App (Free)"
+        ProviderType.APP_DEEPSEEK -> "📱 DeepSeek App (Free)"
+        ProviderType.APP_NOTEBOOKLM -> "📓 NotebookLM (RAG Free)"
     }
 
     val statusColor = when {
         !provider.enabled -> MaterialTheme.colorScheme.surfaceVariant
         provider.type == ProviderType.LOCAL_GGUF -> Color(0xFF1B5E20).copy(alpha = 0.15f)
-        provider.type in listOf(ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK) ->
+        provider.type in listOf(ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK, ProviderType.APP_DEEPSEEK, ProviderType.APP_NOTEBOOKLM) ->
             Color(0xFFE65100).copy(alpha = 0.12f) // Orange for app-based
         provider.apiKey.isNotBlank() || provider.type == ProviderType.OLLAMA -> Color(0xFF0D47A1).copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
@@ -442,6 +444,8 @@ private fun ProviderFormDialog(
                             ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
                             ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
                             ProviderType.APP_GROK -> "📱 Grok App (Free)"
+                            ProviderType.APP_DEEPSEEK -> "📱 DeepSeek App (Free)"
+                            ProviderType.APP_NOTEBOOKLM -> "📓 NotebookLM (RAG Free)"
                         },
                         onValueChange = {},
                         readOnly = true,
@@ -463,6 +467,8 @@ private fun ProviderFormDialog(
                             ProviderType.APP_GEMINI to "📱 Gemini App (Miễn phí)",
                             ProviderType.APP_CHATGPT to "📱 ChatGPT App (Miễn phí)",
                             ProviderType.APP_GROK to "📱 Grok App (Miễn phí)",
+                            ProviderType.APP_DEEPSEEK to "📱 DeepSeek App (Miễn phí)",
+                            ProviderType.APP_NOTEBOOKLM to "📓 NotebookLM (RAG Miễn phí)",
                         ).forEach { (t, label) ->
                             DropdownMenuItem(
                                 text = { Text(label) },
@@ -486,7 +492,7 @@ private fun ProviderFormDialog(
                 )
 
                 // API Key (not for Ollama or App providers)
-                if (type !in listOf(ProviderType.OLLAMA, ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK)) {
+                if (type !in listOf(ProviderType.OLLAMA, ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK, ProviderType.APP_DEEPSEEK, ProviderType.APP_NOTEBOOKLM)) {
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },

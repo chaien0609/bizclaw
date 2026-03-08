@@ -45,6 +45,8 @@ object ProviderChat {
             ProviderType.APP_GEMINI -> chatViaApp("com.google.android.apps.bard", "Gemini", systemPrompt, userMessage)
             ProviderType.APP_CHATGPT -> chatViaApp("com.openai.chatgpt", "ChatGPT", systemPrompt, userMessage)
             ProviderType.APP_GROK -> chatViaApp("com.x.grok", "Grok", systemPrompt, userMessage)
+            ProviderType.APP_DEEPSEEK -> chatViaApp("com.deepseek.chat", "DeepSeek", systemPrompt, userMessage)
+            ProviderType.APP_NOTEBOOKLM -> chatViaApp("com.google.android.apps.notebooklm", "NotebookLM", systemPrompt, userMessage)
         }
     }
 
