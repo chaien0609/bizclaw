@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import vn.bizclaw.app.engine.BizClawLLM
+import java.util.regex.Pattern
 
 /**
  * LocalAgentLoop — Think-Act-Observe loop powered by on-device LLM.
@@ -16,7 +17,7 @@ import vn.bizclaw.app.engine.BizClawLLM
  * ```
  *  User query
  *    ↓
- *  LLM thinks → generates response with optional <tool_call>
+ *  LLM thinks → generates response with optional tool_call tags
  *    ↓
  *  Parse tool_call → ToolDispatcher executes
  *    ↓
@@ -41,16 +42,18 @@ class LocalAgentLoop(
     private val dispatcher = ToolDispatcher(context)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // Tool call parsing regex: <tool_call>...</tool_call>
-    private val toolCallRegex = Regex(
-        """<tool_call>\s*\{.*?}\s*</tool_call>""",
-        setOf(RegexOption.DOT_MATCHES_ALL)
+    // Tool call parsing: <tool_call>...</tool_call>
+    // Use java.util.regex.Pattern directly to avoid Android ICU engine angle-bracket issues
+    private val toolCallPattern = Pattern.compile(
+        "\\x3Ctool_call\\x3E\\s*\\{.*?\\}\\s*\\x3C/tool_call\\x3E",
+        Pattern.DOTALL
     )
 
-    // Alternative format: ```json ... ``` with "name" and "arguments"
-    private val jsonToolCallRegex = Regex(
-        """\{"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{.*?})\s*}""",
-        setOf(RegexOption.DOT_MATCHES_ALL)
+    // Alternative format: {"name": "...", "arguments": {...}} (without tags)
+    // Also use Pattern.compile with hex-escaped braces for Android ICU compatibility
+    private val jsonToolCallPattern = Pattern.compile(
+        "\\x7B\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"arguments\"\\s*:\\s*(\\x7B.*?\\x7D)\\s*\\x7D",
+        Pattern.DOTALL
     )
 
     /**
@@ -152,19 +155,23 @@ class LocalAgentLoop(
         val calls = mutableListOf<ParsedToolCall>()
 
         // Method 1: <tool_call>{...}</tool_call>
-        toolCallRegex.findAll(response).forEach { match ->
-            val jsonStr = match.value
-                .removePrefix("<tool_call>")
-                .removeSuffix("</tool_call>")
+        val matcher = toolCallPattern.matcher(response)
+        while (matcher.find()) {
+            val matched = matcher.group()
+            // Strip tags using plain string replace (no regex needed)
+            val jsonStr = matched
+                .replace("<tool_call>", "")
+                .replace("</tool_call>", "")
                 .trim()
             parseJsonToolCall(jsonStr)?.let { calls.add(it) }
         }
 
         // Method 2: {"name": "...", "arguments": {...}}  (without tags)
         if (calls.isEmpty()) {
-            jsonToolCallRegex.findAll(response).forEach { match ->
-                val name = match.groupValues[1]
-                val argsStr = match.groupValues[2]
+            val jsonMatcher = jsonToolCallPattern.matcher(response)
+            while (jsonMatcher.find()) {
+                val name = jsonMatcher.group(1) ?: continue
+                val argsStr = jsonMatcher.group(2) ?: continue
                 try {
                     val args = json.parseToJsonElement(argsStr).jsonObject
                     calls.add(ParsedToolCall(name, args))
