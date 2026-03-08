@@ -14,3 +14,4 @@ tokio = { workspace = true, features = ["full"] }
 chrono = { workspace = true, features = ["serde"] }
 uuid = { workspace = true, features = ["v4"] }
 dirs.workspace = true
+cron = "0.13"

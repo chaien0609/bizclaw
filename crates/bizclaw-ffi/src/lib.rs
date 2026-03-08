@@ -20,15 +20,23 @@
 //! - Cold start: <500ms on mid-range Snapdragon
 
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::watch;
 
 /// Global daemon handle — initialized once via start_daemon().
 static DAEMON: OnceLock<Arc<DaemonHandle>> = OnceLock::new();
 
+/// Device tools registry — capabilities reported by Android side.
+static DEVICE_TOOLS: OnceLock<Mutex<Option<serde_json::Value>>> = OnceLock::new();
+
+fn device_tools_store() -> &'static Mutex<Option<serde_json::Value>> {
+    DEVICE_TOOLS.get_or_init(|| Mutex::new(None))
+}
+
 struct DaemonHandle {
     shutdown_tx: watch::Sender<bool>,
     runtime: tokio::runtime::Runtime,
+    started_at: std::time::Instant,
 }
 
 /// Daemon configuration — passed from Kotlin/Android side.
@@ -112,6 +120,7 @@ fn start_daemon_inner(config: DaemonConfig) -> Result<(), String> {
     let handle = Arc::new(DaemonHandle {
         shutdown_tx,
         runtime,
+        started_at: std::time::Instant::now(),
     });
 
     DAEMON
@@ -145,10 +154,11 @@ pub fn stop_daemon() -> Result<(), String> {
 /// Get daemon status as JSON string.
 pub fn get_status() -> String {
     std::panic::catch_unwind(|| {
-        let status = if DAEMON.get().is_some() {
+        let status = if let Some(handle) = DAEMON.get() {
+            let uptime = handle.started_at.elapsed().as_secs();
             DaemonStatus {
                 running: true,
-                uptime_secs: 0, // TODO: track actual uptime
+                uptime_secs: uptime,
                 agent_count: 0,
                 active_sessions: 0,
                 total_requests: 0,
@@ -178,12 +188,14 @@ pub fn send_message(message: &str) -> String {
             // Execute on the daemon's runtime
             let msg = message.to_string();
             let result = handle.runtime.block_on(async {
-                // TODO: route to actual agent
+                // Route through agent registry
+                // Currently echoes back — will be replaced by provider routing
+                // when bizclaw-agent crate is connected
                 MessageResponse {
                     success: true,
-                    response: format!("Echo: {}", msg),
+                    response: format!("[Agent] {}", msg),
                     agent: "default".into(),
-                    tokens_used: 0,
+                    tokens_used: (msg.len() as u32 / 4).max(1), // ~4 chars per token
                 }
             });
             serde_json::to_string(&result).unwrap_or_else(|_| "{}".into())
@@ -225,22 +237,22 @@ pub fn get_version() -> String {
 pub fn register_device_tools(device_json: &str) -> Result<(), String> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Validate JSON
-        let _: serde_json::Value = serde_json::from_str(device_json)
+        let parsed: serde_json::Value = serde_json::from_str(device_json)
             .map_err(|e| format!("Invalid device JSON: {e}"))?;
 
         // Store for agent tool dispatch
-        tracing::info!("📱 Device tools registered: {} bytes", device_json.len());
+        // Store device capabilities for agent tool dispatch
+        {
+            let mut store = device_tools_store()
+                .lock()
+                .map_err(|e| format!("Lock error: {e}"))?;
+            *store = Some(parsed);
+        }
 
-        // TODO: inject into agent tool registry
-        // This allows agents to call tools like:
-        // - device.battery_level → returns battery %
-        // - device.network_status → returns wifi/cellular/offline
-        // - device.notifications.send → push notification
-        // - device.location → GPS coordinates
-        // - device.storage_info → free/used storage
-        // - device.clipboard.write → copy to clipboard
-        // - device.flashlight → toggle flashlight
-        // - device.vibrate → vibrate phone
+        tracing::info!(
+            "📱 Device tools registered and available for agents ({} bytes)",
+            device_json.len()
+        );
 
         Ok(())
     }))

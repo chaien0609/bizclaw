@@ -367,7 +367,18 @@ class BizClawAccessibilityService : AccessibilityService() {
                 val text = event.text.joinToString(" ")
                 val pkg = event.packageName?.toString() ?: ""
                 android.util.Log.d("BizClaw", "📬 Notification: [$pkg] $text")
-                // TODO: forward to agent for auto-reply decisions
+                // Forward to notification listener for auto-reply decisions
+                // The NotificationListener already handles this via onNotificationPosted,
+                // but AccessibilityService catches in-app notifications that don't
+                // appear in the notification shade
+                BizClawNotificationListener.onNotificationReceived?.invoke(
+                    BizClawNotificationListener.SocialNotification(
+                        app = BizClawNotificationListener.MONITORED_APPS[pkg] ?: pkg,
+                        packageName = pkg,
+                        sender = "",
+                        message = text,
+                    )
+                )
             }
             else -> {} // Ignore other events for now
         }

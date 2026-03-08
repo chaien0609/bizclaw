@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::manifest::HandManifest;
 
@@ -114,11 +115,25 @@ impl Hand {
                     None => true, // Never run yet
                 }
             }
-            crate::manifest::HandSchedule::Cron(_expr) => {
-                // TODO: proper cron parsing — for now, use interval fallback
-                match self.last_run {
-                    Some(last) => (now - last).num_seconds() >= 3600,
-                    None => true,
+            crate::manifest::HandSchedule::Cron(expr) => {
+                // Parse cron expression and check if we're past the next scheduled time
+                match cron::Schedule::from_str(expr) {
+                    Ok(schedule) => {
+                        let last = self.last_run.unwrap_or(DateTime::<Utc>::MIN_UTC);
+                        schedule
+                            .after(&last)
+                            .next()
+                            .map(|next_time| now >= next_time)
+                            .unwrap_or(false)
+                    }
+                    Err(_) => {
+                        // Invalid cron expression — fallback to 1h interval
+                        tracing::warn!("Invalid cron expression '{}', using 1h fallback", expr);
+                        match self.last_run {
+                            Some(last) => (now - last).num_seconds() >= 3600,
+                            None => true,
+                        }
+                    }
                 }
             }
         }
