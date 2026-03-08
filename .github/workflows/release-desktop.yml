@@ -20,8 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS Intel
-          - os: macos-13
+          # macOS Intel (cross-compile from ARM)
+          - os: macos-latest
             target: x86_64-apple-darwin
             name: bizclaw-desktop-macos-x64
             ext: ''
