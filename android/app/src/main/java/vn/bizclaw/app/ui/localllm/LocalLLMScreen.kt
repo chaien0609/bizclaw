@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import vn.bizclaw.app.engine.BizClawLLM
 import vn.bizclaw.app.engine.DownloadableModel
+import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.ModelDownloadManager
 import vn.bizclaw.app.engine.RECOMMENDED_MODELS
 import java.io.File
@@ -55,45 +56,46 @@ val DEMO_AGENTS = listOf(
         emoji = "🤖",
         name = "BizClaw",
         role = "Trợ lý tổng hợp",
-        systemPrompt = "Bạn tên là BizClaw, một trợ lý AI thân thiện chạy trên điện thoại. " +
-            "Luôn trả lời bằng tiếng Việt. Trả lời ngắn gọn, tự nhiên. " +
-            "Khi được chào, hãy chào lại thân thiện. Không bịa thông tin.",
+        systemPrompt = "Bạn tên là BizClaw, trợ lý AI thân thiện chạy trên điện thoại. " +
+            "CHỈ trả lời bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
+            "Trả lời ngắn gọn, tự nhiên. Khi được chào, chào lại thân thiện. " +
+            "Không bịa thông tin.",
     ),
     AgentPersona(
         emoji = "📝",
         name = "Copywriter",
         role = "Viết nội dung & quảng cáo",
-        systemPrompt = "Bạn là chuyên gia viết nội dung marketing tiếng Việt. " +
+        systemPrompt = "Bạn là chuyên gia viết nội dung marketing. " +
+            "CHỈ viết bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
             "Viết caption Facebook, mô tả sản phẩm, email marketing, bài blog. " +
-            "Phong cách sáng tạo, thu hút, phù hợp thị trường Việt Nam. " +
-            "Luôn trả lời bằng tiếng Việt.",
+            "Phong cách sáng tạo, thu hút, phù hợp thị trường Việt Nam.",
     ),
     AgentPersona(
         emoji = "📊",
         name = "Phân tích",
         role = "Phân tích dữ liệu & báo cáo",
         systemPrompt = "Bạn là chuyên gia phân tích kinh doanh. " +
+            "CHỈ trả lời bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
             "Giúp phân tích số liệu, đưa ra nhận xét và đề xuất. " +
-            "Trả lời có cấu trúc, dùng bullet points. " +
-            "Luôn trả lời bằng tiếng Việt.",
+            "Trả lời có cấu trúc, dùng gạch đầu dòng.",
     ),
     AgentPersona(
         emoji = "🎯",
         name = "Chiến lược",
         role = "Tư vấn chiến lược kinh doanh",
-        systemPrompt = "Bạn là cố vấn chiến lược kinh doanh cho SME Việt Nam. " +
+        systemPrompt = "Bạn là cố vấn chiến lược kinh doanh cho doanh nghiệp Việt Nam. " +
+            "CHỈ trả lời bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
             "Tư vấn marketing, bán hàng, vận hành, nhân sự. " +
-            "Đưa lời khuyên thực tế, áp dụng được ngay. " +
-            "Luôn trả lời bằng tiếng Việt.",
+            "Đưa lời khuyên thực tế, áp dụng được ngay.",
     ),
     AgentPersona(
         emoji = "💬",
         name = "CSKH",
         role = "Chăm sóc khách hàng",
         systemPrompt = "Bạn là nhân viên chăm sóc khách hàng chuyên nghiệp. " +
+            "CHỈ trả lời bằng tiếng Việt, KHÔNG dùng tiếng Trung hay tiếng Anh. " +
             "Trả lời lịch sự, kiên nhẫn, giải quyết vấn đề nhanh chóng. " +
-            "Xin lỗi khi cần, cảm ơn khách hàng, đề xuất giải pháp. " +
-            "Luôn trả lời bằng tiếng Việt.",
+            "Xin lỗi khi cần, cảm ơn khách hàng, đề xuất giải pháp.",
     ),
 )
 
@@ -109,13 +111,15 @@ fun LocalLLMScreen(onBack: () -> Unit) {
 
     // State
     var selectedTab by remember { mutableStateOf(LLMTab.Models) }
-    val llm = remember { BizClawLLM() }
+    val llm = GlobalLLM.instance
     val downloadManager = remember { ModelDownloadManager(context) }
 
-    // Model state
-    var loadedModelName by remember { mutableStateOf<String?>(null) }
+    // Model state — restore from GlobalLLM if model was already loaded
+    var loadedModelName by remember { mutableStateOf(GlobalLLM.loadedModelName) }
     var isLoading by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("") }
+    var statusMessage by remember { mutableStateOf(
+        if (GlobalLLM.loadedModelName != null) "✅ ${GlobalLLM.loadedModelName} đã sẵn sàng!" else ""
+    ) }
     var downloadProgress by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
 
     // Chat state
@@ -136,9 +140,11 @@ fun LocalLLMScreen(onBack: () -> Unit) {
         downloadedModels.map { it.name to it.path }
     }
 
-    // Cleanup
-    DisposableEffect(Unit) {
-        onDispose { llm.close() }
+    // Auto-switch to Chat tab if model already loaded
+    LaunchedEffect(Unit) {
+        if (llm.isLoaded && loadedModelName != null) {
+            selectedTab = LLMTab.Chat
+        }
     }
 
     Scaffold(
@@ -166,6 +172,7 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                         IconButton(onClick = {
                             llm.close()
                             loadedModelName = null
+                            GlobalLLM.setModelName(null)
                             statusMessage = "Đã gỡ mô hình"
                         }) {
                             Icon(Icons.Default.PowerSettingsNew, "Gỡ bỏ")
@@ -246,6 +253,7 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                                 // Set agent system prompt
                                 llm.addSystemPrompt(selectedAgent.systemPrompt)
                                 loadedModelName = name
+                                GlobalLLM.setModelName(name)
                                 statusMessage = "✅ $name đã sẵn sàng!"
                                 chatMessages.clear()
                                 selectedTab = LLMTab.Chat
