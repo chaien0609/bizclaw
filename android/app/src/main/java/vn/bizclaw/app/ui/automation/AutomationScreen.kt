@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.LocalAgent
 import vn.bizclaw.app.engine.LocalAgentManager
@@ -81,6 +82,10 @@ fun AutomationScreen(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val autoAgents = agents.filter { it.autoReply }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -88,9 +93,15 @@ fun AutomationScreen(
                     Column {
                         Text("⚡ Tự Động Hoá", fontWeight = FontWeight.Bold)
                         Text(
-                            "Zalo • Facebook • Messenger • Email",
+                            if (autoAgents.isNotEmpty())
+                                "${autoAgents.size} flow đang chạy • Zalo • FB • Email"
+                            else
+                                "Zalo • Facebook • Messenger • Email",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (autoAgents.isNotEmpty())
+                                Color(0xFF00E676)
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 },
@@ -101,6 +112,7 @@ fun AutomationScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
@@ -130,12 +142,49 @@ fun AutomationScreen(
                 )
             }
 
+            // ─── Active Automation Agents (SHOW FIRST) ──────────
+            if (autoAgents.isNotEmpty()) {
+                item {
+                    Text(
+                        "🟢 Flow Đang Chạy (${autoAgents.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00E676),
+                    )
+                }
+
+                items(autoAgents) { agent ->
+                    ActiveAgentCard(
+                        agent = agent,
+                        onToggle = { enabled ->
+                            manager.updateAgent(agent.copy(autoReply = enabled))
+                            agents = manager.loadAgents()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (enabled) "✅ ${agent.name} đã BẬT"
+                                    else "⏸ ${agent.name} đã TẮT"
+                                )
+                            }
+                        },
+                        onDelete = {
+                            manager.deleteAgent(agent.id)
+                            agents = manager.loadAgents()
+                        },
+                    )
+                }
+            }
+
             // ─── Flow Templates ──────────────────────────────
             item {
                 Text(
-                    "⚡ Tạo Flow Nhanh",
+                    "⚡ Tạo Flow Mới",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Bấm [Dùng] để kích hoạt flow. Flow sẽ tự chạy khi nhận tin nhắn/email.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -154,34 +203,13 @@ fun AutomationScreen(
                         )
                         manager.addAgent(agent)
                         agents = manager.loadAgents()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                "✅ Flow \"${template.name}\" đã kích hoạt!"
+                            )
+                        }
                     },
                 )
-            }
-
-            // ─── Active Automation Agents ──────────────────────────
-            val autoAgents = agents.filter { it.autoReply }
-            if (autoAgents.isNotEmpty()) {
-                item {
-                    Text(
-                        "🤖 Agent Đang Hoạt Động (${autoAgents.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-
-                items(autoAgents) { agent ->
-                    ActiveAgentCard(
-                        agent = agent,
-                        onToggle = { enabled ->
-                            manager.updateAgent(agent.copy(autoReply = enabled))
-                            agents = manager.loadAgents()
-                        },
-                        onDelete = {
-                            manager.deleteAgent(agent.id)
-                            agents = manager.loadAgents()
-                        },
-                    )
-                }
             }
 
             // ─── Recent Notifications ──────────────────────────

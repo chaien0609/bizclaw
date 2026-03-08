@@ -69,7 +69,7 @@ fun BizClawNavHost() {
                 viewModel = chatViewModel,
                 onOpenAgents = { currentScreen = Screen.Agents },
                 onOpenSettings = { currentScreen = Screen.Settings },
-                onOpenDashboard = { currentScreen = Screen.Automation },
+                onOpenAutomation = { currentScreen = Screen.Automation },
                 onOpenLocalLLM = { currentScreen = Screen.LocalLLM },
             )
         }

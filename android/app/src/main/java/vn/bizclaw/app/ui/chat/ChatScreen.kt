@@ -29,7 +29,7 @@ fun ChatScreen(
     viewModel: ChatViewModel,
     onOpenAgents: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenDashboard: () -> Unit = {},
+    onOpenAutomation: () -> Unit = {},
     onOpenLocalLLM: () -> Unit = {},
 ) {
     val messages = viewModel.messages
@@ -114,8 +114,12 @@ fun ChatScreen(
                             tint = if (isLocalMode) Color(0xFF00E676) else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = onOpenDashboard) {
-                        Icon(Icons.Default.Dashboard, contentDescription = "Bảng điều khiển")
+                    IconButton(onClick = onOpenAutomation) {
+                        Icon(
+                            Icons.Default.FlashOn,
+                            contentDescription = "Tự Động Hoá",
+                            tint = Color(0xFFFF9800),
+                        )
                     }
                     IconButton(onClick = onOpenAgents) {
                         Icon(Icons.Default.Group, contentDescription = "Trợ lý")
