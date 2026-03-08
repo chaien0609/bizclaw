@@ -38,10 +38,10 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dashboard", fontWeight = FontWeight.Bold) },
+                title = { Text("Bảng Điều Khiển", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại")
                     }
                 },
             )
@@ -175,7 +175,7 @@ fun DashboardScreen(
                     icon = Icons.Default.Wifi,
                     label = "Mạng",
                     value = network.type.uppercase(),
-                    subtext = network.wifiSsid ?: if (network.isConnected) "Connected" else "Offline",
+                    subtext = network.wifiSsid ?: if (network.isConnected) "Đã kết nối" else "Ngoại tuyến",
                     color = if (network.isConnected)
                         MaterialTheme.colorScheme.secondary
                     else
@@ -185,8 +185,8 @@ fun DashboardScreen(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.Memory,
                     label = "CPU",
-                    value = "${device.cpuCores} cores",
-                    subtext = "${device.freeRamMb} MB RAM free",
+                    value = "${device.cpuCores} nhân",
+                    subtext = "${device.freeRamMb} MB RAM trống",
                     color = MaterialTheme.colorScheme.primary,
                 )
             }

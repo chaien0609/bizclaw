@@ -26,10 +26,10 @@ fun AgentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Agents", fontWeight = FontWeight.Bold) },
+                title = { Text("Trợ Lý AI", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại")
                     }
                 },
             )

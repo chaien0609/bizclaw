@@ -64,7 +64,7 @@ fun SettingsScreen(
                 title = { Text("Cài Đặt", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại")
                     }
                 },
             )
@@ -192,7 +192,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Server URL") },
+                    label = { Text("Địa chỉ máy chủ") },
                     placeholder = { Text("http://192.168.1.100:3001") },
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Default.Dns, null) },
@@ -203,8 +203,8 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = key,
                     onValueChange = { key = it },
-                    label = { Text("API Key (optional)") },
-                    placeholder = { Text("Pairing code từ server") },
+                    label = { Text("Khoá API (tuỳ chọn)") },
+                    placeholder = { Text("Mã ghép nối từ máy chủ") },
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Default.Key, null) },
                     singleLine = true,
@@ -217,7 +217,7 @@ fun SettingsScreen(
                             Icon(
                                 if (showKey) Icons.Default.VisibilityOff
                                 else Icons.Default.Visibility,
-                                contentDescription = "Toggle",
+                                contentDescription = "Hiện/ẩn",
                             )
                         }
                     },
@@ -234,7 +234,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.NetworkCheck, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Test")
+                         Text("Kiểm tra")
                     }
 
                     Button(
@@ -274,7 +274,7 @@ fun SettingsScreen(
             // Daemon status
             ServiceStatusRow(
                 emoji = if (isDaemonRunning) "🟢" else "🔴",
-                label = "Agent Daemon",
+                label = "Agent (Nền)",
                 status = if (isDaemonRunning) "Đang chạy" else "Đã dừng",
                 actionLabel = if (isDaemonRunning) "Dừng" else "Bật",
                 onClick = {
@@ -286,9 +286,9 @@ fun SettingsScreen(
             // Accessibility status
             ServiceStatusRow(
                 emoji = if (isA11yEnabled) "🟢" else "🟡",
-                label = "Accessibility (App Control)",
-                status = if (isA11yEnabled) "Đã bật" else "Chưa bật",
-                actionLabel = if (isA11yEnabled) "Đã OK" else "Bật ngay",
+                label = "Điều khiển ứng dụng",
+                status = if (isA11yEnabled) "Đã bật" else "Chưa bật — Vào Cài đặt → Tìm 'BizClaw' → Bật",
+                actionLabel = if (isA11yEnabled) "Đã OK" else "Mở cài đặt",
                 onClick = {
                     if (!isA11yEnabled) {
                         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -312,9 +312,9 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     InfoItem("Phiên bản", "BizClaw Android v0.3.0")
                     InfoItem("Chế độ", selectedMode.label)
-                    InfoItem("Rust FFI", "7 functions (bizclaw-ffi)")
-                    InfoItem("Device Tools", "10 (battery, GPS, notification...)")
-                    InfoItem("App Control", "Facebook, Messenger, Zalo, any app")
+                    InfoItem("Giao diện FFI", "7 hàm (bizclaw-ffi)")
+                    InfoItem("Công cụ thiết bị", "10 (pin, GPS, thông báo...)")
+                    InfoItem("Điều khiển app", "Facebook, Messenger, Zalo, mọi ứng dụng")
                 }
             }
         }

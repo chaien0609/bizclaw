@@ -88,7 +88,7 @@ fun LocalLLMScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("🧠 Local LLM", fontWeight = FontWeight.Bold)
+                        Text("🧠 AI Cục Bộ", fontWeight = FontWeight.Bold)
                         if (loadedModelName != null) {
                             Text(
                                 "✅ $loadedModelName",
@@ -100,7 +100,7 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Quay lại")
                     }
                 },
                 actions = {
@@ -108,9 +108,9 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                         IconButton(onClick = {
                             llm.close()
                             loadedModelName = null
-                            statusMessage = "Model unloaded"
+                            statusMessage = "Đã gỡ mô hình"
                         }) {
-                            Icon(Icons.Default.PowerSettingsNew, "Unload")
+                            Icon(Icons.Default.PowerSettingsNew, "Gỡ bỏ")
                         }
                     }
                 },
@@ -134,9 +134,9 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                         text = {
                             Text(
                                 when (tab) {
-                                    LLMTab.Models -> "📦 Models"
-                                    LLMTab.Chat -> "💬 Chat"
-                                    LLMTab.Benchmark -> "⚡ Bench"
+                                    LLMTab.Models -> "📦 Mô hình"
+                                    LLMTab.Chat -> "💬 Trò chuyện"
+                                    LLMTab.Benchmark -> "⚡ Hiệu năng"
                                 }
                             )
                         },
@@ -168,14 +168,14 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                     isLoading = isLoading,
                     onDownload = { model ->
                         scope.launch {
-                            statusMessage = "Downloading ${model.name}..."
+                            statusMessage = "Đang tải ${model.name}..."
                             downloadManager.downloadModel(model)
                         }
                     },
                     onLoad = { name, path ->
                         scope.launch {
                             isLoading = true
-                            statusMessage = "Loading $name..."
+                            statusMessage = "Đang nạp $name..."
                             try {
                                 llm.close() // Unload any previous model
                                 llm.load(
@@ -187,22 +187,22 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                                 )
                                 // Set BizClaw system prompt
                                 llm.addSystemPrompt(
-                                    "You are BizClaw, a helpful AI assistant for business operations. " +
-                                    "Respond concisely and helpfully in the user's language."
+                                    "Bạn là BizClaw, trợ lý AI cho doanh nghiệp. " +
+                                    "Trả lời ngắn gọn và hữu ích bằng tiếng Việt."
                                 )
                                 loadedModelName = name
-                                statusMessage = "✅ $name loaded and ready!"
+                                statusMessage = "✅ $name đã sẵn sàng!"
                                 chatMessages.clear()
                                 selectedTab = LLMTab.Chat
                             } catch (e: Exception) {
-                                statusMessage = "❌ Load failed: ${e.message}"
+                                statusMessage = "❌ Nạp thất bại: ${e.message}"
                             }
                             isLoading = false
                         }
                     },
                     onDelete = { name, path ->
                         File(path).delete()
-                        statusMessage = "$name deleted"
+                        statusMessage = "Đã xóa $name"
                     },
                 )
 
@@ -293,7 +293,7 @@ private fun ModelsTab(
         if (localModels.isNotEmpty()) {
             item {
                 Text(
-                    "📱 Downloaded Models",
+                    "📱 Mô hình đã tải",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -314,7 +314,7 @@ private fun ModelsTab(
         item {
             Spacer(Modifier.height(8.dp))
             Text(
-                "🌐 Available Models (HuggingFace)",
+                "🌐 Mô hình có sẵn (HuggingFace)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -388,12 +388,12 @@ private fun LocalModelCard(
                     if (isLoading) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Default.PlayArrow, "Load", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.PlayArrow, "Nạp", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, "Xóa", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -449,7 +449,7 @@ private fun DownloadableModelCard(
                 )
             } else if (isDownloaded) {
                 Text(
-                    "✅ Downloaded",
+                    "✅ Đã tải",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -460,7 +460,7 @@ private fun DownloadableModelCard(
                 ) {
                     Icon(Icons.Default.Download, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Download ${model.sizeDisplay}")
+                    Text("Tải xuống ${model.sizeDisplay}")
                 }
             }
         }
@@ -504,9 +504,9 @@ private fun ChatTab(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🧠", fontSize = 64.sp)
                     Spacer(Modifier.height(16.dp))
-                    Text("Load a model first", style = MaterialTheme.typography.titleMedium)
+                    Text("Hãy nạp mô hình trước", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Go to Models tab → tap ▶️ on a downloaded model",
+                        "Vào tab Mô hình → bấm ▶️ trên mô hình đã tải",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -529,7 +529,7 @@ private fun ChatTab(
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
-                            "📊 Context: $contextUsed",
+                            "📊 Ngữ cảnh: $contextUsed",
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
@@ -566,12 +566,12 @@ private fun ChatTab(
                                 Text("🧠", fontSize = 48.sp)
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    "On-Device AI — $loadedModelName",
+                                    "AI Trên Thiết Bị — $loadedModelName",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Text(
-                                    "100% offline • No API keys • $0 cost",
+                                    "100% ngoại tuyến • Không cần API key • Miễn phí",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -598,7 +598,7 @@ private fun ChatTab(
                         value = input,
                         onValueChange = onInputChange,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Ask BizClaw locally...") },
+                        placeholder = { Text("Hỏi BizClaw cục bộ...") },
                         shape = RoundedCornerShape(24.dp),
                         maxLines = 4,
                     )
@@ -611,7 +611,7 @@ private fun ChatTab(
                         if (isGenerating) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Send, "Send")
+                            Icon(Icons.Default.Send, "Gửi")
                         }
                     }
                 }
@@ -653,7 +653,7 @@ private fun LLMChatBubble(msg: ChatMsg, isGenerating: Boolean) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (!isUser) {
                     Text(
-                        "BizClaw (Local)",
+                        "BizClaw (Cục bộ)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -701,16 +701,16 @@ private fun BenchmarkTab(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Load a model first to run benchmarks")
+                Text("Hãy nạp mô hình để chạy đo hiệu năng")
             }
         } else {
             Text(
-                "⚡ Performance Benchmark",
+                "⚡ Đo Hiệu Năng",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "Model: $loadedModelName",
+                "Mô hình: $loadedModelName",
                 style = MaterialTheme.typography.bodySmall,
             )
 
@@ -722,11 +722,11 @@ private fun BenchmarkTab(
                 if (isBenching) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Running benchmark...")
+                    Text("Đang đo hiệu năng...")
                 } else {
                     Icon(Icons.Default.Speed, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Run Benchmark (pp=512, tg=128)")
+                    Text("Chạy Đo Hiệu Năng (pp=512, tg=128)")
                 }
             }
 

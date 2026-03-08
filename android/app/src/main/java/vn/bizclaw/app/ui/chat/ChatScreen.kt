@@ -76,10 +76,10 @@ fun ChatScreen(
                             Text(
                                 text = when {
                                     isLocalMode && viewModel.localLLM.isLoaded ->
-                                        "🧠 $currentAgent — ${localModelName ?: "local"}"
-                                    isLocalMode -> "🧠 Local (no model)"
+                                        "🧠 $currentAgent — ${localModelName ?: "cục bộ"}"
+                                    isLocalMode -> "🧠 Cục bộ (chưa tải mô hình)"
                                     isConnected -> "🤖 $currentAgent"
-                                    else -> "Disconnected"
+                                    else -> "Mất kết nối"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -102,18 +102,18 @@ fun ChatScreen(
                     }) {
                         Icon(
                             Icons.Default.Memory,
-                            contentDescription = "Local LLM",
+                            contentDescription = "AI Cục Bộ",
                             tint = if (isLocalMode) Color(0xFF00E676) else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     IconButton(onClick = onOpenDashboard) {
-                        Icon(Icons.Default.Dashboard, contentDescription = "Dashboard")
+                        Icon(Icons.Default.Dashboard, contentDescription = "Bảng điều khiển")
                     }
                     IconButton(onClick = onOpenAgents) {
-                        Icon(Icons.Default.Group, contentDescription = "Agents")
+                        Icon(Icons.Default.Group, contentDescription = "Trợ lý")
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Cài đặt")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -146,7 +146,7 @@ fun ChatScreen(
                             color = Color(0xFF00E676),
                         )
                         Text(
-                            "📊 Context: $localContextUsed",
+                            "📊 Ngữ cảnh: $localContextUsed",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -182,7 +182,7 @@ fun ChatScreen(
                             onClick = { viewModel.error.value = null },
                             modifier = Modifier.size(20.dp),
                         ) {
-                            Icon(Icons.Default.Close, "Dismiss", Modifier.size(14.dp))
+                            Icon(Icons.Default.Close, "Đóng", Modifier.size(14.dp))
                         }
                     }
                 }
@@ -225,7 +225,7 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = {
                             Text(
-                                if (isLocalMode) "Hỏi BizClaw local..."
+                                if (isLocalMode) "Hỏi BizClaw cục bộ..."
                                 else "Nhắn tin cho $currentAgent..."
                             )
                         },
@@ -258,7 +258,7 @@ fun ChatScreen(
                         } else {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
+                                contentDescription = "Gửi",
                             )
                         }
                     }
@@ -335,7 +335,7 @@ fun ChatBubble(message: UiMessage) {
                     ) {
                         Column(modifier = Modifier.padding(8.dp)) {
                             Text(
-                                "🔧 Agent Actions",
+                                "🔧 Hành động Agent",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00E676),
@@ -383,7 +383,7 @@ fun ChatBubble(message: UiMessage) {
                         }
                         if (message.isLocal) {
                             Text(
-                                text = "📱 local",
+                                text = "📱 cục bộ",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF00E676).copy(alpha = 0.7f),
                             )
@@ -414,7 +414,7 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
             Text(if (isLocalMode) "🧠" else "🤖", fontSize = 48.sp)
             Spacer(Modifier.height(16.dp))
             Text(
-                if (isLocalMode) "BizClaw Local AI"
+                if (isLocalMode) "BizClaw AI Cục Bộ"
                 else "Chào mừng đến với BizClaw",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
@@ -422,7 +422,7 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
             Spacer(Modifier.height(8.dp))
             Text(
                 if (isLocalMode)
-                    "On-Device • ${localModelName ?: "No model"} • $0 cost"
+                    "Trên thiết bị • ${localModelName ?: "Chưa tải mô hình"} • Miễn phí"
                 else
                     "AI Agent Platform — Nhẹ, Nhanh, Tiết Kiệm",
                 style = MaterialTheme.typography.bodyMedium,
@@ -431,7 +431,7 @@ fun WelcomeCard(isLocalMode: Boolean = false, localModelName: String? = null) {
             Spacer(Modifier.height(16.dp))
             Text(
                 if (isLocalMode)
-                    "100% offline, no API keys. Your data stays on your phone."
+                    "100% ngoại tuyến, không cần API key. Dữ liệu hoàn toàn trên điện thoại."
                 else
                     "Gửi tin nhắn để bắt đầu trò chuyện với agent.",
                 style = MaterialTheme.typography.bodySmall,
