@@ -428,60 +428,54 @@ private fun FlowTemplateCard(
     onUse: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(template.emoji, fontSize = 24.sp)
-                }
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header: emoji + name
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(template.emoji, fontSize = 22.sp)
+                Spacer(Modifier.width(8.dp))
                 Text(
                     template.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    template.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
-                // App badges
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    template.targetApps.forEach { pkg ->
-                        val app = SOCIAL_APPS.find { it.packageName == pkg }
-                        if (app != null) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = app.color.copy(alpha = 0.15f),
-                            ) {
-                                Text(
-                                    "${app.emoji} ${app.name}",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = app.color,
-                                )
-                            }
-                        }
-                    }
+                Button(
+                    onClick = onUse,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Text("Dùng")
                 }
             }
 
-            Button(
-                onClick = onUse,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            // Description
+            Text(
+                template.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 30.dp, top = 2.dp),
+            )
+
+            // App badges
+            Row(
+                modifier = Modifier.padding(start = 30.dp, top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text("Dùng", style = MaterialTheme.typography.labelSmall)
+                template.targetApps.forEach { pkg ->
+                    val app = SOCIAL_APPS.find { it.packageName == pkg }
+                    if (app != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = app.color.copy(alpha = 0.15f),
+                        ) {
+                            Text(
+                                "${app.emoji} ${app.name}",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = app.color,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

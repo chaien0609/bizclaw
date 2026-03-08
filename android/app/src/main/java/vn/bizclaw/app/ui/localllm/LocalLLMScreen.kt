@@ -39,7 +39,7 @@ import java.io.File
 // ═══════════════════════════════════════════════════════════════
 // Tab identifiers
 // ═══════════════════════════════════════════════════════════════
-private enum class LLMTab { Models, Chat, Benchmark }
+private enum class LLMTab { Models, Benchmark }
 
 // ═══════════════════════════════════════════════════════════════
 // Demo Agent Personas
@@ -140,10 +140,10 @@ fun LocalLLMScreen(onBack: () -> Unit) {
         downloadedModels.map { it.name to it.path }
     }
 
-    // Auto-switch to Chat tab if model already loaded
+    // Auto-stay on Models tab
     LaunchedEffect(Unit) {
         if (llm.isLoaded && loadedModelName != null) {
-            selectedTab = LLMTab.Chat
+            selectedTab = LLMTab.Models
         }
     }
 
@@ -200,7 +200,6 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                             Text(
                                 when (tab) {
                                     LLMTab.Models -> "📦 Mô hình"
-                                    LLMTab.Chat -> "💬 Trò chuyện"
                                     LLMTab.Benchmark -> "⚡ Hiệu năng"
                                 }
                             )
@@ -254,9 +253,8 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                                 llm.addSystemPrompt(selectedAgent.systemPrompt)
                                 loadedModelName = name
                                 GlobalLLM.setModelName(name)
-                                statusMessage = "✅ $name đã sẵn sàng!"
+                                statusMessage = "✅ $name đã sẵn sàng! Quay về Home để chat."
                                 chatMessages.clear()
-                                selectedTab = LLMTab.Chat
                             } catch (e: Exception) {
                                 statusMessage = "❌ Nạp thất bại: ${e.message}"
                             }
@@ -266,61 +264,6 @@ fun LocalLLMScreen(onBack: () -> Unit) {
                     onDelete = { name, path ->
                         File(path).delete()
                         statusMessage = "Đã xóa $name"
-                    },
-                )
-
-                LLMTab.Chat -> ChatTab(
-                    llm = llm,
-                    messages = chatMessages,
-                    input = chatInput,
-                    isGenerating = isGenerating,
-                    generationSpeed = generationSpeed,
-                    contextUsed = contextUsed,
-                    loadedModelName = loadedModelName,
-                    selectedAgent = selectedAgent,
-                    onAgentChange = { agent ->
-                        selectedAgent = agent
-                        if (llm.isLoaded) {
-                            llm.addSystemPrompt(agent.systemPrompt)
-                            chatMessages.clear()
-                        }
-                    },
-                    onInputChange = { chatInput = it },
-                    onSend = { query ->
-                        if (llm.isLoaded && query.isNotBlank()) {
-                            chatInput = ""
-                            chatMessages.add(ChatMsg("user", query))
-                            isGenerating = true
-                            val assistantMsg = ChatMsg("assistant", "")
-                            chatMessages.add(assistantMsg)
-
-                            scope.launch {
-                                try {
-                                    val rawBuilder = StringBuilder()
-                                    llm.getResponseAsFlow(query)
-                                        .flowOn(Dispatchers.IO)
-                                        .collect { token ->
-                                            rawBuilder.append(token)
-                                            val raw = rawBuilder.toString()
-
-                                            // Parse <think>...</think> tags
-                                            val parsed = parseThinking(raw)
-                                            chatMessages[chatMessages.size - 1] =
-                                                assistantMsg.copy(
-                                                    content = parsed.response,
-                                                    thinking = parsed.thinking,
-                                                    isThinking = parsed.isStillThinking,
-                                                )
-                                        }
-                                    generationSpeed = llm.getGenerationSpeed()
-                                    contextUsed = llm.getContextUsed()
-                                } catch (e: Exception) {
-                                    chatMessages[chatMessages.size - 1] =
-                                        assistantMsg.copy(content = "⚠️ Lỗi: ${e.message}")
-                                }
-                                isGenerating = false
-                            }
-                        }
                     },
                 )
 

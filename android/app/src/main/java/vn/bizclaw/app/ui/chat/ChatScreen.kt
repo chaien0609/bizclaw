@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,7 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 import vn.bizclaw.app.engine.GlobalLLM
+import vn.bizclaw.app.engine.LocalAgent
+import vn.bizclaw.app.engine.LocalAgentManager
+import vn.bizclaw.app.engine.ProviderManager
+import vn.bizclaw.app.engine.AgentGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +50,15 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Agent selector state
+    val agentManager = remember { LocalAgentManager(context) }
+    val providerManager = remember { ProviderManager(context) }
+    var localAgents by remember { mutableStateOf(agentManager.loadAgents()) }
+    var selectedAgentId by remember { mutableStateOf<String?>(null) }
+    var groups by remember { mutableStateOf(providerManager.loadGroups()) }
+    var showGroupDialog by remember { mutableStateOf(false) }
 
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
@@ -200,6 +215,76 @@ fun ChatScreen(
                 }
             }
 
+            // ─── Agent Selector Bar ───────────────────────────
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // Group button
+                    item {
+                        FilterChip(
+                            selected = false,
+                            onClick = { showGroupDialog = true },
+                            label = { Text("👥 Nhóm", maxLines = 1) },
+                            leadingIcon = { Text("➕", fontSize = 12.sp) },
+                        )
+                    }
+
+                    // Agent chips
+                    items(localAgents) { agent ->
+                        val isSelected = selectedAgentId == agent.id
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                if (isSelected) {
+                                    selectedAgentId = null
+                                    viewModel.currentAgent.value = "BizClaw"
+                                } else {
+                                    selectedAgentId = agent.id
+                                    viewModel.currentAgent.value = agent.name
+                                    if (GlobalLLM.instance.isLoaded) {
+                                        val prompt = agentManager.buildPromptForAgent(agent, "")
+                                        GlobalLLM.instance.addSystemPrompt(prompt)
+                                    }
+                                }
+                            },
+                            label = {
+                                Text(
+                                    "${agent.emoji} ${agent.name}",
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
+                        )
+                    }
+
+                    // Existing groups
+                    items(groups) { group ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { /* TODO: activate group chat */ },
+                            label = {
+                                Text(
+                                    "${group.emoji} ${group.name}",
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            ),
+                        )
+                    }
+                }
+            }
+
             // Messages
             LazyColumn(
                 state = listState,
@@ -277,6 +362,70 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    // ─── Group Creation Dialog ───────────────────────
+    if (showGroupDialog) {
+        var groupName by remember { mutableStateOf("") }
+        var groupEmoji by remember { mutableStateOf("👥") }
+        var selectedMembers by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+        AlertDialog(
+            onDismissRequest = { showGroupDialog = false },
+            title = { Text("Tạo nhóm Agent", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = { Text("Tên nhóm") },
+                        placeholder = { Text("VD: Nhóm CSKH") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Text("Chọn agent vào nhóm:", style = MaterialTheme.typography.labelMedium)
+                    localAgents.forEach { agent ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Checkbox(
+                                checked = agent.id in selectedMembers,
+                                onCheckedChange = {
+                                    selectedMembers = if (it)
+                                        selectedMembers + agent.id
+                                    else
+                                        selectedMembers - agent.id
+                                },
+                            )
+                            Text("${agent.emoji} ${agent.name}")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (groupName.isNotBlank() && selectedMembers.isNotEmpty()) {
+                            providerManager.addGroup(
+                                AgentGroup(
+                                    id = "group_${System.currentTimeMillis()}",
+                                    name = groupName,
+                                    emoji = groupEmoji,
+                                    agentIds = selectedMembers.toList(),
+                                )
+                            )
+                            groups = providerManager.loadGroups()
+                            showGroupDialog = false
+                        }
+                    },
+                    enabled = groupName.isNotBlank() && selectedMembers.isNotEmpty(),
+                ) { Text("Tạo nhóm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGroupDialog = false }) { Text("Huỷ") }
+            },
+        )
     }
 }
 
