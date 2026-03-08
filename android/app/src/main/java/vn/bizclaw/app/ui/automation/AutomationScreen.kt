@@ -27,6 +27,8 @@ import vn.bizclaw.app.engine.LocalAgentManager
 import vn.bizclaw.app.engine.ProviderManager
 import vn.bizclaw.app.service.BizClawAccessibilityService
 import vn.bizclaw.app.service.BizClawNotificationListener
+import vn.bizclaw.app.service.MamaAgent
+import vn.bizclaw.app.service.MamaConfig
 
 // ═══════════════════════════════════════════════════════════════
 // Social app definitions
@@ -63,8 +65,10 @@ fun AutomationScreen(
     val context = LocalContext.current
     val manager = remember { LocalAgentManager(context) }
     val providerManager = remember { ProviderManager(context) }
+    val mama = remember { MamaAgent(context) }
     var agents by remember { mutableStateOf(manager.loadAgents()) }
     var showCreateFlow by remember { mutableStateOf(false) }
+    var mamaConfig by remember { mutableStateOf(mama.loadConfig()) }
 
     // Agent picker for flow activation
     var pendingTemplate by remember { mutableStateOf<FlowTemplate?>(null) }
@@ -147,6 +151,18 @@ fun AutomationScreen(
                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(intent)
                         } catch (_: Exception) {}
+                    },
+                )
+            }
+
+            // ─── Mama Agent Setup ──────────────────────────────
+            item {
+                MamaSetupCard(
+                    config = mamaConfig,
+                    agents = agents,
+                    onUpdateConfig = { newConfig ->
+                        mama.saveConfig(newConfig)
+                        mamaConfig = newConfig
                     },
                 )
             }
@@ -411,6 +427,124 @@ fun AutomationScreen(
 // ═══════════════════════════════════════════════════════════════
 // Status Card
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// Mama Agent Setup Card
+// ═══════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MamaSetupCard(
+    config: MamaConfig,
+    agents: List<LocalAgent>,
+    onUpdateConfig: (MamaConfig) -> Unit,
+) {
+    var bossText by remember(config) {
+        mutableStateOf(config.bossContacts.joinToString(", "))
+    }
+    var expanded by remember { mutableStateOf(false) }
+    val selectedAgent = agents.find { it.id == config.mamaAgentId }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (config.enabled)
+                Color(0xFFE65100).copy(alpha = 0.12f) // Orange glow
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("👑", fontSize = 22.sp)
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Mama Tổng Quản",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        if (config.enabled) "🟢 Đang hoạt động — chờ lệnh từ Zalo"
+                        else "⚪ Chưa bật",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (config.enabled) Color(0xFF00E676) else Color.Gray,
+                    )
+                }
+                Switch(
+                    checked = config.enabled,
+                    onCheckedChange = { enabled ->
+                        onUpdateConfig(config.copy(enabled = enabled))
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Boss contacts input
+            OutlinedTextField(
+                value = bossText,
+                onValueChange = { bossText = it },
+                label = { Text("Tên Zalo Boss (cách nhau dấu phẩy)") },
+                placeholder = { Text("VD: Nguyễn Đức Hoài, 0901234567") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = {
+                        val contacts = bossText.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        onUpdateConfig(config.copy(bossContacts = contacts))
+                    }) {
+                        Icon(Icons.Default.Check, "Lưu")
+                    }
+                },
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Agent selector
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded },
+            ) {
+                OutlinedTextField(
+                    value = if (selectedAgent != null) "${selectedAgent.emoji} ${selectedAgent.name}" else "Chọn Agent...",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Agent xử lý lệnh") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                ) {
+                    agents.forEach { agent ->
+                        DropdownMenuItem(
+                            text = {
+                                Text("${agent.emoji} ${agent.name} — ${agent.role.take(30)}")
+                            },
+                            onClick = {
+                                onUpdateConfig(config.copy(mamaAgentId = agent.id))
+                                expanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Info text
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "💡 Gửi tin nhắn Zalo từ tên Boss → Mama AI phân tích → "
+                    + "sai Agent làm → báo cáo lại Zalo",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 private fun StatusCard(

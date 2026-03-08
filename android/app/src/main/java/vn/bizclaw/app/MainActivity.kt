@@ -18,6 +18,7 @@ import vn.bizclaw.app.ui.chat.ChatViewModel
 import vn.bizclaw.app.ui.dashboard.DashboardScreen
 import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.LocalAgent
+import vn.bizclaw.app.engine.ProviderChat
 import vn.bizclaw.app.ui.localllm.LocalLLMScreen
 import vn.bizclaw.app.ui.automation.AutomationScreen
 import vn.bizclaw.app.ui.settings.SettingsScreen
@@ -28,6 +29,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Set app context for app-based AI providers (Gemini/ChatGPT/Grok)
+        ProviderChat.appContext = applicationContext
 
         setContent {
             BizClawTheme {

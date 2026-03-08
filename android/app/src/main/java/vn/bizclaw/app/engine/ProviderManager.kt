@@ -44,10 +44,13 @@ data class AIProvider(
 enum class ProviderType {
     LOCAL_GGUF,      // On-device via BizClawLLM
     OPENAI,          // OpenAI API (GPT-4, etc.)
-    GEMINI,          // Google Gemini
+    GEMINI,          // Google Gemini API
     OLLAMA,          // Local Ollama server
     BIZCLAW_CLOUD,   // BizClaw backend
     CUSTOM_API,      // Any OpenAI-compatible API
+    APP_GEMINI,      // Use Gemini app on device (free, slower)
+    APP_CHATGPT,     // Use ChatGPT app on device (free, slower)
+    APP_GROK,        // Use Grok app on device (free, slower)
 }
 
 /**

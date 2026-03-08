@@ -243,11 +243,16 @@ private fun ProviderCard(
         ProviderType.OLLAMA -> "Ollama"
         ProviderType.BIZCLAW_CLOUD -> "BizClaw Cloud"
         ProviderType.CUSTOM_API -> "API Tương Thích"
+        ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
+        ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
+        ProviderType.APP_GROK -> "📱 Grok App (Free)"
     }
 
     val statusColor = when {
         !provider.enabled -> MaterialTheme.colorScheme.surfaceVariant
         provider.type == ProviderType.LOCAL_GGUF -> Color(0xFF1B5E20).copy(alpha = 0.15f)
+        provider.type in listOf(ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK) ->
+            Color(0xFFE65100).copy(alpha = 0.12f) // Orange for app-based
         provider.apiKey.isNotBlank() || provider.type == ProviderType.OLLAMA -> Color(0xFF0D47A1).copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
     }
@@ -434,6 +439,9 @@ private fun ProviderFormDialog(
                             ProviderType.CUSTOM_API -> "🔗 API Tương Thích"
                             ProviderType.BIZCLAW_CLOUD -> "☁️ BizClaw Cloud"
                             ProviderType.LOCAL_GGUF -> "🧠 Cục Bộ (GGUF)"
+                            ProviderType.APP_GEMINI -> "📱 Gemini App (Free)"
+                            ProviderType.APP_CHATGPT -> "📱 ChatGPT App (Free)"
+                            ProviderType.APP_GROK -> "📱 Grok App (Free)"
                         },
                         onValueChange = {},
                         readOnly = true,
@@ -452,6 +460,9 @@ private fun ProviderFormDialog(
                             ProviderType.GEMINI to "✨ Google Gemini",
                             ProviderType.OLLAMA to "🦙 Ollama (Máy tính)",
                             ProviderType.CUSTOM_API to "🔗 API Tương Thích",
+                            ProviderType.APP_GEMINI to "📱 Gemini App (Miễn phí)",
+                            ProviderType.APP_CHATGPT to "📱 ChatGPT App (Miễn phí)",
+                            ProviderType.APP_GROK to "📱 Grok App (Miễn phí)",
                         ).forEach { (t, label) ->
                             DropdownMenuItem(
                                 text = { Text(label) },
@@ -474,8 +485,8 @@ private fun ProviderFormDialog(
                     singleLine = true,
                 )
 
-                // API Key (not for Ollama)
-                if (type != ProviderType.OLLAMA) {
+                // API Key (not for Ollama or App providers)
+                if (type !in listOf(ProviderType.OLLAMA, ProviderType.APP_GEMINI, ProviderType.APP_CHATGPT, ProviderType.APP_GROK)) {
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
