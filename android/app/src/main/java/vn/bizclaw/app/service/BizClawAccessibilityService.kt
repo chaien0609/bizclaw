@@ -161,6 +161,29 @@ class BizClawAccessibilityService : AccessibilityService() {
         }
 
         /**
+         * Type text into the first available editable field.
+         */
+        fun typeIntoAnyField(text: String): Boolean {
+            val service = instance ?: return false
+            val root = service.rootInActiveWindow ?: return false
+
+            val editFields = findEditableFields(root)
+            if (editFields.isNotEmpty()) {
+                val field = editFields.first()
+                field.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                field.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+
+                val args = Bundle()
+                args.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    text
+                )
+                return field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            }
+            return false
+        }
+
+        /**
          * Press Enter/IME action (send message, submit form).
          * Note: ACTION_IME_ENTER requires API 30+.
          * Fallback: click send button by common text.

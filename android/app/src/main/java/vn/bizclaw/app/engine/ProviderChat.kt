@@ -331,7 +331,11 @@ object ProviderChat {
                 }
 
                 // 3. Type via A11y
-                val typed = BizClawAccessibilityService.typeText(fullPrompt)
+                var typed = BizClawAccessibilityService.typeIntoAnyField(fullPrompt)
+                if (!typed) {
+                    // Fallback to checking if it is already focused
+                    typed = BizClawAccessibilityService.typeText(fullPrompt)
+                }
                 if (!typed) {
                     return@withContext "⚠️ Không tìm thấy ô nhập tin nhắn trong $appName"
                 }
