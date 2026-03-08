@@ -106,8 +106,8 @@ class ProviderManager(context: Context) {
         }
         // Merge API keys from secure storage
         val mergedList = providers.mapNotNull { p ->
-            // Skip old dynamic App providers (e.g. app_gemini_172...)
-            if (p.type.name.startsWith("APP_") && p.id !in listOf("app_gemini", "app_chatgpt", "app_grok", "app_deepseek", "app_notebooklm")) {
+            // Skip all App providers as they are deprecated
+            if (p.type.name.startsWith("APP_")) {
                 return@mapNotNull null
             }
             
@@ -118,21 +118,8 @@ class ProviderManager(context: Context) {
                 p
             }
         }
-        val mutableList = mergedList.toMutableList()
-        val appProviderDefs = listOf(
-            Triple("app_gemini", "📱 Gemini App", ProviderType.APP_GEMINI),
-            Triple("app_chatgpt", "📱 ChatGPT App", ProviderType.APP_CHATGPT),
-            Triple("app_grok", "📱 Grok App", ProviderType.APP_GROK),
-            Triple("app_deepseek", "📱 DeepSeek App", ProviderType.APP_DEEPSEEK),
-            Triple("app_notebooklm", "📓 NotebookLM (RAG)", ProviderType.APP_NOTEBOOKLM),
-        )
-        appProviderDefs.forEach { (id, name, type) ->
-            if (mutableList.none { it.id == id }) {
-                mutableList.add(AIProvider(id = id, name = name, type = type, emoji = name.substringBefore(" "), enabled = false))
-            }
-        }
         
-        return mutableList
+        return mergedList
     }
 
     fun saveProviders(providers: List<AIProvider>) {

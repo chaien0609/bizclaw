@@ -42,11 +42,7 @@ object ProviderChat {
             ProviderType.GEMINI -> chatGemini(provider, systemPrompt, userMessage)
             ProviderType.OLLAMA -> chatOllama(provider, systemPrompt, userMessage)
             ProviderType.BIZCLAW_CLOUD -> "⚠️ BizClaw Cloud chưa hỗ trợ"
-            ProviderType.APP_GEMINI -> chatViaApp("com.google.android.apps.bard", "Gemini", systemPrompt, userMessage)
-            ProviderType.APP_CHATGPT -> chatViaApp("com.openai.chatgpt", "ChatGPT", systemPrompt, userMessage)
-            ProviderType.APP_GROK -> chatViaApp("com.x.grok", "Grok", systemPrompt, userMessage)
-            ProviderType.APP_DEEPSEEK -> chatViaApp("com.deepseek.chat", "DeepSeek", systemPrompt, userMessage)
-            ProviderType.APP_NOTEBOOKLM -> chatViaApp("com.google.android.apps.notebooklm", "NotebookLM", systemPrompt, userMessage)
+            else -> "⚠️ Nguồn AI này không còn được hỗ trợ"
         }
     }
 
@@ -295,106 +291,4 @@ object ProviderChat {
             "URL must start with http:// or https://"
         }
     }
-
-    // ═══ App-based AI Provider ═════════════════════════════
-    // Open the AI app, type question, wait for response, read it back.
-    // Free but slower (~10-20s).
-
-    private suspend fun chatViaApp(
-        packageName: String,
-        appName: String,
-        systemPrompt: String,
-        userMessage: String,
-    ): String {
-        if (!BizClawAccessibilityService.isRunning()) {
-            return "⚠️ Accessibility Service chưa bật. Vào Cài đặt → Trợ năng để bật."
-        }
-
-        val ctx = appContext
-            ?: return "⚠️ App context chưa sẵn sàng"
-
-        val controller = vn.bizclaw.app.service.AppController(ctx)
-
-        return withContext(Dispatchers.Main) {
-            try {
-                Log.i(TAG, "📱 Opening $appName app...")
-
-                // 1. Open the AI app
-                controller.openApp(packageName)
-                delay(3000)
-
-                // 2. Prepare prompt
-                val fullPrompt = if (systemPrompt.isNotBlank()) {
-                    "[Hướng dẫn: ${systemPrompt.take(200)}]\n\n$userMessage"
-                } else {
-                    userMessage
-                }
-
-                // 3. Type via A11y
-                var typed = BizClawAccessibilityService.typeIntoAnyField(fullPrompt)
-                if (!typed) {
-                    // Fallback to checking if it is already focused
-                    typed = BizClawAccessibilityService.typeText(fullPrompt)
-                }
-                if (!typed) {
-                    return@withContext "⚠️ Không tìm thấy ô nhập tin nhắn trong $appName"
-                }
-                delay(500)
-
-                // 4. Baseline
-                val beforeResult = controller.readCurrentScreen()
-                val beforeText = if (beforeResult.success) beforeResult.message else ""
-
-                // 5. Send
-                val sent = BizClawAccessibilityService.clickByText("Send")
-                    || BizClawAccessibilityService.clickByText("Gửi")
-                    || BizClawAccessibilityService.clickByText("▶")
-                    || BizClawAccessibilityService.pressEnter()
-                if (!sent) {
-                    return@withContext "⚠️ Không gửi được trong $appName"
-                }
-
-                Log.i(TAG, "✉️ Sent to $appName, waiting for response...")
-
-                // 6. Wait for response
-                var response = ""
-                var lastLen = 0
-                var stableCount = 0
-
-                for (attempt in 1..30) {
-                    delay(1000)
-                    val screenResult = controller.readCurrentScreen()
-                    if (!screenResult.success) continue
-
-                    val currentText = screenResult.message
-                    val newContent = currentText.lines()
-                        .filter { line -> line.length > 10 && line !in beforeText.lines() }
-                        .joinToString("\n")
-
-                    if (newContent.length > 20) {
-                        if (newContent.length > lastLen) {
-                            response = newContent
-                            lastLen = newContent.length
-                            stableCount = 0
-                        } else {
-                            stableCount++
-                            if (stableCount >= 3) break
-                        }
-                    }
-                }
-
-                if (response.isBlank()) {
-                    return@withContext "⚠️ $appName không trả lời sau 30 giây."
-                }
-
-                Log.i(TAG, "✅ $appName response: ${response.take(100)}...")
-                response
-
-            } catch (e: Exception) {
-                Log.e(TAG, "$appName chat failed: ${e.message}")
-                "⚠️ $appName lỗi: ${e.message?.take(100)}"
-            }
-        }
-    }
 }
-

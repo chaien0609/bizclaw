@@ -79,9 +79,6 @@ fun ProviderScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         // No FAB — use + in TopAppBar
     ) { padding ->
-        val apiProviders = providers.filter { !it.type.name.startsWith("APP_") }
-        val appProviders = providers.filter { it.type.name.startsWith("APP_") }
-
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -101,62 +98,9 @@ fun ProviderScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            "App AI miễn phí → bật/tắt bên dưới. API → thêm key.",
+                            "Danh sách các Nguồn AI API hoặc Local GGUF",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            // ═══ App AI (Free) — Fixed toggle section ═══
-            item {
-                Text(
-                    "📱 App AI — Miễn phí (bật/tắt)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFE65100),
-                )
-                Text(
-                    "Dùng app AI trên máy — chậm (~15s) nhưng FREE!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            items(appProviders) { provider ->
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (provider.enabled)
-                            Color(0xFFE65100).copy(alpha = 0.12f)
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                provider.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                if (provider.enabled) "🟢 Đang bật" else "⚪ Tắt",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (provider.enabled) Color(0xFF00E676) else Color.Gray,
-                            )
-                        }
-                        Switch(
-                            checked = provider.enabled,
-                            onCheckedChange = { enabled ->
-                                manager.updateProvider(provider.copy(enabled = enabled))
-                                providers = manager.loadProviders()
-                            },
                         )
                     }
                 }
@@ -172,7 +116,7 @@ fun ProviderScreen(
                 )
             }
 
-            items(apiProviders) { provider ->
+            items(providers) { provider ->
                 ProviderCard(
                     provider = provider,
                     onEdit = { editingProvider = provider },
@@ -301,14 +245,12 @@ private fun ProviderCard(
         provider.type == ProviderType.OLLAMA -> "Ollama"
         provider.type == ProviderType.BIZCLAW_CLOUD -> "BizClaw Cloud"
         provider.type == ProviderType.CUSTOM_API -> "API Tương Thích"
-        provider.type.name.startsWith("APP_") -> "📱 App (Free)"
         else -> provider.type.name
     }
 
     val statusColor = when {
         !provider.enabled -> MaterialTheme.colorScheme.surfaceVariant
         provider.type == ProviderType.LOCAL_GGUF -> Color(0xFF1B5E20).copy(alpha = 0.15f)
-        provider.type.name.startsWith("APP_") -> Color(0xFFE65100).copy(alpha = 0.12f)
         provider.apiKey.isNotBlank() || provider.type == ProviderType.OLLAMA -> Color(0xFF0D47A1).copy(alpha = 0.12f)
         else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
     }
@@ -537,7 +479,7 @@ private fun ProviderFormDialog(
                 )
 
                 // API Key (not for Ollama)
-                if (type != ProviderType.OLLAMA && !type.name.startsWith("APP_")) {
+                if (type != ProviderType.OLLAMA) {
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },

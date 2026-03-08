@@ -383,9 +383,7 @@ private fun AgentFormDialog(
                 val availableProviders = providers.filter { it.enabled || it.id == selectedProvider }
 
                 availableProviders.forEach { provider ->
-                    val isAppBased = provider.type.name.startsWith("APP_")
                     val typeTag = when {
-                        isAppBased -> "🆓 Free"
                         provider.type == ProviderType.LOCAL_GGUF -> "🧠 Local"
                         provider.type == ProviderType.OLLAMA -> "🦙 Local"
                         else -> "🌐 API"
@@ -408,10 +406,10 @@ private fun AgentFormDialog(
                             Text(
                                 typeTag,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isAppBased) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (!isAppBased && !provider.enabled && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+                        if (!provider.enabled && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
                             Text(
                                 "chưa kn",
                                 style = MaterialTheme.typography.labelSmall,
