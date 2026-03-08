@@ -218,6 +218,7 @@ $agentList
 - telegram_read: Đọc chat Telegram
 - telegram_send: Gửi Telegram (cần contact, message)
 - schedule_create: Tạo lịch tự động
+- delegate_task: Giao việc cho Agent khác suy nghĩ, tư vấn, viết lách (cần agent_id, task)
 
 Hãy phân tích lệnh và trả lời CHÍNH XÁC theo format:
 INTENT: [mô tả ngắn gọn sếp muốn gì]
@@ -424,6 +425,30 @@ REPORT: yes
                 controller.telegramSendMessage(contact, message).message
             }
 
+            // Core delegation
+            "delegate_task" -> {
+                val targetAgentId = params["agent_id"] ?: return "Thiếu 'agent_id'"
+                val task = params["task"] ?: return "Thiếu 'task'"
+                
+                val targetAgent = allAgents.find { it.id == targetAgentId }
+                    ?: return "Không tìm thấy Agent: $targetAgentId"
+                
+                val targetProvider = ProviderManager(context).loadProviders().find { it.id == targetAgent.providerId }
+                    ?: return "Agent '${targetAgent.name}' chưa cấu hình Nguồn AI"
+                    
+                val systemPrompt = LocalAgentManager(context).buildPromptForAgent(targetAgent, task)
+                
+                Log.i(TAG, "🤖 [delegate_task] Giao cho ${targetAgent.name}: $task")
+                try {
+                    val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        ProviderChat.chat(targetProvider, systemPrompt, task)
+                    }
+                    "\n--- Trả lời từ ${targetAgent.name} ---\n$result\n------------------------------"
+                } catch (e: Exception) {
+                    "⚠️ Lỗi khi hỏi Agent ${targetAgent.name}: ${e.message}"
+                }
+            }
+
             else -> "⚠️ Hành động không rõ: $action"
         }
     }
@@ -444,7 +469,8 @@ Kết quả thực hiện:
 $executionResult
 
 Hãy tổng hợp thành báo cáo ngắn gọn, rõ ràng gửi lại cho sếp qua Zalo.
-Dùng emoji cho dễ đọc. Tối đa 500 ký tự.
+LƯU Ý QUAN TRỌNG: Nếu kết quả có chứa nội dung bài viết, kịch bản, email, hoặc văn bản nào do Agent khác tạo ra (hiển thị giữa dấu --- Trả lời từ... ---), hãy CHÉP NGUYÊN VĂN nội dung đó vào báo cáo của bạn. Đừng tóm tắt nó!
+Dùng emoji cho dễ đọc.
         """.trimIndent()
 
         val agentManager = LocalAgentManager(context)
