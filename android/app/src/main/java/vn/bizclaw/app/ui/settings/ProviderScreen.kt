@@ -89,13 +89,25 @@ fun ProviderScreen(
         )
         LaunchedEffect(Unit) {
             var changed = false
+            
+            // 1. We just save the clean list loaded by manager (already filtered out old ones)
+            val currentProviders = manager.loadProviders()
+
+            // 2. Ensure fixed ID app providers exist
             appProviderDefs.forEach { (id, name, type) ->
-                if (providers.none { it.id == id }) {
+                if (currentProviders.none { it.id == id }) {
                     manager.addProvider(AIProvider(id = id, name = name, type = type, emoji = name.substringBefore(" "), enabled = false))
                     changed = true
                 }
             }
-            if (changed) providers = manager.loadProviders()
+            
+            if (changed) {
+                providers = manager.loadProviders()
+            } else if (providers.size != currentProviders.size) {
+                // Meaning some were filtered out, save the clean list
+                manager.saveProviders(currentProviders)
+                providers = currentProviders
+            }
         }
 
         val apiProviders = providers.filter { !it.type.name.startsWith("APP_") }

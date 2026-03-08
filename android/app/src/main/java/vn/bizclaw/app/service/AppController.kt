@@ -50,15 +50,17 @@ class AppController(private val context: Context) {
 
             // Step 2: Find and tap the "What's on your mind?" field
             val tapped = a11y.clickByText("Bạn đang nghĩ gì")
+                || a11y.clickByText("Bạn nghĩ gì")
                 || a11y.clickByText("What's on your mind")
                 || a11y.clickByText("Viết gì đó")
             if (!tapped) return AutomationResult.error("Cannot find post composer field")
-            delay(1500)
+            delay(2000)
 
             // Step 3: Type content
-            val typed = a11y.typeText(content)
+            val typed = a11y.typeIntoField("Bạn đang nghĩ gì", content)
+                || a11y.typeText(content)
             if (!typed) return AutomationResult.error("Cannot type into post field")
-            delay(500)
+            delay(1000)
 
             // Step 4: Tap Post button
             val posted = a11y.clickByText("Đăng")
@@ -212,21 +214,23 @@ class AppController(private val context: Context) {
             }
             delay(1500)
 
-            // Tap compose / "Bạn đang nghĩ gì?" / create post
-            val compose = a11y.clickByText("Bạn đang nghĩ gì?")
+            // Tap compose / create post
+            val compose = a11y.clickByText("Hôm nay bạn")
+                || a11y.clickByText("Bạn đang nghĩ gì")
                 || a11y.clickByText("Đăng gì đó")
                 || a11y.clickByText("Viết bài")
                 || a11y.clickByText("Tạo bài viết")
                 || a11y.clickByText("What's on your mind")
             if (!compose) return AutomationResult.error("Không tìm thấy ô đăng bài Zalo")
-            delay(1500)
+            delay(2000)
 
             // Type post content
-            val typed = a11y.typeIntoField("Bạn đang nghĩ gì", content)
+            val typed = a11y.typeIntoField("nhĩ gì", content)
                 || a11y.typeIntoField("Hãy chia sẻ", content)
+                || a11y.typeIntoField("Chia sẻ", content)
                 || a11y.typeText(content)
             if (!typed) return AutomationResult.error("Không nhập được nội dung bài Zalo")
-            delay(500)
+            delay(1000)
 
             // Post / Đăng
             val posted = a11y.clickByText("Đăng")

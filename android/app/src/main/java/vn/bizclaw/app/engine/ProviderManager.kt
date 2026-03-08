@@ -105,7 +105,12 @@ class ProviderManager(context: Context) {
             }
         }
         // Merge API keys from secure storage
-        return providers.map { p ->
+        val mergedList = providers.mapNotNull { p ->
+            // Skip old dynamic App providers (e.g. app_gemini_172...)
+            if (p.type.name.startsWith("APP_") && p.id !in listOf("app_gemini", "app_chatgpt", "app_grok", "app_deepseek", "app_notebooklm")) {
+                return@mapNotNull null
+            }
+            
             val storedKey = securePrefs.getString("key_${p.id}", null)
             if (storedKey != null && p.apiKey.isBlank()) {
                 p.copy(apiKey = storedKey)
@@ -113,6 +118,7 @@ class ProviderManager(context: Context) {
                 p
             }
         }
+        return mergedList
     }
 
     fun saveProviders(providers: List<AIProvider>) {
