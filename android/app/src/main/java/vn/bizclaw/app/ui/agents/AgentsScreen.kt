@@ -377,22 +377,12 @@ private fun AgentFormDialog(
                     Switch(checked = autoReply, onCheckedChange = { autoReply = it })
                 }
 
-                // Provider selector — show all available + app-based defaults
+                // Provider selector — show only enabled ones or currently selected
                 Text("⚡ Nguồn AI", style = MaterialTheme.typography.labelMedium)
 
-                // Built-in app providers (always available, no config needed)
-                val appDefaults = listOf(
-                    AIProvider("app_gemini", "Gemini App (Miễn phí)", ProviderType.APP_GEMINI, "📱"),
-                    AIProvider("app_chatgpt", "ChatGPT App (Miễn phí)", ProviderType.APP_CHATGPT, "📱"),
-                    AIProvider("app_grok", "Grok App (Miễn phí)", ProviderType.APP_GROK, "📱"),
-                    AIProvider("app_deepseek", "DeepSeek App (Miễn phí)", ProviderType.APP_DEEPSEEK, "📱"),
-                    AIProvider("app_notebooklm", "NotebookLM RAG (Miễn phí)", ProviderType.APP_NOTEBOOKLM, "📓"),
-                )
-                val allProviders = providers + appDefaults.filter { app ->
-                    providers.none { it.id == app.id }
-                }
+                val availableProviders = providers.filter { it.enabled || it.id == selectedProvider }
 
-                allProviders.forEach { provider ->
+                availableProviders.forEach { provider ->
                     val isAppBased = provider.type.name.startsWith("APP_")
                     val typeTag = when {
                         isAppBased -> "🆓 Free"

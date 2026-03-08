@@ -79,37 +79,6 @@ fun ProviderScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         // No FAB — use + in TopAppBar
     ) { padding ->
-        // Ensure app providers exist in storage with fixed IDs
-        val appProviderDefs = listOf(
-            Triple("app_gemini", "📱 Gemini App", ProviderType.APP_GEMINI),
-            Triple("app_chatgpt", "📱 ChatGPT App", ProviderType.APP_CHATGPT),
-            Triple("app_grok", "📱 Grok App", ProviderType.APP_GROK),
-            Triple("app_deepseek", "📱 DeepSeek App", ProviderType.APP_DEEPSEEK),
-            Triple("app_notebooklm", "📓 NotebookLM (RAG)", ProviderType.APP_NOTEBOOKLM),
-        )
-        LaunchedEffect(Unit) {
-            var changed = false
-            
-            // 1. We just save the clean list loaded by manager (already filtered out old ones)
-            val currentProviders = manager.loadProviders()
-
-            // 2. Ensure fixed ID app providers exist
-            appProviderDefs.forEach { (id, name, type) ->
-                if (currentProviders.none { it.id == id }) {
-                    manager.addProvider(AIProvider(id = id, name = name, type = type, emoji = name.substringBefore(" "), enabled = false))
-                    changed = true
-                }
-            }
-            
-            if (changed) {
-                providers = manager.loadProviders()
-            } else if (providers.size != currentProviders.size) {
-                // Meaning some were filtered out, save the clean list
-                manager.saveProviders(currentProviders)
-                providers = currentProviders
-            }
-        }
-
         val apiProviders = providers.filter { !it.type.name.startsWith("APP_") }
         val appProviders = providers.filter { it.type.name.startsWith("APP_") }
 

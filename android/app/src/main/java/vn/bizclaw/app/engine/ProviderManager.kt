@@ -118,7 +118,21 @@ class ProviderManager(context: Context) {
                 p
             }
         }
-        return mergedList
+        val mutableList = mergedList.toMutableList()
+        val appProviderDefs = listOf(
+            Triple("app_gemini", "📱 Gemini App", ProviderType.APP_GEMINI),
+            Triple("app_chatgpt", "📱 ChatGPT App", ProviderType.APP_CHATGPT),
+            Triple("app_grok", "📱 Grok App", ProviderType.APP_GROK),
+            Triple("app_deepseek", "📱 DeepSeek App", ProviderType.APP_DEEPSEEK),
+            Triple("app_notebooklm", "📓 NotebookLM (RAG)", ProviderType.APP_NOTEBOOKLM),
+        )
+        appProviderDefs.forEach { (id, name, type) ->
+            if (mutableList.none { it.id == id }) {
+                mutableList.add(AIProvider(id = id, name = name, type = type, emoji = name.substringBefore(" "), enabled = false))
+            }
+        }
+        
+        return mutableList
     }
 
     fun saveProviders(providers: List<AIProvider>) {
