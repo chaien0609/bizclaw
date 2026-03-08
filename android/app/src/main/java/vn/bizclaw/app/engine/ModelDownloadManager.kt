@@ -77,27 +77,41 @@ class ModelDownloadManager(private val context: Context) {
             return -1
         }
 
-        Log.i(TAG, "Starting download: ${model.name} → $fileName")
+        Log.i(TAG, "Starting download: ${model.name} → $fileName (dest: ${destFile.absolutePath})")
 
-        val request = DownloadManager.Request(Uri.parse(model.url)).apply {
-            setTitle("BizClaw: ${model.name}")
-            setDescription("Downloading ${model.sizeDisplay} model for local AI")
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            setDestinationUri(Uri.fromFile(destFile))
-            setAllowedOverMetered(true)
-            setAllowedOverRoaming(false)
+        return try {
+            val request = DownloadManager.Request(Uri.parse(model.url)).apply {
+                setTitle("BizClaw: ${model.name}")
+                setDescription("Downloading ${model.sizeDisplay} model for local AI")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationUri(Uri.fromFile(destFile))
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(false)
+            }
+
+            currentDownloadId = downloadManager.enqueue(request)
+            _downloadState.value = DownloadState.Downloading(0, model.sizeBytes)
+
+            // Register completion receiver
+            registerDownloadReceiver()
+
+            // Start progress polling
+            pollDownloadProgress(currentDownloadId, model.sizeBytes)
+
+            currentDownloadId
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException during download: ${e.message}", e)
+            _downloadState.value = DownloadState.Error(
+                "Download permission denied: ${e.message}"
+            )
+            -1
+        } catch (e: Exception) {
+            Log.e(TAG, "Download failed: ${e.message}", e)
+            _downloadState.value = DownloadState.Error(
+                "Download error: ${e.message}"
+            )
+            -1
         }
-
-        currentDownloadId = downloadManager.enqueue(request)
-        _downloadState.value = DownloadState.Downloading(0, model.sizeBytes)
-
-        // Register completion receiver
-        registerDownloadReceiver()
-
-        // Start progress polling
-        pollDownloadProgress(currentDownloadId, model.sizeBytes)
-
-        return currentDownloadId
     }
 
     /**
@@ -176,7 +190,14 @@ class ModelDownloadManager(private val context: Context) {
     // ═══════════════════════════════════════════════════════════
 
     private fun getModelsDir(): File {
-        val dir = File(context.filesDir, MODELS_DIR)
+        // Use external files dir — DownloadManager cannot write to internal filesDir
+        val externalDir = context.getExternalFilesDir(null)
+        val dir = if (externalDir != null) {
+            File(externalDir, MODELS_DIR)
+        } else {
+            // Fallback to internal (won't work with DownloadManager but at least list works)
+            File(context.filesDir, MODELS_DIR)
+        }
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
