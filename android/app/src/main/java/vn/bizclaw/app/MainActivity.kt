@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import vn.bizclaw.app.ui.agents.AgentsScreen
+import vn.bizclaw.app.ui.agents.KnowledgeBaseScreen
 import vn.bizclaw.app.ui.chat.ChatScreen
 import vn.bizclaw.app.ui.chat.ChatViewModel
 import vn.bizclaw.app.ui.dashboard.DashboardScreen
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    Chat, Agents, Settings, Dashboard, LocalLLM
+    Chat, Agents, Settings, Dashboard, LocalLLM, KnowledgeBase
 }
 
 @Composable
@@ -81,6 +82,7 @@ fun BizClawNavHost() {
                     }
                     currentScreen = Screen.LocalLLM
                 },
+                onOpenKB = { currentScreen = Screen.KnowledgeBase },
                 onBack = { currentScreen = Screen.Chat },
             )
         }
@@ -112,6 +114,12 @@ fun BizClawNavHost() {
                     chatViewModel.refreshLocalModels(context)
                     currentScreen = Screen.Chat
                 },
+            )
+        }
+
+        Screen.KnowledgeBase -> {
+            KnowledgeBaseScreen(
+                onBack = { currentScreen = Screen.Agents },
             )
         }
     }

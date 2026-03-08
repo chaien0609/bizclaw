@@ -41,6 +41,7 @@ private val EMOJI_OPTIONS = listOf(
 @Composable
 fun AgentsScreen(
     onSelectAgent: (LocalAgent) -> Unit,
+    onOpenKB: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -48,7 +49,6 @@ fun AgentsScreen(
     var agents by remember { mutableStateOf(manager.loadAgents()) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingAgent by remember { mutableStateOf<LocalAgent?>(null) }
-    var showRagManager by remember { mutableStateOf<LocalAgent?>(null) }
 
     Scaffold(
         topBar = {
@@ -69,6 +69,9 @@ fun AgentsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenKB) {
+                        Icon(Icons.Default.MenuBook, "Kho kiến thức")
+                    }
                     IconButton(onClick = { showCreateDialog = true }) {
                         Icon(Icons.Default.Add, "Tạo agent mới")
                     }
@@ -114,7 +117,7 @@ fun AgentsScreen(
                         agent = agent,
                         onSelect = { onSelectAgent(agent) },
                         onEdit = { editingAgent = agent },
-                        onRag = { showRagManager = agent },
+                        onRag = onOpenKB,
                         onDelete = {
                             manager.deleteAgent(agent.id)
                             agents = manager.loadAgents()
@@ -151,19 +154,6 @@ fun AgentsScreen(
                 manager.updateAgent(updated)
                 agents = manager.loadAgents()
                 editingAgent = null
-            },
-        )
-    }
-
-    // RAG Manager
-    showRagManager?.let { agent ->
-        RagManagerDialog(
-            agent = agent,
-            onDismiss = { showRagManager = null },
-            onSave = { updated ->
-                manager.updateAgent(updated)
-                agents = manager.loadAgents()
-                showRagManager = null
             },
         )
     }
@@ -415,154 +405,4 @@ private fun AgentFormDialog(
     )
 }
 
-// ═══════════════════════════════════════════════════════════════
-// RAG Manager Dialog
-// ═══════════════════════════════════════════════════════════════
 
-@Composable
-private fun RagManagerDialog(
-    agent: LocalAgent,
-    onDismiss: () -> Unit,
-    onSave: (LocalAgent) -> Unit,
-) {
-    val context = LocalContext.current
-    var existingKBs by remember { mutableStateOf(LocalRAG.listKnowledgeBases(context)) }
-    var selectedKBs by remember { mutableStateOf(agent.knowledgeBaseIds.toSet()) }
-    var newKBName by remember { mutableStateOf("") }
-    var showAddDocs by remember { mutableStateOf<String?>(null) }
-    var newDocContent by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "${agent.emoji} ${agent.name} — Kiến thức",
-                fontWeight = FontWeight.Bold,
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Existing RAG
-                Text("Kho kiến thức hiện có:", style = MaterialTheme.typography.labelMedium)
-
-                if (existingKBs.isEmpty() && selectedKBs.isEmpty()) {
-                    Text(
-                        "Chưa có kho kiến thức nào. Tạo mới bên dưới!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                existingKBs.forEach { kbId ->
-                    val rag = remember(kbId) { LocalRAG(context, kbId) }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (kbId in selectedKBs)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(
-                                    checked = kbId in selectedKBs,
-                                    onCheckedChange = {
-                                        selectedKBs = if (it) selectedKBs + kbId else selectedKBs - kbId
-                                    },
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("📚 $kbId", fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        "${rag.size()} tài liệu",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    showAddDocs = if (showAddDocs == kbId) null else kbId
-                                }) {
-                                    Icon(Icons.Default.Add, "Thêm tài liệu")
-                                }
-                            }
-
-                            // Inline add document
-                            AnimatedVisibility(visible = showAddDocs == kbId) {
-                                Column {
-                                    OutlinedTextField(
-                                        value = newDocContent,
-                                        onValueChange = { newDocContent = it },
-                                        label = { Text("Nội dung kiến thức") },
-                                        placeholder = { Text("VD: Giá sản phẩm A là 500.000đ") },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(100.dp),
-                                        maxLines = 5,
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Button(
-                                        onClick = {
-                                            if (newDocContent.isNotBlank()) {
-                                                rag.addDocument(newDocContent)
-                                                newDocContent = ""
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = newDocContent.isNotBlank(),
-                                    ) {
-                                        Text("➕ Thêm vào kho")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider()
-
-                // Create new KB
-                Text("Tạo kho kiến thức mới:", style = MaterialTheme.typography.labelMedium)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = newKBName,
-                        onValueChange = { newKBName = it.lowercase().replace(" ", "_") },
-                        label = { Text("Tên kho") },
-                        placeholder = { Text("san_pham") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                    )
-                    Button(
-                        onClick = {
-                            if (newKBName.isNotBlank()) {
-                                LocalRAG(context, newKBName) // Creates the file
-                                selectedKBs = selectedKBs + newKBName
-                                existingKBs = LocalRAG.listKnowledgeBases(context)
-                                newKBName = ""
-                            }
-                        },
-                        enabled = newKBName.isNotBlank(),
-                    ) {
-                        Text("Tạo")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                onSave(agent.copy(knowledgeBaseIds = selectedKBs.toList()))
-            }) {
-                Text("Lưu")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Huỷ") }
-        },
-    )
-}
