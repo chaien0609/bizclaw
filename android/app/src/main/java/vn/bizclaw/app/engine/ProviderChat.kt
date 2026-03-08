@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import vn.bizclaw.app.service.BizClawAccessibilityService
@@ -52,15 +53,17 @@ object ProviderChat {
         if (!llm.isLoaded) return "⚠️ Chưa tải mô hình cục bộ. Vào 🧠 AI Cục Bộ để tải."
 
         return withContext(Dispatchers.IO) {
-            try {
-                llm.addSystemPrompt(systemPrompt)
-                val sb = StringBuilder()
-                llm.getResponseAsFlow(userMessage).collect { token ->
-                    sb.append(token)
+            GlobalLLM.generateMutex.withLock {
+                try {
+                    llm.addSystemPrompt(systemPrompt)
+                    val sb = StringBuilder()
+                    llm.getResponseAsFlow(userMessage).collect { token ->
+                        sb.append(token)
+                    }
+                    sb.toString().trim()
+                } catch (e: Exception) {
+                    "⚠️ Lỗi mô hình cục bộ: ${e.message}"
                 }
-                sb.toString().trim()
-            } catch (e: Exception) {
-                "⚠️ Lỗi mô hình cục bộ: ${e.message}"
             }
         }
     }

@@ -5,8 +5,12 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import vn.bizclaw.app.engine.GlobalLLM
 import vn.bizclaw.app.engine.LocalAgentManager
+import vn.bizclaw.app.engine.ProviderManager
+import vn.bizclaw.app.engine.ProviderChat
 
 /**
  * BizClaw Notification Listener — catches messages from Zalo, FB, Messenger.
@@ -102,6 +106,19 @@ class BizClawNotificationListener : NotificationListenerService() {
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
         if (text.isBlank()) return
+
+        // Deduplicate: ignore exact same sender + text within 3 seconds
+        synchronized(recentNotifications) {
+            val isDuplicate = recentNotifications.any {
+                it.sender == title && 
+                it.message == text && 
+                System.currentTimeMillis() - it.timestamp < 3000
+            }
+            if (isDuplicate) {
+                Log.d(TAG, "⏭️ Skipping duplicate notification from $title: $text")
+                return
+            }
+        }
 
         Log.i(TAG, "📩 $appName — $title: $text")
 
@@ -201,8 +218,6 @@ class BizClawNotificationListener : NotificationListenerService() {
     }
 
     private fun checkAutoReply(notif: SocialNotification) {
-        if (!GlobalLLM.instance.isLoaded) return // No model loaded
-
         val manager = LocalAgentManager(applicationContext)
         val agents = manager.loadAgents()
 
@@ -212,20 +227,22 @@ class BizClawNotificationListener : NotificationListenerService() {
 
         Log.i(TAG, "🤖 Auto-reply triggered: ${agent.name} → ${notif.app}")
 
+        val provider = ProviderManager(applicationContext).loadProviders().find { it.id == agent.providerId }
+            ?: return
+        
+        // Make sure ProviderChat can interact if tools are somehow used
+        ProviderChat.appContext = applicationContext
+
         scope.launch {
             try {
                 // Build prompt with RAG context
                 val fullPrompt = manager.buildPromptForAgent(agent, notif.message)
+                val userMsg = "Tin nhắn từ ${notif.sender} trên ${notif.app}: ${notif.message}"
 
-                // Set agent prompt and get AI response
-                val llm = GlobalLLM.instance
-                llm.addSystemPrompt(fullPrompt)
+                val replyText = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ProviderChat.chat(provider, fullPrompt, userMsg).trim()
+                }
 
-                val response = StringBuilder()
-                llm.getResponseAsFlow("Tin nhắn từ ${notif.sender} trên ${notif.app}: ${notif.message}")
-                    .collect { token -> response.append(token) }
-
-                val replyText = response.toString().trim()
                 if (replyText.isBlank()) {
                     Log.w(TAG, "⚠️ Empty AI response — skipping reply")
                     return@launch
