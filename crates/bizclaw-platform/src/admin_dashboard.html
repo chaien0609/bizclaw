@@ -1865,8 +1865,9 @@ async function openZaloQR(){
     const res = await authFetch(`${API}/tenants/${channelTenantId}/channels/zalo/qr`, {method:'POST'});
     const data = await res.json();
     if(data.ok && data.qr_code){
+      const qrSrc = data.qr_code.startsWith('data:') ? data.qr_code : 'data:image/png;base64,' + data.qr_code;
       document.getElementById('qr-display').innerHTML = `
-        <img src="${data.qr_code}" alt="Zalo QR Code" style="max-width:200px;border:2px solid var(--accent);border-radius:8px">
+        <img src="${qrSrc}" alt="Zalo QR Code" style="max-width:200px;border:2px solid var(--accent);border-radius:8px">
         <p style="margin-top:8px;font-size:12px;color:var(--muted)">${data.message || 'Mở Zalo → Quét mã QR'}</p>
       `;
     } else {

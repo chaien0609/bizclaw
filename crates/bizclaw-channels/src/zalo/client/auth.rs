@@ -332,13 +332,20 @@ impl ZaloAuth {
         let code = data["data"]["code"]
             .as_str()
             .ok_or_else(|| BizClawError::AuthFailed("No 'code' in QR response".into()))?;
-        let image = data["data"]["image"]
+        let raw_image = data["data"]["image"]
             .as_str()
             .ok_or_else(|| BizClawError::AuthFailed("No 'image' in QR response".into()))?;
 
+        // Ensure image is a proper data URI — Zalo API may return raw base64
+        let image = if raw_image.starts_with("data:") {
+            raw_image.to_string()
+        } else {
+            format!("data:image/png;base64,{}", raw_image)
+        };
+
         Ok(QrCodeResult {
             code: code.to_string(),
-            image: image.to_string(),
+            image,
         })
     }
 
