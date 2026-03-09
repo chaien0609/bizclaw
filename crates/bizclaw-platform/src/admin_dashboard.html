@@ -691,6 +691,18 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
   </div>
 </div>
 
+<!-- Custom Confirm Modal (replaces browser confirm() which gets blocked) -->
+<div id="modal-confirm" class="modal-overlay hidden">
+  <div class="modal" style="max-width:420px">
+    <h2 id="confirm-title">⚠️ Confirm</h2>
+    <p id="confirm-message" style="font-size:14px;color:var(--text2);margin:12px 0"></p>
+    <div class="actions">
+      <button class="btn btn-outline" onclick="resolveConfirm(false)">Cancel</button>
+      <button id="confirm-ok" class="btn btn-primary" onclick="resolveConfirm(true)">OK</button>
+    </div>
+  </div>
+</div>
+
 <!-- Change Role Modal -->
 <div id="modal-change-role" class="modal-overlay hidden">
   <div class="modal">
@@ -1357,13 +1369,34 @@ async function createTenant(){
   }
 }
 
+// Custom confirm modal — replaces browser confirm() which gets blocked
+let _confirmResolve = null;
+function customConfirm(message, title, btnClass) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title || '⚠️ Confirm';
+    document.getElementById('confirm-message').textContent = message;
+    const okBtn = document.getElementById('confirm-ok');
+    okBtn.className = 'btn ' + (btnClass || 'btn-primary');
+    document.getElementById('modal-confirm').classList.remove('hidden');
+  });
+}
+function resolveConfirm(val) {
+  document.getElementById('modal-confirm').classList.add('hidden');
+  if (_confirmResolve) { _confirmResolve(val); _confirmResolve = null; }
+}
+
 async function tenantAction(id,action){
   const confirms = {
-    delete: 'Delete this tenant permanently? All data will be lost.',
-    stop: 'Stop this tenant? Connected channels will disconnect.',
-    restart: 'Restart this tenant? Brief downtime expected.',
+    delete: { msg: 'Delete this tenant permanently? All data will be lost.', title: '🗑️ Delete Tenant', cls: 'btn-danger' },
+    stop: { msg: 'Stop this tenant? Connected channels will disconnect.', title: '⏹ Stop Tenant', cls: 'btn-primary' },
+    restart: { msg: 'Restart this tenant? Brief downtime expected.', title: '🔄 Restart Tenant', cls: 'btn-primary' },
   };
-  if(confirms[action] && !confirm(confirms[action])) return;
+  if(confirms[action]) {
+    const c = confirms[action];
+    const ok = await customConfirm(c.msg, c.title, c.cls);
+    if(!ok) return;
+  }
   const method=action==='delete'?'DELETE':'POST';
   const url=action==='delete'?`${API}/tenants/${id}`:`${API}/tenants/${id}/${action}`;
   try {

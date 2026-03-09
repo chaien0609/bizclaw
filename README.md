@@ -8,11 +8,11 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-335%20passing-brightgreen)]()
 [![Crates](https://img.shields.io/badge/crates-20-success)]()
-[![LOC](https://img.shields.io/badge/lines-62114-informational)]()
+[![LOC](https://img.shields.io/badge/lines-62147-informational)]()
 [![Website](https://img.shields.io/badge/🌐_Website-bizclaw.vn-blue)](https://bizclaw.vn)
 [![Facebook](https://img.shields.io/badge/📘_Fanpage-bizclaw.vn-1877F2?logo=facebook)](https://www.facebook.com/bizclaw.vn)
 
-<!-- AUTO-GENERATED STATS — updated 2026-03-09 @ 8927d75 -->
+<!-- AUTO-GENERATED STATS — updated 2026-03-09 @ 8cbd051 -->
 
 ---
 
@@ -236,7 +236,7 @@ ollama pull qwen3         # ~4.7GB
 |--------|-------|
 | **Language** | 100% Rust |
 | **Crates** | 20 |
-| **Lines of Code** | ~62114 |
+| **Lines of Code** | ~62147 |
 | **Tests** | 335 passing |
 | **Providers** | 15 built-in + custom endpoint |
 | **Channels** | 17 types |
@@ -244,7 +244,7 @@ ollama pull qwen3         # ~4.7GB
 | **Gallery** | 51 business agent templates |
 | **Dashboard** | 12 pages, bilingual (VI/EN) |
 | **Binary Size** | bizclaw 12M, platform 7.7M |
-| **Last Updated** | 2026-03-09 (8927d75) |
+| **Last Updated** | 2026-03-09 (8cbd051) |
 
 ---
 
