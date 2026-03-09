@@ -24,7 +24,7 @@ impl Default for ZaloCredentials {
             cookie: None,
             phone: None,
             user_agent:
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
                     .into(),
         }
     }
@@ -88,7 +88,7 @@ fn zalo_headers(user_agent: &str) -> Vec<(&'static str, String)> {
         ("priority", "u=1, i".into()),
         (
             "sec-ch-ua",
-            "\"Chromium\";v=\"130\", \"Google Chrome\";v=\"130\", \"Not?A_Brand\";v=\"99\"".into(),
+            "\"Chromium\";v=\"134\", \"Google Chrome\";v=\"134\", \"Not?A_Brand\";v=\"99\"".into(),
         ),
         ("sec-ch-ua-mobile", "?0".into()),
         ("sec-ch-ua-platform", "\"Windows\"".into()),

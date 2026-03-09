@@ -623,6 +623,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bizclaw-orchestrator"
+version = "0.3.1"
+dependencies = [
+ "bizclaw-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bizclaw-platform"
 version = "0.3.1"
 dependencies = [

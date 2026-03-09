@@ -20,6 +20,7 @@ members = [
     "crates/bizclaw-ffi",
     "crates/bizclaw-workflows",
     "crates/bizclaw-skills",
+    "crates/bizclaw-orchestrator",
 ]
 
 [workspace.package]
@@ -106,6 +107,7 @@ bizclaw-mcp = { path = "crates/bizclaw-mcp" }
 bizclaw-scheduler = { path = "crates/bizclaw-scheduler" }
 bizclaw-knowledge = { path = "crates/bizclaw-knowledge" }
 bizclaw-db = { path = "crates/bizclaw-db" }
+bizclaw-orchestrator = { path = "crates/bizclaw-orchestrator" }
 
 [package]
 name = "bizclaw"
