@@ -346,109 +346,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     </div>
     <div id="tenants-list"></div>
   </div>
-  <!-- Tenant Detail -->
-  <div id="page-tenant-detail" class="hidden">
-    <h1 style="margin-bottom:4px"><a href="#" onclick="showPage('tenants')" style="color:var(--muted);text-decoration:none">🏢 Tenants</a> / <span id="detail-tenant-name">—</span></h1>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
-      <button class="btn btn-primary btn-sm detail-tab active" onclick="showDetailTab('overview',this)">📋 Overview</button>
-      <button class="btn btn-outline btn-sm detail-tab" onclick="showDetailTab('settings',this)">⚙️ Settings</button>
-      <button class="btn btn-outline btn-sm detail-tab" onclick="showDetailTab('agents',this)">🤖 Agents</button>
-      <button class="btn btn-outline btn-sm detail-tab" onclick="showDetailTab('channels',this)">📱 Channels</button>
-      <button class="btn btn-outline btn-sm detail-tab" onclick="showDetailTab('model',this)">🧠 Model</button>
-    </div>
-    <!-- Overview Tab -->
-    <div id="detail-tab-overview">
-      <div class="stats" id="detail-stats"></div>
-      <div class="card" id="detail-info" style="margin-bottom:15px"></div>
-    </div>
-    <!-- Settings Tab -->
-    <div id="detail-tab-settings" class="hidden">
-      <div class="card" style="margin-bottom:15px">
-        <h3 style="margin-bottom:12px">⚙️ AI Provider & Model</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div>
-            <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">Provider</label>
-            <select id="cfg-provider" style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
-              <option>openai</option><option>anthropic</option><option>ollama</option><option>gemini</option><option>deepseek</option><option>groq</option><option>brain</option><option>llamacpp</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">Model</label>
-            <input id="cfg-model" placeholder="gpt-4o-mini" style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-          <div>
-            <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">API Key</label>
-            <input id="cfg-api-key" type="password" placeholder="sk-..." style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">API Base URL</label>
-            <input id="cfg-api-url" placeholder="https://api.openai.com/v1" style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:15px">
-        <h3 style="margin-bottom:12px">🎭 Identity</h3>
-        <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">Bot Name</label>
-        <input id="cfg-identity-name" placeholder="Sales AI" style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;margin-bottom:10px">
-        <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">Persona</label>
-        <input id="cfg-identity-persona" placeholder="A helpful sales assistant" style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;margin-bottom:10px">
-        <label style="font-size:12px;color:var(--muted);margin-bottom:4px;display:block">System Prompt</label>
-        <textarea id="cfg-identity-prompt" placeholder="You are a helpful AI assistant..." style="width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:monospace;min-height:100px;resize:vertical"></textarea>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="saveTenantConfig()">💾 Lưu Settings</button>
-        <span id="cfg-save-status" style="font-size:12px;color:var(--green);line-height:36px"></span>
-      </div>
-    </div>
-    <!-- Agents Tab -->
-    <div id="detail-tab-agents" class="hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-        <p style="font-size:12px;color:var(--muted)">Quản lý agents cho tenant này. Mỗi agent có provider, model và system prompt riêng.</p>
-        <button class="btn btn-primary btn-sm" onclick="showAddAgentForm()">+ Thêm Agent</button>
-      </div>
-      <div id="add-agent-form" class="card hidden" style="margin-bottom:15px">
-        <h3 id="ag-form-title" style="margin-bottom:8px">🤖 New Agent</h3>
-        <input type="hidden" id="ag-edit-mode" value="">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-          <div><label style="font-size:11px;color:var(--muted)">Name</label><input id="ag-name" placeholder="sales-bot" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px"></div>
-          <div><label style="font-size:11px;color:var(--muted)">Role</label><input id="ag-role" value="assistant" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px"></div>
-          <div><label style="font-size:11px;color:var(--muted)">Provider</label><select id="ag-provider" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px"><option>openai</option><option>anthropic</option><option>ollama</option><option>gemini</option><option>deepseek</option><option>groq</option><option>brain</option></select></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
-          <div><label style="font-size:11px;color:var(--muted)">Model</label><input id="ag-model" placeholder="gpt-4o-mini" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px"></div>
-          <div><label style="font-size:11px;color:var(--muted)">Description</label><input id="ag-desc" placeholder="Sales assistant" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px"></div>
-        </div>
-        <div style="margin-top:8px"><label style="font-size:11px;color:var(--muted)">System Prompt</label><textarea id="ag-prompt" placeholder="You are..." style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:monospace;min-height:60px"></textarea></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button id="ag-submit-btn" class="btn btn-primary btn-sm" onclick="createTenantAgent()">💾 Tạo</button>
-          <button class="btn btn-outline btn-sm" onclick="cancelAgentForm()">Huỷ</button>
-        </div>
-      </div>
-      <div id="agents-list"></div>
-    </div>
-    <!-- Channels Tab -->
-    <div id="detail-tab-channels" class="hidden">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:15px">Cấu hình kênh giao tiếp cho Agent. Bật/tắt và nhập thông tin xác thực cho từng kênh.</p>
-      <div class="ch-grid" id="detail-ch-grid"></div>
-    </div>
-    <!-- Model Tab -->
-    <div id="detail-tab-model" class="hidden">
-      <div class="card" style="margin-bottom:15px">
-        <h3 style="margin-bottom:12px">🧠 Model Configuration</h3>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:15px">Ollama models are shared across all tenants. Each tenant selects which model to use.<br>If Ollama is not installed on the server, use cloud providers (OpenAI, Anthropic, etc.) instead.</p>
-        <div id="detail-model-info"></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:12px">📦 Available Models (Shared Ollama)</h3>
-        <div id="detail-models-list"></div>
-        <div style="margin-top:12px;padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-          <p style="font-size:12px;color:var(--muted)">💡 Mỗi tenant dùng chung Ollama server — chỉ cần pull model 1 lần, tất cả tenant đều dùng được. RAM đủ nếu chỉ run 1 model cùng lúc (~2-4GB cho 7B model).</p>
-        </div>
-      </div>
-    </div>
-  </div>
+
   <!-- Users -->
   <div id="page-users" class="hidden">
     <h1>👥 Users <button class="btn btn-primary" onclick="showCreateUserModal()" style="margin-left:auto">+ Add User</button></h1>
@@ -569,11 +467,12 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Mỗi tenant có thể có nhiều agent với vai trò khác nhau.</p>
       <div style="text-align:left;background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.8">
         <strong>Cấu hình agent:</strong><br>
-        1. Vào <strong>Tenant Detail</strong> → tab <strong>Agents</strong><br>
-        2. Click <strong>"+ Thêm Agent"</strong><br>
-        3. Đặt <strong>Name</strong>, <strong>Role</strong>, <strong>System Prompt</strong><br>
-        4. Chọn provider/model riêng cho agent (nếu muốn)<br>
-        5. Click <strong>Tạo</strong> — có thể edit lại bất cứ lúc nào
+        1. Vào <strong>Tenant Subdomain</strong> (link 🔗 Dashboard)<br>
+        2. Mở tab <strong>Agents</strong><br>
+        3. Click <strong>"+ Thêm Agent"</strong><br>
+        4. Đặt <strong>Name</strong>, <strong>Role</strong>, <strong>System Prompt</strong><br>
+        5. Chọn provider/model riêng cho agent (nếu muốn)<br>
+        6. Click <strong>Tạo</strong> — có thể edit lại bất cứ lúc nào
       </div>
       <div style="display:flex;gap:10px;justify-content:center">
         <button class="btn btn-outline" onclick="onboardNext(2)">← Quay lại</button>
@@ -586,7 +485,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <div style="text-align:left;background:var(--card);border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.8">
         <strong>Kết nối Telegram:</strong><br>
         1. Tạo bot trên <strong>@BotFather</strong> → lấy <strong>Token</strong><br>
-        2. Vào <strong>Tenant Detail</strong> → tab <strong>Channels</strong><br>
+        2. Vào <strong>Tenant Subdomain</strong> → tab <strong>Channels</strong><br>
         3. Bật <strong>Telegram</strong> → Paste <strong>Bot Token</strong><br>
         4. Click <strong>💾 Lưu</strong> — Bot sẽ active ngay lập tức!
       </div>
@@ -735,35 +634,8 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
   </div>
 </div>
 
-<!-- Channel Configuration Modal -->
-<div id="modal-channels" class="modal-overlay hidden">
-  <div class="modal" style="min-width:680px">
-    <h2>⚙️ Channel Configuration — <span id="ch-tenant-name"></span></h2>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:15px">Cấu hình kênh giao tiếp cho Agent. Bật/tắt và nhập thông tin xác thực cho từng kênh.</p>
-    <div class="ch-grid" id="ch-grid"></div>
-    <div class="actions" style="margin-top:20px">
-      <button class="btn btn-outline" onclick="hideModal('modal-channels')">Đóng</button>
-    </div>
-  </div>
-</div>
 
-<!-- Zalo QR Modal -->
-<div id="modal-zalo-qr" class="modal-overlay hidden">
-  <div class="modal" style="text-align:center;min-width:350px">
-    <h2>📱 Quét QR Zalo</h2>
-    <div id="qr-display" class="qr-container">
-      <p style="color:var(--muted)">Đang tải mã QR...</p>
-    </div>
-    <div style="margin-top:12px;text-align:left">
-      <label style="font-size:12px;color:var(--muted)">Hoặc paste cookie Zalo Web:</label>
-      <textarea id="zalo-cookie-input" placeholder="Paste cookie từ DevTools (F12 → Application → Cookies → chat.zalo.me)" style="font-family:monospace;font-size:11px;min-height:60px;margin-top:4px"></textarea>
-    </div>
-    <div class="actions">
-      <button class="btn btn-outline" onclick="hideModal('modal-zalo-qr')">Huỷ</button>
-      <button class="btn btn-green" onclick="saveZaloCookie()">💾 Lưu Cookie</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- Create User Modal -->
 <div id="modal-create-user" class="modal-overlay hidden">
@@ -843,8 +715,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 <script>
 const API='/api/admin';
 let currentPage='dashboard';
-let channelTenantId=null;
-let channelTenantName='';
+
 let authToken=localStorage.getItem('bizclaw_admin_token')||'';
 let allTenants=[]; // Cache for filtering
 
@@ -1020,12 +891,11 @@ function showPage(p, updateHash = true){
 
   // Update sidebar active state
   document.querySelectorAll('.sidebar a[data-page]').forEach(a=>{
-    a.classList.toggle('active', a.dataset.page === p || (p === 'tenant-detail' && a.dataset.page === 'tenants'));
+    a.classList.toggle('active', a.dataset.page === p);
   });
 
   // Update hash in URL (e.g. #/tenants)
-  // Don't update hash for tenant-detail — it uses #/tenants/{id} set by openTenantDetail
-  if(updateHash && p !== 'tenant-detail'){
+  if(updateHash){
     const hash = '#/' + (p === 'dashboard' ? 'dashboard' : p);
     if(window.location.hash !== hash){
       window.location.hash = hash;
@@ -1044,9 +914,6 @@ window.addEventListener('hashchange', () => {
 // Read route from current URL hash
 function routeFromHash(){
   const hash = window.location.hash.replace(/^#/, '') || '/';
-  // Check for /tenants/{id} pattern
-  const tenantMatch = hash.match(/^\/tenants\/(.+)/);
-  if(tenantMatch) return 'tenant-detail';
   return ROUTE_MAP[hash] || 'dashboard';
 }
 
@@ -1068,7 +935,6 @@ function initRouter(){
 function loadPage(){
   if(currentPage==='dashboard')loadDashboard();
   else if(currentPage==='tenants')loadTenants();
-  else if(currentPage==='tenant-detail') loadTenantDetailFromHash();
   else if(currentPage==='users')loadUsers();
   else if(currentPage==='teams')loadTeams();
   else if(currentPage==='audit')loadAudit();
@@ -1076,27 +942,35 @@ function loadPage(){
   else if(currentPage==='wiki')loadWiki('getting-started');
 }
 
-// Load tenant detail from URL hash (e.g. after F5 or direct navigation)
-async function loadTenantDetailFromHash() {
-  const hash = window.location.hash.replace(/^#/, '') || '/';
-  const m = hash.match(/^\/tenants\/(.+)/);
-  if(!m) { showPage('tenants'); return; }
-  const tenantId = m[1];
-  // If already loaded this tenant, skip
-  if(detailTenantId === tenantId && document.getElementById('detail-tenant-name').textContent !== '—') return;
+// Fetch and display inline summary for a tenant card (read-only)
+async function loadTenantSummary(tenantId) {
+  const el = document.getElementById('tenant-summary-'+tenantId);
+  if(!el || el.dataset.loaded === '1') return;
+  el.dataset.loaded = '1';
   try {
-    const res = await authFetch(API+'/tenants/'+tenantId);
-    const data = await res.json();
-    if(data.ok && data.tenant) {
-      const t = data.tenant;
-      openTenantDetail(t.id, t.name, t.slug, t.provider, t.model, t.status, t.plan, t.pairing_code||'', t.port||'');
-    } else {
-      toast('❌ Tenant not found', 'error');
-      showPage('tenants');
-    }
+    const [chRes, agRes] = await Promise.all([
+      authFetch(`${API}/tenants/${tenantId}/channels`),
+      authFetch(`${API}/tenants/${tenantId}/agents`)
+    ]);
+    const chData = await chRes.json();
+    const agData = await agRes.json();
+    const channels = (chData.ok && chData.channels) ? chData.channels : [];
+    const agents = (agData.ok && agData.agents) ? agData.agents : [];
+    const chIcons = {telegram:'🤖',zalo:'💬',discord:'🎮',email:'📧',webhook:'🔗',whatsapp:'📱'};
+    const chHtml = channels.length > 0
+      ? channels.map(c => `<span class="badge ${c.enabled?'running':'stopped'}" style="font-size:10px;margin-right:4px">${chIcons[c.channel_type]||'📡'} ${c.channel_type}</span>`).join('')
+      : '<span style="font-size:11px;color:var(--muted)">Chưa có kênh nào</span>';
+    const agHtml = agents.length > 0
+      ? agents.map(a => `<span class="badge running" style="font-size:10px;margin-right:4px">🤖 ${escapeHtml(a.name)}</span>`).join('')
+      : '<span style="font-size:11px;color:var(--muted)">Chưa có agent</span>';
+    el.innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><span style="font-size:11px;color:var(--muted);margin-right:6px">📡 Channels:</span>${chHtml}</div>
+        <div><span style="font-size:11px;color:var(--muted);margin-right:6px">🤖 Agents:</span>${agHtml}</div>
+      </div>
+    `;
   } catch(e) {
-    toast('❌ '+e.message, 'error');
-    showPage('tenants');
+    el.innerHTML = '<span style="font-size:11px;color:var(--muted)">—</span>';
   }
 }
 
@@ -1176,17 +1050,18 @@ function renderTenantList(tenants){
     return;
   }
   document.getElementById('tenants-list').innerHTML=tenants.map(t=>{
+    const subUrl = `${proto}//${escapeHtml(t.slug)}.${baseDomain}`;
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <strong>${escapeHtml(t.name)}</strong> <span class="badge ${t.status}">${t.status}</span>
           <div class="tenant-slug" style="margin-top:4px">
-            <a href="${proto}//${escapeHtml(t.slug)}.${baseDomain}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">🔗 ${escapeHtml(t.slug)}.${baseDomain}</a>
+            <a href="${subUrl}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">🔗 ${escapeHtml(t.slug)}.${baseDomain}</a>
             · ${providerBadge(t.provider,t.model)} · <span style="color:var(--muted);font-size:11px">${escapeHtml(t.plan)}</span>
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="openTenantDetail('${t.id}','${esc(t.name)}','${esc(t.slug)}','${esc(t.provider)}','${esc(t.model)}','${t.status}','${esc(t.plan)}','${esc(t.pairing_code||'')}','${t.port||''}')" title="Tenant Detail">⚙️ Detail</button>
+          <a href="${subUrl}" target="_blank" class="btn btn-primary btn-sm" title="Mở Dashboard cấu hình" style="text-decoration:none">🔗 Dashboard</a>
           ${t.status!=='running'
             ?`<button class="btn btn-primary btn-sm" onclick="tenantAction('${t.id}','start')">▶ Start</button>`
             :`<button class="btn btn-outline btn-sm" onclick="tenantAction('${t.id}','stop')">⏹ Stop</button>`}
@@ -1194,9 +1069,13 @@ function renderTenantList(tenants){
           <button class="btn btn-danger btn-sm" onclick="tenantAction('${t.id}','delete')" title="Delete">✕</button>
         </div>
       </div>
-      ${t.pairing_code?`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Pairing: <strong style="color:var(--yellow);font-size:16px;font-family:monospace;letter-spacing:2px">${t.pairing_code}</strong></div>`:''}
+      <div id="tenant-summary-${t.id}" style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:6px;font-size:12px">
+        <span style="color:var(--muted)">⏳ Đang tải thông tin...</span>
+      </div>
     </div>`;
   }).join('');
+  // Load inline summaries for each tenant
+  tenants.forEach(t => loadTenantSummary(t.id));
 }
 function esc(s){return (s||"").replace(/'/g,"\\'");}
 
@@ -1499,565 +1378,6 @@ async function tenantAction(id,action){
 }
 function logout(){localStorage.removeItem('bizclaw_admin_token');authToken='';showLogin();}
 
-// ── Tenant Detail Page ──────────────────────────────
-let detailTenantId = '';
-let detailTenantData = {};
-
-function openTenantDetail(id, name, slug, provider, model, status, plan, pairing, port) {
-  detailTenantId = id;
-  detailTenantData = {id, name, slug, provider, model, status, plan, pairing, port};
-  channelTenantId = id;
-  channelTenantName = name;
-
-  // Push URL for this tenant detail
-  // Use hash-based route for tenant detail
-  window.location.hash = '#/tenants/' + id;
-
-  document.getElementById('detail-tenant-name').textContent = name;
-
-  // Stats
-  const baseDomain = location.hostname.replace(/^(admin|apps)\./, '');
-  const proto = location.protocol;
-  document.getElementById('detail-stats').innerHTML =
-    `<div class="stat"><label>Status</label><div class="val ${status==='running'?'green':'red'}">${status}</div></div>`+
-    `<div class="stat"><label>Provider</label><div class="val">${provider}</div></div>`+
-    `<div class="stat"><label>Model</label><div class="val">${model}</div></div>`+
-    `<div class="stat"><label>Port</label><div class="val">${port||'—'}</div></div>`;
-
-  // Info card
-  document.getElementById('detail-info').innerHTML = `
-    <h3 style="margin-bottom:12px">📋 Tenant Info</h3>
-    <div style="display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:14px">
-      <span style="color:var(--muted)">ID:</span><code style="font-size:12px">${id}</code>
-      <span style="color:var(--muted)">Slug:</span><span>${slug}</span>
-      <span style="color:var(--muted)">URL:</span><a href="${proto}//${slug}.${baseDomain}" target="_blank" style="color:var(--accent)">${slug}.${baseDomain}</a>
-      <span style="color:var(--muted)">Pairing:</span><strong style="color:var(--yellow)">${pairing||'N/A'}</strong>
-    </div>
-    <div style="margin-top:15px;display:flex;gap:8px">
-      ${status!=='running'
-        ?`<button class="btn btn-primary btn-sm" onclick="tenantAction('${id}','start');setTimeout(()=>showPage('tenants'),500)">▶ Start</button>`
-        :`<button class="btn btn-outline btn-sm" onclick="tenantAction('${id}','stop');setTimeout(()=>showPage('tenants'),500)">⏹ Stop</button>`}
-      <button class="btn btn-outline btn-sm" onclick="tenantAction('${id}','restart');toast('Restarting...')">🔄 Restart</button>
-      <button class="btn btn-outline btn-sm" onclick="resetTenantPairing('${id}')">🔑 Reset Pairing</button>
-    </div>
-  `;
-
-  // Show detail page
-  showPage('tenant-detail');
-  showDetailTab('overview', document.querySelector('.detail-tab'));
-
-  // Preload channels for channels tab
-  loadDetailChannels(id);
-  loadDetailModels();
-}
-
-function showDetailTab(tab, btn) {
-  ['overview','settings','agents','channels','model'].forEach(t => {
-    const el = document.getElementById('detail-tab-'+t);
-    if(el) el.classList.toggle('hidden', t!==tab);
-  });
-  document.querySelectorAll('.detail-tab').forEach(b => {
-    b.className = 'btn btn-outline btn-sm detail-tab';
-  });
-  if(btn) {
-    btn.className = 'btn btn-primary btn-sm detail-tab active';
-  }
-  if(tab==='settings') loadTenantConfig();
-  if(tab==='agents') loadTenantAgents();
-}
-
-async function loadDetailChannels(tenantId) {
-  const res = await authFetch(`${API}/tenants/${tenantId}/channels`);
-  const data = await res.json();
-  const existing = {};
-  if(data.ok && data.channels){
-    data.channels.forEach(ch => {
-      try { existing[ch.channel_type] = { ...ch, config: JSON.parse(ch.config_json) }; }
-      catch { existing[ch.channel_type] = { ...ch, config: {} }; }
-    });
-  }
-  loadedChannels = existing;
-  renderDetailChannelCards();
-}
-
-function renderDetailChannelCards() {
-  const grid = document.getElementById('detail-ch-grid');
-  grid.innerHTML = CHANNEL_DEFS.map(def => {
-    const saved = loadedChannels[def.type];
-    const enabled = saved ? saved.enabled : false;
-    const status = saved ? saved.status : 'disconnected';
-    const config = saved ? saved.config : {};
-    return `<div class="ch-card" id="ch-${def.type}">
-      <div class="ch-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="ch-icon">${def.icon}</span>
-          <span class="ch-name">${def.name}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge ${status}" style="font-size:10px">${status}</span>
-          <label class="toggle">
-            <input type="checkbox" id="toggle-${def.type}" ${enabled?'checked':''} onchange="toggleChannel('${def.type}',this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
-      <div class="ch-fields">
-        ${def.fields.map(f => {
-          const val = config[f.key] || '';
-          if(f.type==='textarea') return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-            <textarea id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}">${val}</textarea>`;
-          if(f.type==='password') return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-            <input type="password" id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}" value="${val}">`;
-          return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-            <input type="text" id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}" value="${val}">`;
-        }).join('')}
-      </div>
-      <div class="ch-actions">
-        <button class="btn btn-primary btn-sm" onclick="saveChannel('${def.type}')">💾 Lưu</button>
-        ${def.hasQR ? `<button class="btn btn-green btn-sm" onclick="openZaloQR()">📱 Quét QR</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function loadDetailModels() {
-  const info = document.getElementById('detail-model-info');
-  const list = document.getElementById('detail-models-list');
-  const t = detailTenantData;
-  info.innerHTML = `
-    <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;font-size:14px">
-      <span style="color:var(--muted)">Current Provider:</span><strong>${t.provider}</strong>
-      <span style="color:var(--muted)">Current Model:</span><strong style="color:var(--accent)">${t.model}</strong>
-      <span style="color:var(--muted)">Ollama Host:</span><span style="font-size:12px">Shared — configured in platform env (OLLAMA_HOST)</span>
-    </div>
-  `;
-
-  // Fetch shared Ollama models
-  try {
-    const r = await(await authFetch(API+'/ollama/models')).json();
-    if(r.ok && r.models && r.models.length > 0) {
-      list.innerHTML = r.models.map(m => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border)">
-          <div>
-            <strong style="color:var(--accent)">${m.name}</strong>
-            <span style="color:var(--muted);font-size:12px;margin-left:8px">${m.size} · ${m.family||''} · ${m.parameter_size||''}</span>
-          </div>
-          <span style="font-size:12px;color:${t.model===m.name?'var(--green)':'var(--muted)'}">${t.model===m.name?'✅ Active':'Available'}</span>
-        </div>
-      `).join('');
-    } else {
-      list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted)">
-        <p>Ollama chưa được cài đặt hoặc chưa có model nào.</p>
-        <p style="font-size:12px;margin-top:6px">Cài đặt: <code>curl -fsSL https://ollama.ai/install.sh | sh</code></p>
-        <p style="font-size:12px;margin-top:4px">Pull model: <code>ollama pull tinyllama</code></p>
-        <p style="font-size:12px;margin-top:8px;color:var(--yellow)">💡 Hoặc dùng cloud provider (OpenAI, Anthropic, Gemini) thay cho Ollama</p>
-      </div>`;
-    }
-  } catch(e) {
-    list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--red)">❌ Cannot connect to Ollama</div>`;
-  }
-}
-
-async function resetTenantPairing(id) {
-  try {
-    const r = await(await authFetch(`${API}/tenants/${id}/pairing`, {method:'POST'})).json();
-    if(r.ok) { toast(`✅ New pairing code: ${r.pairing_code}`); }
-    else { toast(`❌ ${r.error}`, 'error'); }
-  } catch(e) { toast('❌ ' + e.message, 'error'); }
-}
-
-// ══════════════════════════════════════════════════
-// ── CHANNEL CONFIGURATION ──────────────────────
-// ══════════════════════════════════════════════════
-
-const CHANNEL_DEFS = [
-  {
-    type:'telegram', icon:'🤖', name:'Telegram Bot', color:'#229ED9',
-    fields:[
-      {key:'bot_token', label:'Bot Token', placeholder:'123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11', type:'password'},
-      {key:'allowed_chat_ids', label:'Allowed Chat IDs (comma-separated)', placeholder:'-100123456789, 987654321', type:'text'},
-    ]
-  },
-  {
-    type:'zalo', icon:'💬', name:'Zalo Personal', color:'#0068FF',
-    fields:[
-      {key:'cookie', label:'Zalo Cookie', placeholder:'zpw_sek=...; zpw_enk=...', type:'textarea'},
-      {key:'imei', label:'IMEI (Device ID)', placeholder:'Auto-generated if empty', type:'text'},
-    ],
-    hasQR: true
-  },
-  {
-    type:'discord', icon:'🎮', name:'Discord Bot', color:'#5865F2',
-    fields:[
-      {key:'bot_token', label:'Bot Token', placeholder:'MTA0Nz...', type:'password'},
-      {key:'allowed_channel_ids', label:'Allowed Channel IDs (comma-separated)', placeholder:'1234567890, 0987654321', type:'text'},
-    ]
-  },
-  {
-    type:'email', icon:'📧', name:'Email (IMAP/SMTP)', color:'#EA4335',
-    fields:[
-      {key:'imap_host', label:'IMAP Host', placeholder:'imap.gmail.com', type:'text'},
-      {key:'imap_port', label:'IMAP Port', placeholder:'993', type:'text'},
-      {key:'smtp_host', label:'SMTP Host', placeholder:'smtp.gmail.com', type:'text'},
-      {key:'smtp_port', label:'SMTP Port', placeholder:'587', type:'text'},
-      {key:'email', label:'Email Address', placeholder:'bot@example.com', type:'text'},
-      {key:'password', label:'App Password', placeholder:'xxxx-xxxx-xxxx-xxxx', type:'password'},
-    ]
-  },
-  {
-    type:'webhook', icon:'🔗', name:'Webhook', color:'var(--orange)',
-    fields:[
-      {key:'url', label:'Webhook URL', placeholder:'https://example.com/webhook', type:'text'},
-      {key:'secret', label:'Webhook Secret', placeholder:'your-secret-key', type:'password'},
-    ]
-  },
-  {
-    type:'whatsapp', icon:'📱', name:'WhatsApp Business', color:'#25D366',
-    fields:[
-      {key:'api_token', label:'API Token', placeholder:'EAAxxxxxx...', type:'password'},
-      {key:'phone_number_id', label:'Phone Number ID', placeholder:'123456789', type:'text'},
-      {key:'business_id', label:'Business ID', placeholder:'987654321', type:'text'},
-    ]
-  },
-];
-
-// Store loaded channel configs
-let loadedChannels = {};
-
-async function openChannels(tenantId, tenantName){
-  channelTenantId = tenantId;
-  channelTenantName = tenantName;
-  document.getElementById('ch-tenant-name').textContent = tenantName;
-
-  // Load existing channels from API
-  const res = await authFetch(`${API}/tenants/${tenantId}/channels`);
-  const data = await res.json();
-  const existing = {};
-  if(data.ok && data.channels){
-    data.channels.forEach(ch => {
-      try { existing[ch.channel_type] = { ...ch, config: JSON.parse(ch.config_json) }; }
-      catch { existing[ch.channel_type] = { ...ch, config: {} }; }
-    });
-  }
-  loadedChannels = existing;
-
-  // Render channel cards
-  renderChannelCards();
-  document.getElementById('modal-channels').classList.remove('hidden');
-}
-
-function renderChannelCards(){
-  const grid = document.getElementById('ch-grid');
-  grid.innerHTML = CHANNEL_DEFS.map(def => {
-    const saved = loadedChannels[def.type];
-    const enabled = saved ? saved.enabled : false;
-    const status = saved ? saved.status : 'disconnected';
-    const config = saved ? saved.config : {};
-
-    return `<div class="ch-card" id="ch-${def.type}">
-      <div class="ch-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="ch-icon">${def.icon}</span>
-          <span class="ch-name">${def.name}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge ${status}" style="font-size:10px">${status}</span>
-          <label class="toggle">
-            <input type="checkbox" id="toggle-${def.type}" ${enabled?'checked':''} onchange="toggleChannel('${def.type}',this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
-      <div class="ch-fields">
-        ${def.fields.map(f => {
-          const val = config[f.key] || '';
-          if(f.type==='textarea'){
-            return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-              <textarea id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}">${val}</textarea>`;
-          }
-          if(f.type==='password'){
-            return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-              <input type="password" id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}" value="${val}">`;
-          }
-          return `<label style="font-size:11px;color:var(--muted);margin-top:6px">${f.label}</label>
-            <input type="text" id="ch-${def.type}-${f.key}" placeholder="${f.placeholder}" value="${val}">`;
-        }).join('')}
-      </div>
-      <div class="ch-actions">
-        <button class="btn btn-primary btn-sm" onclick="saveChannel('${def.type}')">💾 Lưu</button>
-        ${def.hasQR ? `<button class="btn btn-green btn-sm" onclick="openZaloQR()">📱 Quét QR</button>` : ''}
-        ${saved ? `<button class="btn btn-danger btn-sm" onclick="removeChannel('${def.type}','${saved.id}')">✕ Xoá</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function saveChannel(type){
-  const def = CHANNEL_DEFS.find(d=>d.type===type);
-  if(!def) return;
-
-  const config = {};
-  def.fields.forEach(f => {
-    const el = document.getElementById(`ch-${type}-${f.key}`);
-    if(el) config[f.key] = el.value;
-  });
-
-  const enabled = document.getElementById(`toggle-${type}`).checked;
-
-  const res = await authFetch(`${API}/tenants/${channelTenantId}/channels`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ channel_type: type, enabled, config })
-  });
-  const data = await res.json();
-  if(data.ok){
-    toast(`${def.name} — Đã lưu cấu hình!`);
-    // Reload
-    const r2 = await authFetch(`${API}/tenants/${channelTenantId}/channels`);
-    const d2 = await r2.json();
-    loadedChannels = {};
-    if(d2.ok && d2.channels){
-      d2.channels.forEach(ch => {
-        try { loadedChannels[ch.channel_type] = { ...ch, config: JSON.parse(ch.config_json) }; }
-        catch { loadedChannels[ch.channel_type] = { ...ch, config: {} }; }
-      });
-    }
-    renderChannelCards();
-  } else {
-    toast(data.error || 'Lỗi lưu cấu hình', 'error');
-  }
-}
-
-async function toggleChannel(type, enabled){
-  // Auto-save toggle state
-  const def = CHANNEL_DEFS.find(d=>d.type===type);
-  if(!def) return;
-
-  const config = {};
-  def.fields.forEach(f => {
-    const el = document.getElementById(`ch-${type}-${f.key}`);
-    if(el) config[f.key] = el.value;
-  });
-
-  await authFetch(`${API}/tenants/${channelTenantId}/channels`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ channel_type: type, enabled, config })
-  });
-  toast(`${def.name} — ${enabled?'Đã bật':'Đã tắt'}`);
-}
-
-async function removeChannel(type, channelId){
-  if(!confirm('Xoá cấu hình kênh này?')) return;
-  await authFetch(`${API}/tenants/${channelTenantId}/channels/${channelId}`, {method:'DELETE'});
-  delete loadedChannels[type];
-  renderChannelCards();
-  toast('Đã xoá kênh');
-}
-
-// ── Zalo QR ──────────────────────────────────
-async function openZaloQR(){
-  document.getElementById('modal-zalo-qr').classList.remove('hidden');
-  document.getElementById('qr-display').innerHTML = '<p style="color:var(--muted)">⏳ Đang tạo mã QR...</p>';
-  document.getElementById('zalo-cookie-input').value = '';
-
-  try {
-    const res = await authFetch(`${API}/tenants/${channelTenantId}/channels/zalo/qr`, {method:'POST'});
-    const data = await res.json();
-    if(data.ok && data.qr_code){
-      const qrSrc = data.qr_code.startsWith('data:') ? data.qr_code : 'data:image/png;base64,' + data.qr_code;
-      document.getElementById('qr-display').innerHTML = `
-        <img src="${qrSrc}" alt="Zalo QR Code" style="max-width:200px;border:2px solid var(--accent);border-radius:8px">
-        <p style="margin-top:8px;font-size:12px;color:var(--muted)">${data.message || 'Mở Zalo → Quét mã QR'}</p>
-      `;
-    } else {
-      document.getElementById('qr-display').innerHTML = `
-        <p style="color:var(--yellow)">⚠️ ${data.error || 'Không lấy được QR'}</p>
-        <p style="font-size:12px;color:var(--muted);margin-top:6px">${data.fallback || 'Vui lòng paste cookie bên dưới'}</p>
-      `;
-    }
-  } catch(e) {
-    document.getElementById('qr-display').innerHTML = `
-      <p style="color:var(--yellow)">⚠️ Lỗi kết nối đến server</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:6px">Vui lòng paste cookie Zalo Web bên dưới</p>
-    `;
-  }
-}
-
-async function saveZaloCookie(){
-  const cookie = document.getElementById('zalo-cookie-input').value.trim();
-  if(!cookie){
-    toast('Vui lòng nhập cookie Zalo', 'error');
-    return;
-  }
-
-  // Save cookie to Zalo channel config
-  const el = document.getElementById('ch-zalo-cookie');
-  if(el) el.value = cookie;
-
-  // Auto-save
-  await saveChannel('zalo');
-  hideModal('modal-zalo-qr');
-  toast('✅ Cookie Zalo đã được lưu!');
-}
-
-// ── (Ollama/Brain Engine moved to per-tenant Model tab) ──
-
-// ══════════════════════════════════════════════════
-// ── TENANT CONFIG (SETTINGS TAB) ──────────────
-// ══════════════════════════════════════════════════
-
-async function loadTenantConfig() {
-  try {
-    const r = await(await authFetch(`${API}/tenants/${detailTenantId}/configs`)).json();
-    if(r.ok && r.configs) {
-      const c = r.configs;
-      const setVal = (id, key) => { const el=document.getElementById(id); if(el) el.value=c[key]||''; };
-      setVal('cfg-provider','default_provider');
-      setVal('cfg-model','default_model');
-      setVal('cfg-api-key','api_key');
-      setVal('cfg-api-url','api_base_url');
-      setVal('cfg-identity-name','identity.name');
-      setVal('cfg-identity-persona','identity.persona');
-      setVal('cfg-identity-prompt','identity.system_prompt');
-      // Set select dropdown
-      const sel = document.getElementById('cfg-provider');
-      if(sel && c.default_provider) {
-        for(let i=0;i<sel.options.length;i++) {
-          if(sel.options[i].value===c.default_provider) { sel.selectedIndex=i; break; }
-        }
-      }
-    }
-  } catch(e) { console.error('Load config error:', e); }
-}
-
-async function saveTenantConfig() {
-  const configs = {
-    default_provider: document.getElementById('cfg-provider').value,
-    default_model: document.getElementById('cfg-model').value,
-    api_key: document.getElementById('cfg-api-key').value,
-    api_base_url: document.getElementById('cfg-api-url').value,
-    'identity.name': document.getElementById('cfg-identity-name').value,
-    'identity.persona': document.getElementById('cfg-identity-persona').value,
-    'identity.system_prompt': document.getElementById('cfg-identity-prompt').value,
-  };
-  try {
-    const r = await(await authFetch(`${API}/tenants/${detailTenantId}/configs`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({configs})
-    })).json();
-    if(r.ok) {
-      toast(`✅ Settings saved (${r.saved} keys)`);
-      document.getElementById('cfg-save-status').textContent = '✅ Saved!';
-      setTimeout(() => document.getElementById('cfg-save-status').textContent = '', 3000);
-    } else {
-      toast(r.error||'Save failed', 'error');
-    }
-  } catch(e) { toast('❌ '+e.message, 'error'); }
-}
-
-// ══════════════════════════════════════════════════
-// ── TENANT AGENTS (AGENTS TAB) ──────────────
-// ══════════════════════════════════════════════════
-
-function showAddAgentForm() {
-  document.getElementById('add-agent-form').classList.remove('hidden');
-  document.getElementById('ag-form-title').textContent = '🤖 New Agent';
-  document.getElementById('ag-submit-btn').textContent = '💾 Tạo';
-  document.getElementById('ag-edit-mode').value = '';
-  document.getElementById('ag-name').value = '';
-  document.getElementById('ag-name').disabled = false;
-  document.getElementById('ag-role').value = 'assistant';
-  document.getElementById('ag-desc').value = '';
-  document.getElementById('ag-prompt').value = '';
-  if(document.getElementById('ag-provider')) document.getElementById('ag-provider').value = 'openai';
-  if(document.getElementById('ag-model')) document.getElementById('ag-model').value = '';
-}
-function editTenantAgent(name, role, desc, provider, model, prompt) {
-  document.getElementById('add-agent-form').classList.remove('hidden');
-  document.getElementById('ag-form-title').textContent = '✏️ Edit Agent: ' + name;
-  document.getElementById('ag-submit-btn').textContent = '💾 Cập nhật';
-  document.getElementById('ag-edit-mode').value = name;
-  document.getElementById('ag-name').value = name;
-  document.getElementById('ag-name').disabled = true;
-  document.getElementById('ag-role').value = role || 'assistant';
-  document.getElementById('ag-desc').value = desc || '';
-  if(document.getElementById('ag-provider')) document.getElementById('ag-provider').value = provider || 'openai';
-  if(document.getElementById('ag-model')) document.getElementById('ag-model').value = model || '';
-  document.getElementById('ag-prompt').value = prompt || '';
-  document.getElementById('add-agent-form').scrollIntoView({behavior:'smooth'});
-}
-function cancelAgentForm() {
-  document.getElementById('add-agent-form').classList.add('hidden');
-  document.getElementById('ag-edit-mode').value = '';
-  document.getElementById('ag-name').disabled = false;
-}
-function editAgentByIndex(idx) {
-  const a = window._agentsCache && window._agentsCache[idx];
-  if(!a) return;
-  editTenantAgent(a.name, a.role, a.description||'', a.provider||'', a.model||'', a.system_prompt||'');
-}
-
-async function loadTenantAgents() {
-  try {
-    const r = await(await authFetch(`${API}/tenants/${detailTenantId}/agents`)).json();
-    const list = document.getElementById('agents-list');
-    window._agentsCache = (r.ok && r.agents) ? r.agents : [];
-    if(r.ok && r.agents && r.agents.length > 0) {
-      list.innerHTML = r.agents.map((a,idx) => `
-        <div class="card" style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong style="color:var(--accent)">${escapeHtml(a.name)}</strong>
-              <span class="badge running" style="margin-left:8px">${escapeHtml(a.role)}</span>
-              <span style="margin-left:8px">${providerBadge(a.provider,a.model)}</span>
-            </div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-outline btn-sm" onclick="editAgentByIndex(${idx})" title="Edit agent">✏️</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteTenantAgent('${esc(a.name)}')" title="Delete agent">✕</button>
-            </div>
-          </div>
-          ${a.description ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${escapeHtml(a.description)}</div>` : ''}
-          ${a.system_prompt ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:monospace;max-height:40px;overflow:hidden;text-overflow:ellipsis">📝 ${escapeHtml(a.system_prompt.slice(0,120))}${a.system_prompt.length>120?'...':''}</div>` : ''}
-        </div>
-      `).join('');
-    } else {
-      list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)"><p>👻 Chưa có agent nào.</p><p style="font-size:12px;margin-top:4px">Nhấn "+ Thêm Agent" để tạo agent mới.</p></div>';
-    }
-  } catch(e) { console.error('Load agents error:', e); }
-}
-
-async function createTenantAgent() {
-  const body = {
-    name: document.getElementById('ag-name').value.trim(),
-    role: document.getElementById('ag-role').value.trim() || 'assistant',
-    description: document.getElementById('ag-desc').value.trim(),
-    provider: document.getElementById('ag-provider').value,
-    model: document.getElementById('ag-model').value.trim(),
-    system_prompt: document.getElementById('ag-prompt').value.trim(),
-  };
-  if(!body.name) { toast('Nhập tên agent', 'error'); return; }
-  try {
-    const r = await(await authFetch(`${API}/tenants/${detailTenantId}/agents`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-    })).json();
-    if(r.ok) {
-      const mode = document.getElementById('ag-edit-mode').value;
-      toast(`✅ Agent "${body.name}" ${mode ? 'updated' : 'created'}!`);
-      cancelAgentForm();
-      loadTenantAgents();
-    } else { toast(r.error||'Create failed', 'error'); }
-  } catch(e) { toast('❌ '+e.message, 'error'); }
-}
-
-async function deleteTenantAgent(name) {
-  if(!confirm(`Xoá agent "${name}"?`)) return;
-  try {
-    const r = await(await authFetch(`${API}/tenants/${detailTenantId}/agents/${encodeURIComponent(name)}`, {method:'DELETE'})).json();
-    if(r.ok) { toast(`✅ Agent "${name}" deleted`); loadTenantAgents(); }
-    else { toast(r.error||'Delete failed', 'error'); }
-  } catch(e) { toast('❌ '+e.message, 'error'); }
-}
 
 // ── Keyboard shortcuts ──────────────────────────────────
 document.addEventListener('keydown', (e) => {
