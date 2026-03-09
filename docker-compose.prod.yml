@@ -54,6 +54,7 @@ services:
       - RUST_LOG=info
       - BIZCLAW_CONFIG=/root/.bizclaw/config.toml
       - BIZCLAW_CORS_ORIGINS=https://bizclaw.vn,https://apps.bizclaw.vn
+      - BIZCLAW_DOMAIN=bizclaw.vn
       - BIZCLAW_BIND_ALL=1
       - NGINX_SSL_CERT_DIR=bizclaw.vn-0001
       - NGINX_CONTAINER_NAME=bizclaw-nginx
@@ -91,6 +92,7 @@ services:
       - RUST_LOG=info
       - BIZCLAW_CONFIG=/root/.bizclaw/config.toml
       - BIZCLAW_CORS_ORIGINS=https://viagent.vn,https://apps.viagent.vn
+      - BIZCLAW_DOMAIN=viagent.vn
       - BIZCLAW_BIND_ALL=1
       - NGINX_SSL_CERT_DIR=viagent.vn
       - NGINX_CONTAINER_NAME=bizclaw-nginx

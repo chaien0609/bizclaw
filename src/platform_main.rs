@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
         jwt_secret,
         bizclaw_bin: cli.bizclaw_bin.clone(),
         base_port: cli.base_port,
-        domain: cli.domain.clone(),
+        domain: std::env::var("BIZCLAW_DOMAIN").unwrap_or_else(|_| cli.domain.clone()),
         login_attempts: std::sync::Mutex::new(std::collections::HashMap::new()),
         register_attempts: std::sync::Mutex::new(std::collections::HashMap::new()),
         pg_db,
