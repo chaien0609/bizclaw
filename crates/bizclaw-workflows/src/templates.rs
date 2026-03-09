@@ -13,6 +13,7 @@ pub fn builtin_workflows() -> Vec<Workflow> {
         research_pipeline(),
         translation_pipeline(),
         code_review_pipeline(),
+        slide_creator(),
     ]
 }
 
@@ -167,6 +168,138 @@ pub fn code_review_pipeline() -> Workflow {
                 },
             ),
         )
+}/// AI Slide Creator: Research → Plan → Generate (parallel) → Review → Export.
+///
+/// 4-stage pipeline implementing the full slide creation flow:
+/// ① Research: Gather information, save to memory
+/// ② Plan: LLM reasoning → structured slide outline with dependencies  
+/// ③ Generate: FanOut parallel slide creation + sequential for dependent slides
+/// ④ Review & Export: Quality gate loop → merge → PPTX export → notify
+pub fn slide_creator() -> Workflow {
+    Workflow::new(
+        "slide_creator",
+        "AI Slide Creator — Nghiên cứu → Lập kế hoạch → Tạo slide song song → Xuất PPTX",
+    )
+    .with_tags(vec!["slides", "presentation", "pptx", "research", "parallel"])
+    .with_timeout(1800) // 30 min max for full pipeline
+    // Stage 1: Research — thu thập dữ liệu
+    .add_step(
+        WorkflowStep::new("research", "researcher", StepType::Sequential)
+            .with_prompt(
+                "Bạn là chuyên gia nghiên cứu. Nhiệm vụ: nghiên cứu chủ đề sau để chuẩn bị tạo bài thuyết trình.\n\n\
+                Chủ đề: {{input}}\n\n\
+                Hãy:\n\
+                1. Thu thập dữ liệu, số liệu, xu hướng quan trọng\n\
+                2. Xác định 5-8 điểm chính cần trình bày\n\
+                3. Tìm ví dụ, case study minh hoạ\n\
+                4. Ghi lại nguồn tham khảo\n\n\
+                Trả về kết quả nghiên cứu chi tiết, có cấu trúc rõ ràng."
+            )
+            .with_timeout(600)
+            .with_retries(1),
+    )
+    // Stage 2: Plan — lập kế hoạch slide
+    .add_step(
+        WorkflowStep::new("plan", "planner", StepType::Sequential)
+            .with_prompt(
+                "Bạn là chuyên gia thiết kế bài thuyết trình. Dựa trên nghiên cứu sau, hãy lập kế hoạch chi tiết cho bài slide.\n\n\
+                Nghiên cứu:\n{{input}}\n\n\
+                Hãy tạo outline gồm:\n\
+                1. Tiêu đề bài thuyết trình\n\
+                2. Danh sách slides (10-20 slides), mỗi slide gồm:\n\
+                   - Số thứ tự\n\
+                   - Tiêu đề slide\n\
+                   - Nội dung chính (3-5 bullet points)\n\
+                   - Gợi ý hình ảnh/biểu đồ\n\
+                   - Loại: cover, content, data, chart, quote, closing\n\
+                3. Phân loại slides nào có thể tạo song song (độc lập) vs tuần tự (phụ thuộc)\n\n\
+                Format kết quả rõ ràng để AI khác có thể tạo từng slide."
+            )
+            .with_timeout(300),
+    )
+    // Stage 3a: Generate slides — parallel FanOut
+    .add_step(
+        WorkflowStep::new("gen-intro", "slide-designer", StepType::Sequential)
+            .with_prompt(
+                "Tạo nội dung chi tiết cho SLIDE MỞ ĐẦU (Cover + Giới thiệu) dựa trên plan sau.\n\
+                Viết nội dung đầy đủ, chuyên nghiệp cho mỗi slide.\n\n{{input}}"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("gen-body-a", "slide-designer", StepType::Sequential)
+            .with_prompt(
+                "Tạo nội dung chi tiết cho NHÓM SLIDE PHẦN 1 (slides 3-6 trong plan) dựa trên plan.\n\
+                Viết nội dung đầy đủ, chuyên nghiệp, có số liệu cụ thể.\n\n{{input}}"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("gen-body-b", "slide-designer", StepType::Sequential)
+            .with_prompt(
+                "Tạo nội dung chi tiết cho NHÓM SLIDE PHẦN 2 (slides 7-10 trong plan) dựa trên plan.\n\
+                Viết nội dung đầy đủ, chuyên nghiệp, có ví dụ minh hoạ.\n\n{{input}}"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("gen-closing", "slide-designer", StepType::Sequential)
+            .with_prompt(
+                "Tạo nội dung chi tiết cho SLIDE KẾT LUẬN (Tổng kết + CTA + Q&A) dựa trên plan.\n\
+                Viết kết luận mạnh mẽ, có call-to-action rõ ràng.\n\n{{input}}"
+            )
+            .with_timeout(300),
+    )
+    // Stage 3b: FanOut — chạy song song 4 nhóm slide
+    .add_step(WorkflowStep::new(
+        "parallel-gen",
+        "orchestrator",
+        StepType::FanOut {
+            parallel_steps: vec![
+                "gen-intro".into(),
+                "gen-body-a".into(),
+                "gen-body-b".into(),
+                "gen-closing".into(),
+            ],
+        },
+    ))
+    // Stage 3c: Collect — gom kết quả
+    .add_step(WorkflowStep::new(
+        "assemble",
+        "orchestrator",
+        StepType::Collect {
+            strategy: CollectStrategy::Merge,
+            evaluator: None,
+        },
+    ))
+    // Stage 4a: Quality review loop
+    .add_step(WorkflowStep::new(
+        "quality-check",
+        "quality-reviewer",
+        StepType::Loop {
+            body_step: "assemble".into(),
+            config: LoopConfig::new(
+                2, // max 2 revision rounds
+                Condition::new("quality", "contains", "APPROVED"),
+            ),
+        },
+    ))
+    // Stage 4b: Export — format final output
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## 📊 Bài Thuyết Trình Hoàn Chỉnh\n\n\
+                    Đã tạo xong! Dưới đây là nội dung đầy đủ của tất cả slides:\n\n\
+                    {{input}}\n\n\
+                    ---\n\
+                    ✅ Workflow: Research → Plan → Generate (Parallel) → Review → Export\n\
+                    📁 Sẵn sàng xuất ra PPTX bằng Document Generator skill."
+                    .to_string(),
+            },
+        ),
+    )
 }
 
 #[cfg(test)]
@@ -176,7 +309,7 @@ mod tests {
     #[test]
     fn test_builtin_workflows_count() {
         let workflows = builtin_workflows();
-        assert_eq!(workflows.len(), 6);
+        assert_eq!(workflows.len(), 7);
     }
 
     #[test]
@@ -208,5 +341,20 @@ mod tests {
         for wf in builtin_workflows() {
             assert!(!wf.tags.is_empty(), "Workflow '{}' has no tags", wf.name);
         }
+    }
+
+    #[test]
+    fn test_slide_creator_structure() {
+        let wf = slide_creator();
+        assert_eq!(wf.name, "slide_creator");
+        // Should have: research, plan, gen-intro, gen-body-a, gen-body-b, gen-closing,
+        //              parallel-gen, assemble, quality-check, export = 10 steps
+        assert!(wf.step_count() >= 10);
+        assert!(wf.get_step("research").is_some());
+        assert!(wf.get_step("plan").is_some());
+        assert!(wf.get_step("parallel-gen").is_some());
+        assert!(wf.get_step("assemble").is_some());
+        assert!(wf.get_step("quality-check").is_some());
+        assert!(wf.get_step("export").is_some());
     }
 }
