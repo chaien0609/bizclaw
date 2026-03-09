@@ -357,6 +357,9 @@ server {{
     add_header X-Content-Type-Options "nosniff" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
+    # Docker internal DNS — required when proxy_pass uses variables
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
     # Reserved subdomains — let static server blocks handle them
     if ($subdomain_{domain_slug} = "apps") {{
         return 444;
@@ -370,7 +373,8 @@ server {{
     }}
 
     location / {{
-        proxy_pass http://{upstream_host}:$tenant_port_{domain_slug};
+        set $tenant_upstream http://{upstream_host}:$tenant_port_{domain_slug};
+        proxy_pass $tenant_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
