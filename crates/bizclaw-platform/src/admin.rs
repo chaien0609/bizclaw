@@ -322,8 +322,11 @@ async fn sync_nginx_routing(state: &AdminState) {
         // Docker mode: use container hostname; Non-Docker: use 127.0.0.1
         let upstream_host = if std::env::var("BIZCLAW_BIND_ALL").unwrap_or_default() == "1" {
             // In Docker, nginx connects to the app container via network hostname
-            // The hostname matches the docker-compose service name
-            "bizclaw".to_string()
+            // Use NGINX_UPSTREAM_HOST env or derive from HOSTNAME or fallback to domain-based guess
+            std::env::var("NGINX_UPSTREAM_HOST").unwrap_or_else(|_| {
+                // Try HOSTNAME env (set by Docker to container name)
+                std::env::var("HOSTNAME").unwrap_or_else(|_| "bizclaw".to_string())
+            })
         } else {
             "127.0.0.1".to_string()
         };
@@ -937,8 +940,14 @@ async fn validate_pairing_deprecated(
     }))
 }
 
-async fn admin_dashboard_page() -> axum::response::Html<&'static str> {
-    axum::response::Html(include_str!("admin_dashboard.html"))
+async fn admin_dashboard_page() -> impl axum::response::IntoResponse {
+    (
+        [
+            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            (axum::http::header::PRAGMA, "no-cache"),
+        ],
+        axum::response::Html(include_str!("admin_dashboard.html")),
+    )
 }
 
 async fn pixel_office_page() -> axum::response::Html<&'static str> {
