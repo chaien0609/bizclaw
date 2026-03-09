@@ -2,20 +2,26 @@
 //! The core agent engine — orchestrates providers, channels, memory, and tools.
 //!
 //! ## Features (BizClaw agent features):
-//! - **Multi-round tool calling**: Up to 3 rounds of tool → LLM → tool loops
+//! - **Multi-round tool calling**: Up to 5 rounds of tool → LLM → tool loops
 //! - **Tool Loop Detection**: Detects and prevents infinite tool call loops (saves tokens)
 //! - **Memory retrieval (RAG)**: FTS5-powered search of past conversations
 //! - **Knowledge base integration**: Auto-search uploaded documents for context
 //! - **Auto-compaction**: Summarizes long conversations to prevent context overflow
 //! - **Session management**: Thread isolation via session_id
 //! - **Context tracking**: Monitor conversation length and estimate token usage
+//! - **Circuit Breaker**: Prevents cascading failures when provider is down/rate-limited
+//! - **Model Router**: Auto-selects optimal model tier based on task complexity
+//! - **Stealth Browser**: Anti-detection patches for headless Chrome automation
 
+pub mod circuit_breaker;
 pub mod context;
 pub mod discovery;
 pub mod engine;
 pub mod loop_detector;
+pub mod model_router;
 pub mod orchestrator;
 pub mod proactive;
+pub mod stealth_browser;
 
 use bizclaw_core::config::BizClawConfig;
 use bizclaw_core::error::Result;
@@ -105,6 +111,10 @@ pub struct Agent {
     daily_log: bizclaw_memory::brain::DailyLogManager,
     /// Tool loop detector — prevents infinite tool call loops
     loop_detector: loop_detector::LoopDetector,
+    /// Circuit Breaker — prevents cascading failures when provider is down
+    circuit_breaker: circuit_breaker::CircuitBreaker,
+    /// Model Router — auto-selects optimal model tier based on task complexity
+    model_router: model_router::ModelRouter,
 }
 
 impl Agent {
@@ -154,6 +164,8 @@ impl Agent {
             },
             daily_log,
             loop_detector: loop_detector::LoopDetector::new(),
+            circuit_breaker: circuit_breaker::CircuitBreaker::default(),
+            model_router: model_router::ModelRouter::new(model_router::ModelRouterConfig::default()),
         })
     }
 
@@ -237,6 +249,8 @@ impl Agent {
             knowledge: None,
             daily_log,
             loop_detector: loop_detector::LoopDetector::new(),
+            circuit_breaker: circuit_breaker::CircuitBreaker::default(),
+            model_router: model_router::ModelRouter::new(model_router::ModelRouterConfig::default()),
             last_stats: ContextStats {
                 message_count: 1,
                 estimated_tokens: 0,
@@ -320,8 +334,23 @@ impl Agent {
         }
 
         let tool_defs = self.prompt_cache.tool_defs(&self.tools).to_vec();
+
+        // Model Router: auto-select model based on task complexity
+        let tool_names: Vec<&str> = tool_defs.iter().map(|t| t.name.as_str()).collect();
+        let routing = self.model_router.route(
+            self.conversation.len(),
+            &tool_names[..std::cmp::min(tool_names.len(), 3)],
+            user_message,
+        );
+        let selected_model = if self.model_router.enabled() {
+            tracing::info!("🎯 Model Router: {}", routing);
+            routing.model.clone()
+        } else {
+            self.config.default_model.clone()
+        };
+
         let params = GenerateParams {
-            model: self.config.default_model.clone(),
+            model: selected_model,
             temperature: self.config.default_temperature,
             max_tokens: self.config.brain.max_tokens,
             top_p: 0.9,
@@ -337,7 +366,30 @@ impl Agent {
             let tools = if round < MAX_ROUNDS { &tool_defs } else { &vec![] };
             tracing::debug!("🧠 Think round {}/{}", round + 1, MAX_ROUNDS);
 
-            let resp = self.provider.chat(&self.conversation, tools, &params).await?;
+            // Circuit Breaker: check if provider is available
+            if !self.circuit_breaker.can_execute() {
+                let state = self.circuit_breaker.state();
+                tracing::warn!("🔴 Circuit breaker {} — provider unavailable", state);
+                final_content = format!(
+                    "⚠️ Xin lỗi, provider đang tạm thời không khả dụng (circuit breaker: {}). \
+                     Vui lòng thử lại sau.",
+                    state
+                );
+                self.conversation.push(Message::assistant(&final_content));
+                break;
+            }
+
+            let resp = match self.provider.chat(&self.conversation, tools, &params).await {
+                Ok(r) => {
+                    self.circuit_breaker.record_success();
+                    r
+                }
+                Err(e) => {
+                    self.circuit_breaker.record_failure();
+                    tracing::error!("Provider error: {} (CB: {})", e, self.circuit_breaker.summary());
+                    return Err(e);
+                }
+            };
 
             if resp.tool_calls.is_empty() {
                 final_content = resp.content.unwrap_or_else(|| "I'm not sure how to respond.".into());
@@ -780,5 +832,25 @@ impl Agent {
     /// Get last context statistics.
     pub fn context_stats(&self) -> &ContextStats {
         &self.last_stats
+    }
+
+    /// Get circuit breaker reference (for monitoring).
+    pub fn circuit_breaker(&self) -> &circuit_breaker::CircuitBreaker {
+        &self.circuit_breaker
+    }
+
+    /// Get model router reference.
+    pub fn model_router(&self) -> &model_router::ModelRouter {
+        &self.model_router
+    }
+
+    /// Update model router configuration.
+    pub fn set_model_router_config(&mut self, config: model_router::ModelRouterConfig) {
+        self.model_router.update_config(config);
+    }
+
+    /// Reset circuit breaker to closed state.
+    pub fn reset_circuit_breaker(&self) {
+        self.circuit_breaker.reset();
     }
 }

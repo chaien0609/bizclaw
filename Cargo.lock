@@ -419,6 +419,7 @@ dependencies = [
  "bizclaw-security",
  "bizclaw-tools",
  "chrono",
+ "dirs",
  "futures",
  "reqwest",
  "serde",
