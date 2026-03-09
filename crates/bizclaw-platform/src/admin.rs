@@ -81,7 +81,7 @@ impl AdminServer {
             .route("/api/admin/tenants/{id}/start", post(start_tenant))
             .route("/api/admin/tenants/{id}/stop", post(stop_tenant))
             .route("/api/admin/tenants/{id}/restart", post(restart_tenant))
-            .route("/api/admin/tenants/{id}/pairing", post(reset_pairing))
+            // pairing route removed — SaaS uses JWT login
             // Channel Configuration
             .route("/api/admin/tenants/{id}/channels", get(list_channels))
             .route("/api/admin/tenants/{id}/channels", post(upsert_channel))
@@ -162,7 +162,7 @@ impl AdminServer {
         // Public routes — including invitation acceptance
         let public = Router::new()
             .route("/api/admin/login", post(login))
-            .route("/api/admin/pairing/validate", post(validate_pairing))
+            .route("/api/admin/pairing/validate", post(validate_pairing_deprecated))
             .route("/api/admin/register", post(crate::self_serve::register_handler))
             .route("/api/admin/password-reset", post(crate::self_serve::forgot_password_handler))
             .route("/api/admin/password-reset/confirm", post(crate::self_serve::reset_password_handler))
@@ -803,28 +803,7 @@ async fn restart_tenant(
     }
 }
 
-async fn reset_pairing(
-    State(state): State<Arc<AdminState>>,
-    Extension(claims): Extension<crate::auth::Claims>,
-    Path(id): Path<String>,
-) -> Json<serde_json::Value> {
-    if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền reset pairing code."}));
-    }
-    // IMPORTANT: separate lock scopes to avoid Mutex deadlock
-    let reset_result = state.db.lock().await.reset_pairing_code(&id);
-    match reset_result {
-        Ok(code) => {
-            state
-                .db
-                .lock().await
-                .log_event("tenant_pairing_reset", "admin", &id, None)
-                .ok();
-            Json(serde_json::json!({"ok": true, "pairing_code": code}))
-        }
-        Err(e) => internal_error("admin", e),
-    }
-}
+// Pairing code management removed — SaaS uses JWT from Platform login
 
 async fn list_users(
     State(state): State<Arc<AdminState>>,
@@ -940,36 +919,18 @@ async fn login(
     }
 }
 
-#[derive(serde::Deserialize)]
-struct PairingReq {
-    slug: String,
-    code: String,
-}
-
-async fn validate_pairing(
-    State(state): State<Arc<AdminState>>,
-    Json(req): Json<PairingReq>,
+/// Deprecated — pairing code validation endpoint kept for backward compat.
+/// Returns deprecation notice regardless of input.
+async fn validate_pairing_deprecated(
+    State(_state): State<Arc<AdminState>>,
+    Json(_body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    // IMPORTANT: separate lock scopes to avoid Mutex deadlock
-    let pairing_result = state.db.lock().await.validate_pairing(&req.slug, &req.code);
-    match pairing_result {
-        Ok(Some(tenant)) => {
-            // Generate a session token for this tenant
-            match crate::auth::create_token(&tenant.id, &tenant.slug, "tenant", Some(&tenant.id), &state.jwt_secret) {
-                Ok(token) => {
-                    state
-                        .db
-                        .lock().await
-                        .log_event("pairing_success", "tenant", &tenant.id, None)
-                        .ok();
-                    Json(serde_json::json!({"ok": true, "token": token, "tenant": tenant}))
-                }
-                Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
-            }
-        }
-        Ok(None) => Json(serde_json::json!({"ok": false, "error": "Invalid pairing code"})),
-        Err(e) => internal_error("admin", e),
-    }
+    Json(serde_json::json!({
+        "ok": false,
+        "error": "Pairing code đã bị loại bỏ. Vui lòng đăng nhập qua Platform để nhận JWT token.",
+        "deprecated": true,
+        "redirect": "/login"
+    }))
 }
 
 async fn admin_dashboard_page() -> axum::response::Html<&'static str> {

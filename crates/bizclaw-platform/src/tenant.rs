@@ -348,10 +348,7 @@ require_pairing = false
                 tracing::info!("  📋 Generated agents.json with {} agent(s)", agents.len());
             }
 
-        // Write pairing code for gateway auth
-        if let Some(ref code) = tenant.pairing_code {
-            std::fs::write(tenant_dir.join(".pairing_code"), code).ok();
-        }
+        // (pairing_code removed — SaaS uses JWT from Platform login)
 
         // Log file for debugging
         let log_path = tenant_dir.join("gateway.log");
@@ -368,10 +365,7 @@ require_pairing = false
             .env("BIZCLAW_CONFIG", config_path.to_str().unwrap_or(""))
             .env("BIZCLAW_DATA_DIR", tenant_dir.to_str().unwrap_or(""));
 
-        // Pass pairing code directly via env var — most reliable method
-        if let Some(ref code) = tenant.pairing_code {
-            cmd.env("BIZCLAW_PAIRING_CODE", code);
-        }
+        // (pairing_code env var removed — SaaS uses JWT from Platform login)
 
         let child = cmd
             .stdout(stdout)

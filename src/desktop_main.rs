@@ -39,7 +39,7 @@ fn desktop_config(port: u16) -> BizClawConfig {
     config.gateway = GatewayConfig {
         host: "127.0.0.1".into(),
         port,
-        require_pairing: false, // Desktop mode — no pairing needed
+        require_pairing: false, // deprecated — JWT auth only
     };
 
     config

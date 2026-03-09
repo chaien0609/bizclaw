@@ -290,9 +290,9 @@ pub struct GatewayConfig {
     pub port: u16,
     #[serde(default = "default_host")]
     pub host: String,
-    /// Legacy pairing code auth — disabled by default.
-    /// Platform JWT auth is used instead.
-    #[serde(default)]
+    /// DEPRECATED: Pairing code auth removed — SaaS uses JWT from Platform login.
+    /// Kept for backward compatibility when loading old config files.
+    #[serde(default, skip_serializing)]
     pub require_pairing: bool,
 }
 

@@ -3,7 +3,7 @@
 //! Any tool/app that supports OpenAI API (Cursor, Continue, Aider, LibreChat, etc.)
 //! can use BizClaw as a proxy by pointing to `http://localhost:3579/v1`.
 //!
-//! Authentication: `Authorization: Bearer <pairing-code>` or `api-key` header.
+//! Authentication: `Authorization: Bearer <JWT-token>` from Platform login.
 
 use axum::extract::State;
 use axum::{Json, http::StatusCode};
@@ -95,18 +95,17 @@ fn extract_api_key(headers: &axum::http::HeaderMap) -> Option<String> {
     None
 }
 
-/// Validate API key against pairing code. Returns true if valid.
+/// Validate API key — accepts JWT tokens from Platform login.
+/// For backward compat, also accepts any API key if no JWT secret is configured (dev mode).
 fn validate_key(state: &AppState, key: &str) -> bool {
-    let stored = state.pairing_code.lock().unwrap_or_else(|p| p.into_inner()).clone();
-    // Constant-time comparison
-    if key.len() != stored.len() {
-        return false;
+    // Try JWT validation first
+    if !state.jwt_secret.is_empty() {
+        if super::server::validate_jwt_public(key, &state.jwt_secret).is_ok() {
+            return true;
+        }
     }
-    key.as_bytes()
-        .iter()
-        .zip(stored.as_bytes().iter())
-        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
-        == 0
+    // Dev mode: no JWT secret = allow all
+    state.jwt_secret.is_empty()
 }
 
 // ─── POST /v1/chat/completions ───────────────────────────────────────────────

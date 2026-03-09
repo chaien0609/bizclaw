@@ -21,8 +21,7 @@ const AppContext = createContext({});
 export function useApp() { return useContext(AppContext); }
 
 // ═══ API HELPERS ═══
-// Auth: JWT token from Platform login (priority) or legacy pairing code
-let pairingCode = sessionStorage.getItem('bizclaw_pairing') || '';
+// Auth: JWT token from Platform login
 
 // Try to get JWT token from: 1) URL ?token=  2) cookie bizclaw_token  3) sessionStorage
 function getJwtToken() {
@@ -46,24 +45,17 @@ function getJwtToken() {
 let jwtToken = getJwtToken();
 
 function authHeaders(extra = {}) {
-  if (jwtToken) {
-    return { ...extra, 'Authorization': 'Bearer ' + jwtToken, 'Content-Type': 'application/json' };
-  }
-  return { ...extra, 'X-Pairing-Code': pairingCode, 'Content-Type': 'application/json' };
+  return { ...extra, 'Authorization': 'Bearer ' + jwtToken, 'Content-Type': 'application/json' };
 }
 
 async function authFetch(url, opts = {}) {
   if (!opts.headers) opts.headers = {};
   if (jwtToken) {
     opts.headers['Authorization'] = 'Bearer ' + jwtToken;
-  } else {
-    opts.headers['X-Pairing-Code'] = pairingCode;
   }
   const res = await fetch(url, opts);
   if (res.status === 401) {
-    sessionStorage.removeItem('bizclaw_pairing');
     sessionStorage.removeItem('bizclaw_jwt');
-    pairingCode = '';
     jwtToken = '';
     throw new Error('Unauthorized');
   }
@@ -166,46 +158,18 @@ function Sidebar({ currentPage, lang, wsStatus, agentName, theme }) {
   </aside>`;
 }
 
-// ═══ PAIRING GATE ═══
-function PairingGate({ onSuccess }) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const doPairing = async () => {
-    setError('');
-    if (!code.trim()) { setError('Vui lòng nhập mã pairing'); return; }
-    setLoading(true);
-    try {
-      const res = await fetch('/api/v1/verify-pairing', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim() })
-      });
-      const r = await res.json();
-      if (r.ok) {
-        pairingCode = code.trim();
-        sessionStorage.setItem('bizclaw_pairing', pairingCode);
-        onSuccess();
-      } else {
-        setError(r.error || 'Sai mã pairing');
-      }
-    } catch (e) { setError(e.message); }
-    setLoading(false);
-  };
-
+// ═══ AUTH GATE (JWT-only) ═══
+// PairingGate removed — SaaS uses JWT from Platform login
+// If no JWT token, redirect to platform login page
+function AuthGate({ onSuccess }) {
   return html`<div style="position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;text-align:center">
       <div style="font-size:32px;margin-bottom:12px">🔐</div>
       <h2 style="color:var(--accent);margin-bottom:8px">BizClaw Agent</h2>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Nhập mã Pairing Code để truy cập Dashboard</p>
-      ${error && html`<div style="color:var(--red);font-size:13px;margin-bottom:12px">${error}</div>`}
-      <input type="text" value=${code} onInput=${e => setCode(e.target.value)}
-        placeholder="Pairing Code (6 digits)" maxlength="10"
-        onKeyDown=${e => e.key === 'Enter' && doPairing()}
-        style="width:100%;padding:12px 16px;margin-bottom:14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:18px;text-align:center;letter-spacing:4px;font-family:var(--mono)" />
-      <button onClick=${doPairing} disabled=${loading}
+      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Phiên đăng nhập hết hạn hoặc chưa đăng nhập</p>
+      <button onClick=${onSuccess}
         style="width:100%;padding:12px;background:var(--grad1);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
-        ${loading ? '⏳...' : '🔓 Xác nhận'}
+        🔓 Thử lại
       </button>
     </div>
   </div>`;
@@ -3942,14 +3906,14 @@ export function App() {
   }, [theme]);
   const wsRef = useRef(null);
 
-  // Check auth — JWT token (from Platform login) or legacy pairing code
+  // Check auth — JWT token from Platform login
   useEffect(() => {
     (async () => {
       try {
-        // Build verify body: prefer JWT token, fallback to pairing code
+        // Verify JWT token with backend
         const verifyBody = jwtToken
           ? { token: jwtToken }
-          : { code: pairingCode || '' };
+          : {};
         const res = await fetch('/api/v1/verify-pairing', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(verifyBody)
@@ -3960,12 +3924,10 @@ export function App() {
         }
         // If not ok, clear stale credentials
         else {
-          sessionStorage.removeItem('bizclaw_pairing');
           sessionStorage.removeItem('bizclaw_jwt');
-          pairingCode = '';
           jwtToken = '';
         }
-      } catch (e) { setPaired(true); } // if API fails, assume no pairing required
+      } catch (e) { setPaired(true); } // if API fails, assume dev mode (no auth required)
       setCheckingPairing(false);
     })();
   }, []);
@@ -3993,10 +3955,9 @@ export function App() {
     function connect() {
       if (cancelled) return;
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Prefer JWT token for WebSocket auth, fallback to pairing code
+      // JWT token for WebSocket auth
       let authParam = '';
       if (jwtToken) authParam = '?token=' + encodeURIComponent(jwtToken);
-      else if (pairingCode) authParam = '?code=' + encodeURIComponent(pairingCode);
       const url = proto + '//' + location.host + '/ws' + authParam;
       
       try {
@@ -4133,7 +4094,7 @@ export function App() {
 
   // Early returns AFTER all hooks (Rules of Hooks: hooks must be called in same order every render)
   if (checkingPairing) return html`<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg);color:var(--text2)">⏳ Loading...</div>`;
-  if (!paired) return html`<${PairingGate} onSuccess=${() => setPaired(true)} />`;
+  if (!paired) return html`<${AuthGate} onSuccess=${() => setPaired(true)} />`;
 
   return html`
     <${AppContext.Provider} value=${{ config, lang, t: (k) => t(k, lang), showToast, navigate, wsStatus }}>
