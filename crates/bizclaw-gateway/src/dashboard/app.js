@@ -1650,7 +1650,7 @@ function ChannelsPage({ lang }) {
             </div>
             ${zaloQr && html`
               <div style="text-align:center;padding:10px">
-                ${zaloQr.qr_code ? html`<img src="data:image/png;base64,${zaloQr.qr_code}" style="width:200px;height:200px;border-radius:8px;border:2px solid var(--accent)" />` : html`<div style="color:var(--text2)">Không thể hiển thị QR</div>`}
+                ${zaloQr.qr_code ? html`<img src="${zaloQr.qr_code.startsWith('data:') ? zaloQr.qr_code : 'data:image/png;base64,'+zaloQr.qr_code}" style="width:200px;height:200px;border-radius:8px;border:2px solid var(--accent)" />` : html`<div style="color:var(--text2)">Không thể hiển thị QR</div>`}
                 <div style="font-size:12px;color:var(--text2);margin-top:8px">${zaloQr.message || 'Quét mã QR bằng Zalo trên điện thoại'}</div>
               </div>
             `}
