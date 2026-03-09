@@ -182,8 +182,10 @@ function ChatPage({ config, lang }) {
   const [thinking, setThinking] = useState(false);
   const [streamContent, setStreamContent] = useState('');
   const [streamReqId, setStreamReqId] = useState(null);
-  const [sessions, setSessions] = useState([{ id: 'main', name: 'Main Chat', icon: '🤖', time: 'now', count: 0 }]);
+  const [sessions, setSessions] = useState([{ id: 'main', name: 'Main Chat', icon: '🤖', time: 'now', count: 0, mode: '1v1' }]);
   const [activeSession, setActiveSession] = useState('main');
+  const activeSessionObj = sessions.find(s => s.id === activeSession);
+  const isGroupMode = activeSessionObj?.mode === 'group';
   const [wsInfo, setWsInfo] = useState({});
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -307,15 +309,29 @@ function ChatPage({ config, lang }) {
     }
 
     // Add user message to UI
-    setMessages(prev => [...prev, { type: 'user', content: text, agent: selectedAgent || undefined }]);
+    // @mention support — detect @agentname at start of message in group chat
+    let targetAgent = selectedAgent;
+    let displayText = text;
+    const mentionMatch = text.match(/^@(\S+)\s+(.*)/);
+    if (mentionMatch && isGroupMode) {
+      const mentionedName = mentionMatch[1];
+      const found = agentsList.find(a => a.name.toLowerCase() === mentionedName.toLowerCase());
+      if (found) {
+        targetAgent = found.name;
+        displayText = mentionMatch[2];
+      }
+    }
+    // In group mode, auto-broadcast if no specific agent selected and no @mention
+    if (isGroupMode && !targetAgent) targetAgent = '__broadcast__';
+    setMessages(prev => [...prev, { type: 'user', content: text, agent: targetAgent || undefined }]);
     setThinking(true);
 
     // Send via WebSocket — include agent name for multi-agent routing
     if (window._ws && window._ws.readyState === 1) {
       const payload = { type: 'chat', content: text, stream: true };
-      if (selectedAgent && selectedAgent !== '__broadcast__') payload.agent = selectedAgent;
+      if (targetAgent && targetAgent !== '__broadcast__') payload.agent = targetAgent;
       
-      if (selectedAgent === '__broadcast__') {
+      if (targetAgent === '__broadcast__') {
         // Broadcast mode: send to ALL registered agents
         if (agentsList.length === 0) {
           setMessages(prev => [...prev, { type: 'system', content: '⚠️ No agents registered. Create agents first in AI Agent page.', error: true }]);
@@ -323,7 +339,7 @@ function ChatPage({ config, lang }) {
           return;
         }
         agentsList.forEach(a => {
-          window._ws.send(JSON.stringify({ type: 'chat', content: text, stream: true, agent: a.name }));
+          window._ws.send(JSON.stringify({ type: 'chat', content: displayText || text, stream: true, agent: a.name }));
         });
       } else {
         window._ws.send(JSON.stringify(payload));
@@ -378,20 +394,30 @@ function ChatPage({ config, lang }) {
       <div class="chat-sidebar">
         <div class="chat-sidebar-header">
           <h3>💬 ${t('chat.title', lang)}</h3>
-          <button class="btn btn-outline btn-sm" onClick=${() => {
-            const id = 'chat_' + Date.now();
-            setSessions(prev => [{ id, name: 'New Chat', icon: '💬', time: fmtTime(), count: 0 }, ...prev]);
-            setActiveSession(id);
-            setMessages([]);
-          }}>+ New</button>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-outline btn-sm" onClick=${() => {
+              const id = 'chat_' + Date.now();
+              setSessions(prev => [{ id, name: 'New Chat', icon: '💬', time: fmtTime(), count: 0, mode: '1v1' }, ...prev]);
+              setActiveSession(id);
+              setSelectedAgent('');
+              setMessages([]);
+            }} title="New 1-on-1 Chat">+</button>
+            <button class="btn btn-sm" style="background:var(--accent2);color:#fff;font-size:11px" onClick=${() => {
+              const id = 'group_' + Date.now();
+              setSessions(prev => [{ id, name: 'Group Chat', icon: '👥', time: fmtTime(), count: 0, mode: 'group' }, ...prev]);
+              setActiveSession(id);
+              setSelectedAgent('__broadcast__');
+              setMessages([{type:'system',content:'👥 Group Chat — All agents will respond. Use @agentname to target a specific agent.'}]);
+            }} title="New Group Chat">👥</button>
+          </div>
         </div>
         <div class="chat-list">
           <div class="chat-list-sep">Sessions</div>
           ${sessions.map(s => html`
-            <div key=${s.id} class="chat-list-item ${activeSession === s.id ? 'active' : ''}" onClick=${() => setActiveSession(s.id)}>
+            <div key=${s.id} class="chat-list-item ${activeSession === s.id ? 'active' : ''}" onClick=${() => { setActiveSession(s.id); if(s.mode==='group') setSelectedAgent('__broadcast__'); else setSelectedAgent(''); }}>
               <div class="chat-list-icon">${s.icon}</div>
               <div class="chat-list-info">
-                <div class="chat-list-name">${s.name}</div>
+                <div class="chat-list-name">${s.name} ${s.mode==='group' ? html`<span class="badge badge-blue" style="font-size:9px;padding:1px 5px;margin-left:4px">GROUP</span>`:''}</div>
                 <div class="chat-list-sub">${s.count || 0} messages · ${s.time}</div>
               </div>
             </div>
@@ -451,9 +477,13 @@ function ChatPage({ config, lang }) {
             ${messages.map((m, i) => html`
               <div key=${i} class=${m.type === 'user' ? 'msg msg-user' : m.type === 'bot' ? 'msg msg-bot' : 'msg msg-system'}
                 style=${m.error ? 'color:var(--red)' : ''}>
+                ${m.type === 'bot' && m.agent && isGroupMode ? html`<div style="font-size:11px;font-weight:600;color:var(--accent2);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                  <span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;text-align:center;font-size:10px;line-height:18px">${m.agent.charAt(0).toUpperCase()}</span>
+                  ${m.agent}
+                </div>` : ''}
                 ${m.type === 'bot' ? renderContent(m.content) : m.content}
                 ${m.type === 'bot' ? html`<div style="font-size:10px;color:var(--text2);margin-top:4px;text-align:right">
-                  ${m.agent ? '🤖 ' + m.agent : ''}${m.mode === 'agent' ? ' 🧠 Agent' : ''}${m.mode === 'multi-agent' ? ' 🔀 Multi-Agent' : ''}${m.context ? ' · ctx:' + m.context.total_tokens : ''}
+                  ${m.agent && !isGroupMode ? '🤖 ' + m.agent : ''}${m.mode === 'agent' ? ' 🧠 Agent' : ''}${m.mode === 'multi-agent' ? ' 🔀 Multi-Agent' : ''}${m.context ? ' · ctx:' + m.context.total_tokens : ''}
                 </div>` : ''}
               </div>
             `)}
@@ -468,8 +498,8 @@ function ChatPage({ config, lang }) {
         <div class="chat-input-wrap">
           <input ref=${inputRef} value=${input} onInput=${e => setInput(e.target.value)}
             onKeyDown=${e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder=${t('chat.placeholder', lang)} autocomplete="off" />
-          <button onClick=${sendMessage} disabled=${thinking}>${t('chat.send', lang)}</button>
+            placeholder=${isGroupMode ? 'Type a message or @agentname to target...' : t('chat.placeholder', lang)} autocomplete="off" />
+          <button onClick=${sendMessage} disabled=${thinking}>${isGroupMode ? '📢 Send' : t('chat.send', lang)}</button>
         </div>
       </div>
     </div>
@@ -1803,11 +1833,16 @@ function McpPage({ lang }) {
   const [addForm,setAddForm] = useState({name:'',command:'npx',args:'',env:''});
 
   const popular = [
+    {name:'playwright',desc:'Browser automation (Chrome, Firefox)',icon:'🎭',cmd:'npx -y @anthropic/mcp-server-playwright'},
+    {name:'gmail',desc:'Gmail read/send/draft',icon:'📧',cmd:'npx -y @anthropic/mcp-server-gmail'},
+    {name:'google-calendar',desc:'Google Calendar events',icon:'📅',cmd:'npx -y @anthropic/mcp-server-google-calendar'},
     {name:'filesystem',desc:'Read/write filesystem',icon:'📁',cmd:'npx -y @modelcontextprotocol/server-filesystem /tmp'},
     {name:'github',desc:'GitHub API',icon:'🐙',cmd:'npx -y @modelcontextprotocol/server-github'},
     {name:'postgres',desc:'PostgreSQL queries',icon:'🐘',cmd:'npx -y @modelcontextprotocol/server-postgres'},
     {name:'slack',desc:'Slack integration',icon:'💬',cmd:'npx -y @modelcontextprotocol/server-slack'},
-    {name:'puppeteer',desc:'Browser automation',icon:'🌐',cmd:'npx -y @modelcontextprotocol/server-puppeteer'},
+    {name:'puppeteer',desc:'Puppeteer browser',icon:'🌐',cmd:'npx -y @modelcontextprotocol/server-puppeteer'},
+    {name:'brave-search',desc:'Brave Search API',icon:'🔍',cmd:'npx -y @anthropic/mcp-server-brave-search'},
+    {name:'notion',desc:'Notion pages/databases',icon:'📝',cmd:'npx -y @anthropic/mcp-server-notion'},
     {name:'memory',desc:'Knowledge graph',icon:'🧠',cmd:'npx -y @modelcontextprotocol/server-memory'},
     {name:'gdrive',desc:'Google Drive',icon:'📂',cmd:'npx -y @anthropic/server-gdrive'},
     {name:'sqlite',desc:'SQLite database',icon:'💾',cmd:'npx -y @modelcontextprotocol/server-sqlite'},
