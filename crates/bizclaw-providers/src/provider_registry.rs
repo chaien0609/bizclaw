@@ -242,12 +242,58 @@ static MODELARK_MODELS: &[ModelDef] = &[
     },
 ];
 
-static OLLAMA_MODELS: &[ModelDef] = &[ModelDef {
-    id: "llama3.2",
-    name: "Llama 3.2 (Ollama)",
-    context_length: 4096,
-    max_output_tokens: Some(4096),
-}];
+static OLLAMA_MODELS: &[ModelDef] = &[
+    // ⭐ Recommended: Jan-nano — 4B, DAPO-optimized for tool-calling & search
+    // https://huggingface.co/Menlo/Jan-nano
+    ModelDef {
+        id: "jan-nano",
+        name: "⭐ Jan-nano (4B, Tool-calling Master)",
+        context_length: 32768,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "qwen3:0.6b",
+        name: "Qwen3 0.6B (Ultra-light, Pi-ready)",
+        context_length: 32768,
+        max_output_tokens: Some(4096),
+    },
+    ModelDef {
+        id: "qwen3",
+        name: "Qwen3 4B (Balanced)",
+        context_length: 32768,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "qwen3:8b",
+        name: "Qwen3 8B (Powerful)",
+        context_length: 32768,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "llama3.2",
+        name: "Llama 3.2 3B (Meta)",
+        context_length: 128000,
+        max_output_tokens: Some(4096),
+    },
+    ModelDef {
+        id: "gemma3",
+        name: "Gemma 3 4B (Google)",
+        context_length: 128000,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "phi4-mini",
+        name: "Phi-4 Mini 3.8B (Microsoft)",
+        context_length: 128000,
+        max_output_tokens: Some(4096),
+    },
+    ModelDef {
+        id: "deepseek-r1:7b",
+        name: "DeepSeek R1 7B (Reasoning)",
+        context_length: 64000,
+        max_output_tokens: Some(8192),
+    },
+];
 
 static LLAMACPP_MODELS: &[ModelDef] = &[ModelDef {
     id: "local-model",
