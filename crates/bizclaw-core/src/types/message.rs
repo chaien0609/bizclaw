@@ -143,6 +143,15 @@ pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    /// Anthropic prompt caching: tokens written to cache this request.
+    #[serde(default)]
+    pub cache_creation_input_tokens: u32,
+    /// Anthropic prompt caching: tokens read from cache (saved cost).
+    #[serde(default)]
+    pub cache_read_input_tokens: u32,
+    /// Extended thinking: tokens consumed by the thinking process.
+    #[serde(default)]
+    pub thinking_tokens: u32,
 }
 
 #[cfg(test)]

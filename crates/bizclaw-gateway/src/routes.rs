@@ -180,13 +180,15 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
             })
         }).collect::<Vec<_>>(),
         "channels": {
-            "telegram": cfg.channel.telegram.as_ref().map(|t| serde_json::json!({
+            "telegram": cfg.channel.telegram.iter().map(|t| serde_json::json!({
+                "name": t.name,
                 "enabled": t.enabled,
                 "bot_token": mask_secret(&t.bot_token),
                 "bot_token_set": !t.bot_token.is_empty(),
                 "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-            })),
-            "zalo": cfg.channel.zalo.as_ref().map(|z| serde_json::json!({
+            })).collect::<Vec<_>>(),
+            "zalo": cfg.channel.zalo.iter().map(|z| serde_json::json!({
+                "name": z.name,
                 "enabled": z.enabled,
                 "mode": z.mode,
                 "cookie_path": z.personal.cookie_path,
@@ -194,14 +196,15 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
                 "imei": z.personal.imei,
                 "self_listen": z.personal.self_listen,
                 "auto_reconnect": z.personal.auto_reconnect,
-            })),
-            "discord": cfg.channel.discord.as_ref().map(|d| serde_json::json!({
+            })).collect::<Vec<_>>(),
+            "discord": cfg.channel.discord.iter().map(|d| serde_json::json!({
+                "name": d.name,
                 "enabled": d.enabled,
                 "bot_token": mask_secret(&d.bot_token),
                 "bot_token_set": !d.bot_token.is_empty(),
                 "allowed_channel_ids": d.allowed_channel_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-            })),
-            "email": cfg.channel.email.as_ref().map(|e| serde_json::json!({
+            })).collect::<Vec<_>>(),
+            "email": cfg.channel.email.iter().map(|e| serde_json::json!({
                 "enabled": e.enabled,
                 "smtp_host": e.smtp_host,
                 "smtp_port": e.smtp_port,
@@ -209,19 +212,19 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
                 "smtp_pass": mask_secret(&e.password),
                 "imap_host": e.imap_host,
                 "imap_port": e.imap_port,
-            })),
-            "whatsapp": cfg.channel.whatsapp.as_ref().map(|w| serde_json::json!({
+            })).collect::<Vec<_>>(),
+            "whatsapp": cfg.channel.whatsapp.iter().map(|w| serde_json::json!({
                 "enabled": w.enabled,
                 "phone_number_id": w.phone_number_id,
                 "access_token": mask_secret(&w.access_token),
                 "business_id": w.business_id,
-            })),
-            "webhook": cfg.channel.webhook.as_ref().map(|wh| serde_json::json!({
+            })).collect::<Vec<_>>(),
+            "webhook": cfg.channel.webhook.iter().map(|wh| serde_json::json!({
                 "enabled": wh.enabled,
                 "secret": mask_secret(&wh.secret),
                 "secret_set": !wh.secret.is_empty(),
                 "outbound_url": wh.outbound_url,
-            })),
+            })).collect::<Vec<_>>(),
         },
     }))
 }
@@ -408,10 +411,9 @@ pub async fn update_channel(
     match channel_type {
         "telegram" => {
             let token_val = req.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
+            let instance_name = req.get("name").and_then(|v| v.as_str()).unwrap_or("Telegram").to_string();
             let token = if token_val.contains('•') {
-                cfg.channel
-                    .telegram
-                    .as_ref()
+                cfg.channel.telegram.first()
                     .map(|t| t.bot_token.clone())
                     .unwrap_or_default()
             } else {
@@ -424,17 +426,25 @@ pub async fn update_channel(
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
-            cfg.channel.telegram = Some(bizclaw_core::config::TelegramChannelConfig {
+            let new_cfg = bizclaw_core::config::TelegramChannelConfig {
+                name: instance_name.clone(),
                 enabled,
                 bot_token: token,
                 allowed_chat_ids: chat_ids,
-            });
+            };
+            // Upsert by name
+            if let Some(pos) = cfg.channel.telegram.iter().position(|t| t.name == instance_name) {
+                cfg.channel.telegram[pos] = new_cfg;
+            } else {
+                cfg.channel.telegram.push(new_cfg);
+            }
         }
         "zalo" => {
-            let mut zalo_cfg = cfg.channel.zalo.clone().unwrap_or_default();
+            let mut zalo_cfg = cfg.channel.zalo.first().cloned().unwrap_or_default();
+            let instance_name = req.get("name").and_then(|v| v.as_str()).unwrap_or(&zalo_cfg.name).to_string();
+            zalo_cfg.name = instance_name.clone();
             zalo_cfg.enabled = enabled;
             if let Some(v) = req.get("cookie").and_then(|v| v.as_str()) {
-                // Save cookie to file
                 let cookie_dir = state
                     .config_path
                     .parent()
@@ -446,15 +456,17 @@ pub async fn update_channel(
             if let Some(v) = req.get("imei").and_then(|v| v.as_str()) {
                 zalo_cfg.personal.imei = v.to_string();
             }
-            cfg.channel.zalo = Some(zalo_cfg);
+            if let Some(pos) = cfg.channel.zalo.iter().position(|z| z.name == instance_name) {
+                cfg.channel.zalo[pos] = zalo_cfg;
+            } else {
+                cfg.channel.zalo.push(zalo_cfg);
+            }
         }
         "discord" => {
+            let instance_name = req.get("name").and_then(|v| v.as_str()).unwrap_or("Discord").to_string();
             let token_val = req.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
             let token = if token_val.contains('•') {
-                // Keep existing token if masked value sent
-                cfg.channel
-                    .discord
-                    .as_ref()
+                cfg.channel.discord.first()
                     .map(|d| d.bot_token.clone())
                     .unwrap_or_default()
             } else {
@@ -467,11 +479,17 @@ pub async fn update_channel(
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
-            cfg.channel.discord = Some(bizclaw_core::config::DiscordChannelConfig {
+            let new_cfg = bizclaw_core::config::DiscordChannelConfig {
+                name: instance_name.clone(),
                 enabled,
                 bot_token: token,
                 allowed_channel_ids: ids,
-            });
+            };
+            if let Some(pos) = cfg.channel.discord.iter().position(|d| d.name == instance_name) {
+                cfg.channel.discord[pos] = new_cfg;
+            } else {
+                cfg.channel.discord.push(new_cfg);
+            }
         }
         "email" => {
             let smtp_host = req
@@ -492,9 +510,7 @@ pub async fn update_channel(
                 .to_string();
             let pass_val = req.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("");
             let password = if pass_val.contains('•') {
-                cfg.channel
-                    .email
-                    .as_ref()
+                cfg.channel.email.first()
                     .map(|e| e.password.clone())
                     .unwrap_or_default()
             } else {
@@ -505,7 +521,7 @@ pub async fn update_channel(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            cfg.channel.email = Some(bizclaw_core::config::EmailChannelConfig {
+            let new_cfg = bizclaw_core::config::EmailChannelConfig {
                 enabled,
                 smtp_host,
                 smtp_port,
@@ -513,7 +529,12 @@ pub async fn update_channel(
                 password,
                 imap_host,
                 imap_port: 993,
-            });
+            };
+            if cfg.channel.email.is_empty() {
+                cfg.channel.email.push(new_cfg);
+            } else {
+                cfg.channel.email[0] = new_cfg;
+            }
         }
         "whatsapp" => {
             let phone_val = req
@@ -526,15 +547,13 @@ pub async fn update_channel(
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let token = if token_val.contains('•') {
-                cfg.channel
-                    .whatsapp
-                    .as_ref()
+                cfg.channel.whatsapp.first()
                     .map(|w| w.access_token.clone())
                     .unwrap_or_default()
             } else {
                 token_val.to_string()
             };
-            cfg.channel.whatsapp = Some(bizclaw_core::config::WhatsAppChannelConfig {
+            let new_cfg = bizclaw_core::config::WhatsAppChannelConfig {
                 enabled,
                 phone_number_id: phone_val,
                 access_token: token,
@@ -546,21 +565,31 @@ pub async fn update_channel(
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string(),
-            });
+            };
+            if cfg.channel.whatsapp.is_empty() {
+                cfg.channel.whatsapp.push(new_cfg);
+            } else {
+                cfg.channel.whatsapp[0] = new_cfg;
+            }
         }
         "webhook" => {
             let secret_val = req.get("webhook_secret").and_then(|v| v.as_str()).unwrap_or("");
             let secret = if secret_val.contains('•') {
-                cfg.channel.webhook.as_ref().map(|wh| wh.secret.clone()).unwrap_or_default()
+                cfg.channel.webhook.first().map(|wh| wh.secret.clone()).unwrap_or_default()
             } else {
                 secret_val.to_string()
             };
             let outbound_url = req.get("webhook_url").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            cfg.channel.webhook = Some(bizclaw_core::config::WebhookChannelConfig {
+            let new_cfg = bizclaw_core::config::WebhookChannelConfig {
                 enabled,
                 secret,
                 outbound_url,
-            });
+            };
+            if cfg.channel.webhook.is_empty() {
+                cfg.channel.webhook.push(new_cfg);
+            } else {
+                cfg.channel.webhook[0] = new_cfg;
+            }
         }
         _ => {
             return Json(
@@ -577,35 +606,37 @@ pub async fn update_channel(
             // This prevents channel loss when platform regenerates config.toml
             if let Some(parent) = state.config_path.parent() {
                 let channels_json = serde_json::json!({
-                    // SECURITY: Never write secrets to sync file — only enabled flags + non-sensitive data
-                    "telegram": cfg.channel.telegram.as_ref().map(|t| serde_json::json!({
+                    "telegram": cfg.channel.telegram.iter().map(|t| serde_json::json!({
+                        "name": t.name,
                         "enabled": t.enabled,
                         "bot_token_set": !t.bot_token.is_empty(),
                         "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "),
-                    })),
-                    "zalo": cfg.channel.zalo.as_ref().map(|z| serde_json::json!({
+                    })).collect::<Vec<_>>(),
+                    "zalo": cfg.channel.zalo.iter().map(|z| serde_json::json!({
+                        "name": z.name,
                         "enabled": z.enabled,
                         "mode": z.mode,
-                    })),
-                    "discord": cfg.channel.discord.as_ref().map(|d| serde_json::json!({
+                    })).collect::<Vec<_>>(),
+                    "discord": cfg.channel.discord.iter().map(|d| serde_json::json!({
+                        "name": d.name,
                         "enabled": d.enabled,
                         "bot_token_set": !d.bot_token.is_empty(),
-                    })),
-                    "email": cfg.channel.email.as_ref().map(|e| serde_json::json!({
+                    })).collect::<Vec<_>>(),
+                    "email": cfg.channel.email.iter().map(|e| serde_json::json!({
                         "enabled": e.enabled,
                         "smtp_host": e.smtp_host,
                         "smtp_port": e.smtp_port,
                         "email": e.email,
-                    })),
-                    "whatsapp": cfg.channel.whatsapp.as_ref().map(|w| serde_json::json!({
+                    })).collect::<Vec<_>>(),
+                    "whatsapp": cfg.channel.whatsapp.iter().map(|w| serde_json::json!({
                         "enabled": w.enabled,
                         "phone_number_id": w.phone_number_id,
-                    })),
-                    "webhook": cfg.channel.webhook.as_ref().map(|wh| serde_json::json!({
+                    })).collect::<Vec<_>>(),
+                    "webhook": cfg.channel.webhook.iter().map(|wh| serde_json::json!({
                         "enabled": wh.enabled,
                         "secret_set": !wh.secret.is_empty(),
                         "outbound_url": wh.outbound_url,
-                    })),
+                    })).collect::<Vec<_>>(),
                 });
                 let sync_path = parent.join("channels_sync.json");
                 std::fs::write(&sync_path, serde_json::to_string_pretty(&channels_json).unwrap_or_default()).ok();
@@ -735,16 +766,26 @@ pub async fn save_channel_instance(
                 let chat_ids: Vec<i64> = sync_body.get("allowed_chat_ids")
                     .and_then(|v| v.as_str()).unwrap_or("")
                     .split(',').filter_map(|s| s.trim().parse().ok()).collect();
-                full_cfg.channel.telegram = Some(bizclaw_core::config::TelegramChannelConfig {
-                    enabled: true, bot_token: token, allowed_chat_ids: chat_ids,
-                });
+                let new_tg = bizclaw_core::config::TelegramChannelConfig {
+                    name: "Telegram".into(), enabled: true, bot_token: token, allowed_chat_ids: chat_ids,
+                };
+                if full_cfg.channel.telegram.is_empty() {
+                    full_cfg.channel.telegram.push(new_tg);
+                } else {
+                    full_cfg.channel.telegram[0] = new_tg;
+                }
             }
             "webhook" => {
                 let outbound = sync_body.get("webhook_url").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let secret = sync_body.get("webhook_secret").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                full_cfg.channel.webhook = Some(bizclaw_core::config::WebhookChannelConfig {
+                let new_wh = bizclaw_core::config::WebhookChannelConfig {
                     enabled: true, secret, outbound_url: outbound,
-                });
+                };
+                if full_cfg.channel.webhook.is_empty() {
+                    full_cfg.channel.webhook.push(new_wh);
+                } else {
+                    full_cfg.channel.webhook[0] = new_wh;
+                }
             }
             _ => {} // Other types handled as-is
         }
@@ -757,8 +798,8 @@ pub async fn save_channel_instance(
     let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(parent) = state.config_path.parent() {
         let channels_json = serde_json::json!({
-            "telegram": cfg.channel.telegram.as_ref().map(|t| serde_json::json!({"enabled": t.enabled, "bot_token": t.bot_token, "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", ")})),
-            "webhook": cfg.channel.webhook.as_ref().map(|wh| serde_json::json!({"enabled": wh.enabled, "secret": wh.secret, "outbound_url": wh.outbound_url})),
+            "telegram": cfg.channel.telegram.iter().map(|t| serde_json::json!({"name": t.name, "enabled": t.enabled, "bot_token": t.bot_token, "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", ")})).collect::<Vec<_>>(),
+            "webhook": cfg.channel.webhook.iter().map(|wh| serde_json::json!({"enabled": wh.enabled, "secret": wh.secret, "outbound_url": wh.outbound_url})).collect::<Vec<_>>(),
         });
         std::fs::write(parent.join("channels_sync.json"), serde_json::to_string_pretty(&channels_json).unwrap_or_default()).ok();
     }
@@ -1079,7 +1120,7 @@ pub async fn auto_connect_channels(state: Arc<AppState>) {
         // Extract telegram config data (owned) to avoid holding MutexGuard across await
         let tg_data = {
             let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
-            cfg.channel.telegram.as_ref().and_then(|tg| {
+            cfg.channel.telegram.first().and_then(|tg| {
                 if tg.enabled && !tg.bot_token.is_empty() {
                     Some((tg.bot_token.clone(), tg.allowed_chat_ids.clone()))
                 } else { None }
@@ -1472,12 +1513,12 @@ pub async fn list_channels(State(state): State<Arc<AppState>>) -> Json<serde_jso
     Json(serde_json::json!({
         "channels": [
             {"name": "cli", "type": "interactive", "status": "active", "configured": true},
-            {"name": "telegram", "type": "messaging", "status": if cfg.channel.telegram.as_ref().is_some_and(|t| t.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.telegram.is_some()},
-            {"name": "zalo", "type": "messaging", "status": if cfg.channel.zalo.as_ref().is_some_and(|z| z.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.zalo.is_some()},
-            {"name": "discord", "type": "messaging", "status": if cfg.channel.discord.as_ref().is_some_and(|d| d.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.discord.is_some()},
-            {"name": "email", "type": "messaging", "status": if cfg.channel.email.as_ref().is_some_and(|e| e.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.email.is_some()},
-            {"name": "webhook", "type": "api", "status": if cfg.channel.webhook.as_ref().is_some_and(|wh| wh.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.webhook.is_some()},
-            {"name": "whatsapp", "type": "messaging", "status": if cfg.channel.whatsapp.as_ref().is_some_and(|w| w.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.whatsapp.is_some()},
+            {"name": "telegram", "type": "messaging", "status": if cfg.channel.telegram.iter().any(|t| t.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.telegram.is_empty(), "count": cfg.channel.telegram.len()},
+            {"name": "zalo", "type": "messaging", "status": if cfg.channel.zalo.iter().any(|z| z.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.zalo.is_empty(), "count": cfg.channel.zalo.len()},
+            {"name": "discord", "type": "messaging", "status": if cfg.channel.discord.iter().any(|d| d.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.discord.is_empty(), "count": cfg.channel.discord.len()},
+            {"name": "email", "type": "messaging", "status": if cfg.channel.email.iter().any(|e| e.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.email.is_empty(), "count": cfg.channel.email.len()},
+            {"name": "webhook", "type": "api", "status": if cfg.channel.webhook.iter().any(|wh| wh.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.webhook.is_empty(), "count": cfg.channel.webhook.len()},
+            {"name": "whatsapp", "type": "messaging", "status": if cfg.channel.whatsapp.iter().any(|w| w.enabled) { "active" } else { "disabled" }, "configured": !cfg.channel.whatsapp.is_empty(), "count": cfg.channel.whatsapp.len()},
         ]
     }))
 }
@@ -1655,7 +1696,7 @@ pub async fn whatsapp_webhook_verify(
         let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
         cfg.channel
             .whatsapp
-            .as_ref()
+            .first()
             .map(|w| w.webhook_verify_token.clone())
             .unwrap_or_default()
     };
@@ -1707,7 +1748,7 @@ pub async fn whatsapp_webhook(
                             // Get WhatsApp config for reply
                             let wa_config = {
                                 let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
-                                cfg.channel.whatsapp.clone()
+                                cfg.channel.whatsapp.first().cloned()
                             };
 
                             // Spawn background task for agent processing + reply
@@ -1777,7 +1818,7 @@ pub async fn _webhook_inbound_legacy(
     // Check if webhook channel is enabled
     let (enabled, secret, outbound_url) = {
         let cfg = state.full_config.lock().unwrap_or_else(|p| p.into_inner());
-        match cfg.channel.webhook.as_ref() {
+        match cfg.channel.webhook.first() {
             Some(wh) => (wh.enabled, wh.secret.clone(), wh.outbound_url.clone()),
             None => {
                 return Json(serde_json::json!({

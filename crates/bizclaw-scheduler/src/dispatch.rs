@@ -247,38 +247,38 @@ pub async fn dispatch_all(
 pub fn targets_from_config(config: &bizclaw_core::config::BizClawConfig) -> Vec<(String, NotifyTarget)> {
     let mut targets = Vec::new();
 
-    // Telegram
-    if let Some(tg) = &config.channel.telegram
-        && tg.enabled && !tg.bot_token.is_empty() {
-            // We don't know the chat_id at init time — it's per-user.
-            // For notifications, the admin should configure a notification chat_id.
-            // For now, we'll store the token and use a config-based chat_id.
+    // Telegram (all enabled instances)
+    for tg in &config.channel.telegram {
+        if tg.enabled && !tg.bot_token.is_empty() {
             let chat_id = std::env::var("BIZCLAW_NOTIFY_TELEGRAM_CHAT_ID").unwrap_or_default();
             if !chat_id.is_empty() {
-                targets.push(("telegram".to_string(), NotifyTarget::Telegram {
+                targets.push((format!("telegram:{}", tg.name), NotifyTarget::Telegram {
                     bot_token: tg.bot_token.clone(),
                     chat_id,
                 }));
             }
         }
+    }
 
-    // Zalo OA
-    if let Some(zalo) = &config.channel.zalo
-        && zalo.enabled && !zalo.oa_access_token.is_empty() && !zalo.notify_user_id.is_empty() {
-            targets.push(("zalo_oa".to_string(), NotifyTarget::ZaloOA {
+    // Zalo OA (all enabled instances with OA token)
+    for zalo in &config.channel.zalo {
+        if zalo.enabled && !zalo.oa_access_token.is_empty() && !zalo.notify_user_id.is_empty() {
+            targets.push((format!("zalo_oa:{}", zalo.name), NotifyTarget::ZaloOA {
                 access_token: zalo.oa_access_token.clone(),
                 user_id: zalo.notify_user_id.clone(),
             }));
         }
+    }
 
-    // Webhook
-    if let Some(wh) = &config.channel.webhook
-        && wh.enabled && !wh.outbound_url.is_empty() {
+    // Webhooks (all enabled instances)
+    for wh in &config.channel.webhook {
+        if wh.enabled && !wh.outbound_url.is_empty() {
             targets.push(("webhook".to_string(), NotifyTarget::Webhook {
                 url: wh.outbound_url.clone(),
                 headers: vec![],
             }));
         }
+    }
 
     // Dashboard is always available
     targets.push(("dashboard".to_string(), NotifyTarget::Dashboard));

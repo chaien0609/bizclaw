@@ -355,6 +355,9 @@ impl Agent {
             max_tokens: self.config.brain.max_tokens,
             top_p: 0.9,
             stop: vec![],
+            extended_thinking: self.config.extended_thinking,
+            thinking_budget_tokens: self.config.thinking_budget_tokens,
+            reasoning_effort: self.config.reasoning_effort.clone(),
         };
 
         // Think-Act-Observe Loop
@@ -475,6 +478,8 @@ impl Agent {
                     let epar = GenerateParams {
                         model: gate.evaluator_model.clone().unwrap_or(self.config.default_model.clone()),
                         temperature: 0.3, max_tokens: 500, top_p: 0.9, stop: vec![],
+                        extended_thinking: false, thinking_budget_tokens: 0,
+                        reasoning_effort: String::new(),
                     };
                     match self.provider.chat(&em, &[], &epar).await {
                         Ok(er) => {

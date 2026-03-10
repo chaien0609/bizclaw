@@ -839,9 +839,8 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                     let _ = db.track_usage("hand_executions", 1.0);
 
                     // 3. Send to Telegram (all configured bots)
-                    if let Some(ref tg_cfg) = cfg.channel.telegram {
+                    for tg_cfg in &cfg.channel.telegram {
                         if tg_cfg.enabled && !tg_cfg.bot_token.is_empty() {
-                            // Get notify chat_id from env or config
                             let chat_id = std::env::var("BIZCLAW_NOTIFY_TELEGRAM_CHAT_ID")
                                 .unwrap_or_default();
                             if !chat_id.is_empty() {
@@ -869,7 +868,8 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                                     .send()
                                     .await;
                                 tracing::info!(
-                                    "📨 Hand result sent to Telegram: {} → chat {}",
+                                    "📨 Hand result sent to Telegram '{}': {} → chat {}",
+                                    tg_cfg.name,
                                     task_name,
                                     chat_id
                                 );
@@ -877,8 +877,8 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                         }
                     }
 
-                    // 4. Send to Webhook (if configured)
-                    if let Some(ref wh_cfg) = cfg.channel.webhook {
+                    // 4. Send to Webhooks (all configured instances)
+                    for wh_cfg in &cfg.channel.webhook {
                         if wh_cfg.enabled && !wh_cfg.outbound_url.is_empty() {
                             let client = reqwest::Client::new();
                             let _ = client

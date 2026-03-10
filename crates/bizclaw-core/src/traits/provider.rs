@@ -13,6 +13,12 @@ pub struct GenerateParams {
     pub max_tokens: u32,
     pub top_p: f32,
     pub stop: Vec<String>,
+    /// Enable extended thinking mode (Anthropic budget tokens, OpenAI reasoning effort).
+    pub extended_thinking: bool,
+    /// Thinking budget in tokens (Anthropic / DashScope). 0 = provider default.
+    pub thinking_budget_tokens: u32,
+    /// Reasoning effort level for OpenAI-compatible (low/medium/high). Empty = default.
+    pub reasoning_effort: String,
 }
 
 impl Default for GenerateParams {
@@ -23,6 +29,9 @@ impl Default for GenerateParams {
             max_tokens: 4096,
             top_p: 0.9,
             stop: vec![],
+            extended_thinking: false,
+            thinking_budget_tokens: 0,
+            reasoning_effort: String::new(),
         }
     }
 }

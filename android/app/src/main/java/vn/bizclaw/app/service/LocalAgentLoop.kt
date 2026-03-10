@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import vn.bizclaw.app.engine.BizClawLLM
+import vn.bizclaw.app.engine.GlobalLLM
 import java.util.regex.Pattern
 
 /**
@@ -21,25 +22,35 @@ import java.util.regex.Pattern
  *    ↓
  *  Parse tool_call → ToolDispatcher executes
  *    ↓
+ *  StuckDetector checks: screen frozen? action loop? drift?
+ *    ↓ (if stuck → inject recovery hint)
  *  Feed result back to LLM as "tool" message
  *    ↓
- *  Repeat until LLM responds without tool_call (max 5 rounds)
+ *  Repeat until LLM responds without tool_call (max 8 rounds)
  *    ↓
  *  Return final text to user
  * ```
  *
+ * Features (v0.4.0):
+ * - StuckDetector: 4-mode stuck detection with recovery hints
+ * - VisionFallback: Screenshot → vision LLM when accessibility tree is empty
+ *
  * Architecture:
  *   LocalAgentLoop → BizClawLLM (llama.cpp) → ToolDispatcher → AppController/AccessibilityService
+ *                  → StuckDetector (monitors stuck conditions)
+ *                  → VisionFallback (screenshot when accessibility fails)
  *
  * Everything runs ON THE PHONE. No server. No API keys. $0 cost.
  */
 class LocalAgentLoop(
     private val llm: BizClawLLM,
     private val context: Context,
-    private val maxRounds: Int = 5,
+    private val maxRounds: Int = 8,
 ) {
     private val tag = "LocalAgentLoop"
     private val dispatcher = ToolDispatcher(context)
+    private val stuckDetector = StuckDetector()
+    private val visionFallback = VisionFallback(context)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     // Tool call parsing: <tool_call>...</tool_call>
@@ -71,6 +82,9 @@ class LocalAgentLoop(
         appendLine("3. Always confirm what you did after completing an action.")
         appendLine("4. If a tool fails, try an alternative approach or inform the user.")
         appendLine("5. Be concise but helpful.")
+        appendLine("6. If you receive a STUCK DETECTED warning, follow the recovery suggestions.")
+        appendLine("7. If screen_read returns empty, the app may be using WebView/Flutter.")
+        appendLine("   In that case, try screen_capture() for vision-based analysis.")
         appendLine()
         append(dispatcher.toolDefinitions)
     }
@@ -89,6 +103,9 @@ class LocalAgentLoop(
         var round = 0
         var currentQuery = query
         var pendingToolCalls = true
+
+        // Reset stuck detector for new conversation
+        stuckDetector.reset()
 
         while (pendingToolCalls && round < maxRounds) {
             round++
@@ -131,6 +148,51 @@ class LocalAgentLoop(
                     toolResults.appendLine("Tool '${call.name}' result:")
                     toolResults.appendLine(if (result.success) "✅ ${result.message}" else "❌ ${result.message}")
                     toolResults.appendLine()
+
+                    // ── StuckDetector: Record this action ──
+                    val targetText = extractTargetText(call)
+                    val screenContent = BizClawAccessibilityService.readScreen()
+                    val fingerprint = StuckDetector.fingerprint(screenContent)
+
+                    val stuckHint = stuckDetector.onRoundComplete(
+                        screenFingerprint = fingerprint,
+                        action = StuckDetector.ActionRecord(
+                            toolName = call.name,
+                            targetText = targetText,
+                            success = result.success,
+                        )
+                    )
+
+                    // If stuck detected, inject recovery hint
+                    if (stuckHint != null) {
+                        val hint = stuckHint.recoveryHint()
+                        toolResults.appendLine(hint)
+                        toolResults.appendLine()
+                        emit(AgentToken.Text("\n\n🔴 Stuck detected: ${stuckHint.name}\n"))
+                        Log.w(tag, "🔴 Stuck hint injected: ${stuckHint.name}")
+                    }
+
+                    // ── VisionFallback: If screen_read returned empty ──
+                    if (call.name == "screen_read" && result.success &&
+                        screenContent != null && screenContent.elements.isEmpty()
+                    ) {
+                        val visionProvider = GlobalLLM.getVisionProvider()
+                        if (visionProvider != null) {
+                            Log.i(tag, "📸 Accessibility empty → Vision fallback")
+                            emit(AgentToken.Text("\n📸 Vision mode: analyzing screenshot...\n"))
+                            val visionResult = visionFallback.analyzeScreen(visionProvider)
+                            if (visionResult.success) {
+                                toolResults.appendLine("📸 VISION FALLBACK (accessibility tree was empty):")
+                                toolResults.appendLine(visionResult.description)
+                                toolResults.appendLine("Use screen_tap(x, y) with coordinates above to interact.")
+                                toolResults.appendLine()
+                            }
+                        } else {
+                            toolResults.appendLine("⚠️ Accessibility tree empty. No vision provider available.")
+                            toolResults.appendLine("Try screen_tap(x, y) with estimated coordinates.")
+                            toolResults.appendLine()
+                        }
+                    }
                 }
 
                 // === OBSERVE: Feed results back to LLM ===
@@ -145,6 +207,22 @@ class LocalAgentLoop(
         }
 
         emit(AgentToken.Done(round))
+    }
+
+    /**
+     * Run the agent loop to completion (non-streaming, for automation).
+     * Returns the final response text.
+     */
+    suspend fun runToCompletion(query: String): String {
+        val result = StringBuilder()
+        run(query).collect { token ->
+            when (token) {
+                is AgentToken.Text -> result.append(token.content)
+                is AgentToken.Done -> {} // Complete
+                else -> {} // Skip markers
+            }
+        }
+        return result.toString()
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -195,6 +273,18 @@ class LocalAgentLoop(
             null
         }
     }
+
+    /**
+     * Extract the primary target text from a tool call (for stuck detection).
+     */
+    private fun extractTargetText(call: ParsedToolCall): String {
+        return call.arguments["text"]?.jsonPrimitive?.content
+            ?: call.arguments["content"]?.jsonPrimitive?.content
+            ?: call.arguments["contact_name"]?.jsonPrimitive?.content
+            ?: call.arguments["hint"]?.jsonPrimitive?.content
+            ?: call.arguments["package_name"]?.jsonPrimitive?.content
+            ?: ""
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -225,3 +315,4 @@ sealed class AgentToken {
     /** Agent loop completed */
     data class Done(val totalRounds: Int) : AgentToken()
 }
+

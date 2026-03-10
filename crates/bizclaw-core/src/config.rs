@@ -80,6 +80,15 @@ pub struct BizClawConfig {
     /// Quality Gate — optional evaluator for response review.
     #[serde(default)]
     pub quality_gate: Option<QualityGateConfig>,
+    /// Enable extended thinking / deep reasoning mode.
+    #[serde(default)]
+    pub extended_thinking: bool,
+    /// Thinking budget in tokens (Anthropic/DashScope). 0 = provider default.
+    #[serde(default)]
+    pub thinking_budget_tokens: u32,
+    /// Reasoning effort for OpenAI-compatible ("low", "medium", "high"). Empty = default.
+    #[serde(default)]
+    pub reasoning_effort: String,
 }
 
 fn default_api_key() -> String {
@@ -115,6 +124,9 @@ impl Default for BizClawConfig {
             channel: ChannelConfig::default(),
             mcp_servers: vec![],
             quality_gate: None,
+            extended_thinking: false,
+            thinking_budget_tokens: 0,
+            reasoning_effort: String::new(),
         }
     }
 }
@@ -407,26 +419,86 @@ impl Default for SecretsConfig {
     }
 }
 
-/// Channel configuration.
+/// Channel configuration — supports multiple instances per channel type.
+///
+/// TOML config examples:
+///
+/// Single instance (backward compatible):
+/// ```toml
+/// [channel.telegram]
+/// name = "Main Bot"
+/// bot_token = "123:ABC"
+/// ```
+///
+/// Multiple instances:
+/// ```toml
+/// [[channel.telegram]]
+/// name = "Sales Bot"
+/// bot_token = "123:ABC"
+///
+/// [[channel.telegram]]
+/// name = "Support Bot"
+/// bot_token = "456:DEF"
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ChannelConfig {
-    #[serde(default)]
-    pub zalo: Option<ZaloChannelConfig>,
-    #[serde(default)]
-    pub telegram: Option<TelegramChannelConfig>,
-    #[serde(default)]
-    pub discord: Option<DiscordChannelConfig>,
-    #[serde(default)]
-    pub email: Option<EmailChannelConfig>,
-    #[serde(default)]
-    pub whatsapp: Option<WhatsAppChannelConfig>,
-    #[serde(default)]
-    pub webhook: Option<WebhookChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub zalo: Vec<ZaloChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub telegram: Vec<TelegramChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub discord: Vec<DiscordChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub email: Vec<EmailChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub whatsapp: Vec<WhatsAppChannelConfig>,
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub webhook: Vec<WebhookChannelConfig>,
+}
+
+/// Deserialize helper: accept either a single object or an array.
+/// This allows backward compatibility with old configs that have `[channel.telegram]`
+/// while also supporting `[[channel.telegram]]` for multiple instances.
+fn deserialize_one_or_many<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    use serde::de;
+
+    struct OneOrMany<T>(std::marker::PhantomData<T>);
+
+    impl<'de, T: serde::Deserialize<'de>> de::Visitor<'de> for OneOrMany<T> {
+        type Value = Vec<T>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a single object or an array of objects")
+        }
+
+        fn visit_seq<A>(self, seq: A) -> std::result::Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            Vec::deserialize(de::value::SeqAccessDeserializer::new(seq))
+        }
+
+        fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
+        where
+            M: de::MapAccess<'de>,
+        {
+            T::deserialize(de::value::MapAccessDeserializer::new(map)).map(|v| vec![v])
+        }
+    }
+
+    deserializer.deserialize_any(OneOrMany(std::marker::PhantomData))
 }
 
 /// Zalo channel configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZaloChannelConfig {
+    /// Instance name (e.g., "Zalo Cá Nhân", "Zalo OA Shop").
+    #[serde(default = "default_zalo_name")]
+    pub name: String,
     #[serde(default)]
     pub enabled: bool,
     #[serde(default = "default_zalo_mode")]
@@ -452,6 +524,7 @@ fn default_zalo_mode() -> String {
 impl Default for ZaloChannelConfig {
     fn default() -> Self {
         Self {
+            name: default_zalo_name(),
             enabled: false,
             mode: default_zalo_mode(),
             personal: ZaloPersonalConfig::default(),
@@ -554,19 +627,30 @@ impl Default for ZaloAllowlistConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramChannelConfig {
+    /// Instance name (e.g., "Bot Bán Hàng", "Bot Support").
+    #[serde(default = "default_telegram_name")]
+    pub name: String,
     pub enabled: bool,
     pub bot_token: String,
     #[serde(default)]
     pub allowed_chat_ids: Vec<i64>,
 }
 
+fn default_telegram_name() -> String { "Telegram".into() }
+fn default_zalo_name() -> String { "Zalo".into() }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscordChannelConfig {
+    /// Instance name.
+    #[serde(default = "default_discord_name")]
+    pub name: String,
     pub enabled: bool,
     pub bot_token: String,
     #[serde(default)]
     pub allowed_channel_ids: Vec<u64>,
 }
+
+fn default_discord_name() -> String { "Discord".into() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailChannelConfig {

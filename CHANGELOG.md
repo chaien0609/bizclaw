@@ -1,5 +1,63 @@
 # Changelog
 
+## [1.0.0] — 2026-03-10 🎉 Production Ready
+
+### 🚀 Milestone: First Stable Release
+
+BizClaw is now **production-ready** — the most complete edge AI assistant platform
+with 18 LLM providers, 10 channels, 13 tools, multi-agent orchestration, and
+unique differentiators (Android Agent, Brain Engine, Xiaozhi Voice, Desktop App).
+
+### Added
+- **🔌 3 New Providers**: Cohere (Command R+), Perplexity (Sonar Pro), DashScope/Qwen (Qwen-Max)
+  - Total: **18 providers** — surpasses GoClaw (13) and ZeroClaw (12)
+  - Aliases: `qwen`→dashscope, `alibaba`→dashscope, `pplx`→perplexity, `co`→cohere
+- **🧠 Extended Thinking**: Deep reasoning mode for complex tasks
+  - Anthropic: `thinking.type=enabled` with configurable `budget_tokens`
+  - OpenAI-compatible: `reasoning_effort` (low/medium/high)
+  - Config: `extended_thinking = true`, `thinking_budget_tokens = 10000`
+- **🧊 Prompt Caching Metrics**: Real-time tracking of Anthropic cache performance
+  - `cache_creation_input_tokens`, `cache_read_input_tokens` in Usage
+  - Auto-logging: "🧊 Prompt cache: X read, Y created (saved ~Z%)"
+  - `thinking_tokens` tracking for extended thinking mode
+- **📊 Orchestration Types** (fully defined, v1.1 will wire into runtime):
+  - `AgentLink` — permission links with Outbound/Inbound/Bidirectional direction
+  - `Delegation` — sync/async inter-agent task delegation
+  - `AgentTeam` — Lead/Member roles with task board and mailbox
+  - `Handoff` — conversation control transfer between agents
+  - `EvaluateConfig` — generator-evaluator feedback loops
+  - `QualityGate` — Command/Agent type gates with block_on_failure
+  - `LaneConfig` — Main/Subagent/Delegate/Cron execution lanes
+
+### Improved
+- **Parse Usage helper** — DRY refactoring eliminates 3 duplicated usage parsing blocks
+- **Prompt caching** already supported for Anthropic (cache_control on system blocks)
+- **All 403+ tests pass** across 19 workspace crates
+
+### Provider Registry
+| # | Provider | Models |
+|---|----------|--------|
+| 1 | OpenAI | GPT-4o, GPT-4o Mini |
+| 2 | OpenRouter | GPT-4o, Claude Sonnet 4, Step 3.5 Flash |
+| 3 | Anthropic | Claude Sonnet 4, 3.5 Haiku, 3.5 Sonnet |
+| 4 | DeepSeek | Chat, Reasoner (R1) |
+| 5 | Gemini | 2.5 Pro, 2.5 Flash |
+| 6 | Groq | Llama 3.3 70B, 3.1 8B, Mixtral |
+| 7 | Ollama | Jan-nano, Qwen3, Llama 3.2, Gemma 3, Phi-4, DeepSeek R1 |
+| 8 | llama.cpp | Local model |
+| 9 | CLIProxy | Custom model |
+| 10 | vLLM | Default model |
+| 11 | Together AI | Llama 3.3 70B |
+| 12 | Mistral | Large, Small |
+| 13 | MiniMax | Text 01 |
+| 14 | xAI/Grok | Grok 3, Grok 3 Mini |
+| 15 | ModelArk | Seed 2.0, Doubao, DeepSeek V3, GLM 4.7 |
+| 16 | **Cohere** (NEW) | Command R+, Command R |
+| 17 | **Perplexity** (NEW) | Sonar Pro, Sonar |
+| 18 | **DashScope** (NEW) | Qwen Max, Plus, Turbo |
+
+Plus: `brain` (GGUF on-device) and `custom:` endpoints
+
 ## [0.3.2] — 2026-03-08
 
 ### Added

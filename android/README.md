@@ -1,6 +1,8 @@
 # 📱 BizClaw Android — AI Agent Platform
 
 > **Biến điện thoại thành AI Agent chạy 24/7 — không chỉ chat, mà điều khiển cả điện thoại.**
+> 
+> **v0.5.0**: Smart Agent Platform — Flow Runner, Workflow Engine, Stuck Detection, Vision Fallback, Screen Diff
 
 ## 🏗️ Kiến trúc
 
@@ -71,6 +73,55 @@ Agent có thể truy cập phần cứng phone:
 | `scrollDown()` | Scroll | Cuộn xuống |
 | `pressEnter()` | Submit | Gửi tin nhắn / submit |
 
+### 🛡️ Smart Agent Features (v0.5.0)
+
+**Stuck Detection (5 modes):**
+
+| Stuck Type | Trigger | Recovery |
+|------------|---------|----------|
+| Screen Frozen | Màn hình không đổi 3 rounds | Thử scroll, đổi approach |
+| Action Loop | Lặp cùng action 3+ lần | Dừng lại, tìm element khác |
+| Navigation Drift | Spam back/home/scroll | Interact trực tiếp |
+| Repeated Failures | 3 failures liên tiếp | Đọc screen trước |
+| Repetition Cycle | A-B-A-B pattern | Phá vỡi cycle hoàn toàn |
+
+**Vision Fallback:**
+Khi AccessibilityService không đọc được (WebView, Flutter, Game):
+```
+Accessibility tree empty? → Screenshot → Vision LLM → UI elements + tọa độ
+```
+
+**⚡ Flow Runner (No-LLM Macros):**
+Chuỗi hành động chạy instant, $0 cost:
+- `cross_post` — Đăng bài lên Facebook + Zalo + Instagram cùng lúc
+- `broadcast` — Gửi tin nhắn cho nhiều người (Zalo/Messenger/Telegram)
+- `sales_post` — Đăng bán hàng + gửi cho danh sách khách
+- Custom flows — Tự tạo và lưu trữ
+
+**🔗 Workflow Engine (Multi-App Chain):**
+Kết hợp LLM + macro chạy nhiều app tự động:
+```
+Step 1: [🤖 Agent] Shopee → "Check đơn hàng mới"
+Step 2: [⚡ Flow] Zalo → Báo cáo cho Boss
+Step 3: [⚡ Flow] Cross-post lên 3 nền tảng
+```
+
+**📊 Screen Diff:**
+Chỉ gửi *thay đổi* cho LLM, tiết kiệm ~80% token:
+```
+Round N vs N+1: +2 new, -1 removed, 15 unchanged
+→ Gửi 3 elements thay vì 17 → tiết kiệm 120 tokens
+```
+
+| Tool | Mô tả |
+|------|--------|
+| `screen_read_smart()` | Accessibility first, vision fallback |
+| `screen_read_diff()` | Chỉ gửi thay đổi, giảm token |
+| `screen_capture()` | Screenshot → Vision AI |
+| `flow_run()` | Chạy macro instant |
+| `flow_list()` | Xem danh sách flows |
+
+
 ### 📘 App Workflows
 
 **Facebook:**
@@ -134,13 +185,17 @@ Mở app → Dashboard → Nhấn "Khởi động Agent"
 
 | Metric | Value |
 |--------|-------|
-| Kotlin files | 16 |
-| Lines of Code | 2,750 |
+| Kotlin files | 22 |
+| Lines of Code | 5,400+ |
 | Screens | 4 (Chat, Agents, Settings, Dashboard) |
 | Services | 2 (Daemon, Accessibility) |
 | Permissions | 12 |
 | FFI functions | 7 |
 | Device tools | 10 |
+| Agent tools | 24 |
+| Flow actions | 24 |
+| Stuck detection modes | 5 |
+| Vision providers | 3 (Gemini, OpenAI, Ollama) |
 | Supported apps | Facebook, Messenger, Zalo, any app |
 
 ## ⚠️ OEM Battery Killer
@@ -158,4 +213,4 @@ App tự phát hiện hãng phone và cảnh báo:
 
 ---
 
-**BizClaw Android** v0.3.0 — *Phone = AI Agent Server*
+**BizClaw Android** v0.5.0 — *Phone = AI Agent Server — Smart Automation Platform*

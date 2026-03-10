@@ -16,6 +16,21 @@ use serde_json::{Value, json};
 
 use crate::provider_registry::{AuthStyle, ProviderConfig};
 
+/// Parse usage from OpenAI-style response (including Anthropic caching metrics).
+fn parse_usage(json: &Value) -> Option<Usage> {
+    json["usage"].as_object().map(|u| {
+        let get = |key: &str| u.get(key).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        Usage {
+            prompt_tokens: get("prompt_tokens"),
+            completion_tokens: get("completion_tokens"),
+            total_tokens: get("total_tokens"),
+            cache_creation_input_tokens: get("cache_creation_input_tokens"),
+            cache_read_input_tokens: get("cache_read_input_tokens"),
+            thinking_tokens: get("thinking_tokens"),
+        }
+    })
+}
+
 /// A unified provider that works with any OpenAI-compatible API.
 pub struct OpenAiCompatibleProvider {
     /// Provider name (e.g., "openai", "groq", "deepseek").
@@ -179,6 +194,27 @@ impl Provider for OpenAiCompatibleProvider {
             "max_tokens": params.max_tokens,
         });
 
+        // ═══ Extended Thinking Support ═══
+        if params.extended_thinking {
+            if is_anthropic {
+                // Anthropic: thinking block with budget_tokens
+                let budget = if params.thinking_budget_tokens > 0 {
+                    params.thinking_budget_tokens
+                } else {
+                    10000 // sensible default
+                };
+                body["thinking"] = json!({
+                    "type": "enabled",
+                    "budget_tokens": budget
+                });
+                tracing::info!("🧠 Extended thinking enabled (Anthropic, budget: {})", budget);
+            } else if !params.reasoning_effort.is_empty() {
+                // OpenAI-compatible: reasoning_effort field (low/medium/high)
+                body["reasoning_effort"] = json!(params.reasoning_effort);
+                tracing::info!("🧠 Reasoning effort: {}", params.reasoning_effort);
+            }
+        }
+
         // ═══════════════════════════════════════
         // Anthropic Prompt Caching — cache_control
         // ═══════════════════════════════════════
@@ -292,11 +328,7 @@ impl Provider for OpenAiCompatibleProvider {
                     .get(0)
                     .ok_or_else(|| BizClawError::Provider("No choices in retry response".into()))?;
                 let content = choice["message"]["content"].as_str().map(String::from);
-                let usage = json["usage"].as_object().map(|u| Usage {
-                    prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    completion_tokens: u.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                });
+                let usage = parse_usage(&json);
                 return Ok(ProviderResponse {
                     content,
                     tool_calls: vec![], // No tools available
@@ -438,11 +470,7 @@ impl Provider for OpenAiCompatibleProvider {
                         .get(0)
                         .ok_or_else(|| BizClawError::Provider("No choices in retry".into()))?;
                     let rcontent = rchoice["message"]["content"].as_str().map(String::from);
-                    let rusage = rjson["usage"].as_object().map(|u| Usage {
-                        prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                        completion_tokens: u.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                        total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    });
+                    let rusage = parse_usage(&rjson);
                     return Ok(ProviderResponse {
                         content: rcontent,
                         tool_calls: vec![],
@@ -454,14 +482,24 @@ impl Provider for OpenAiCompatibleProvider {
             }
         }
 
-        let usage = json["usage"].as_object().map(|u| Usage {
-            prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            completion_tokens: u
-                .get("completion_tokens")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u32,
-            total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-        });
+        let usage = parse_usage(&json);
+
+        // Log caching metrics if available
+        if let Some(ref u) = usage {
+            if u.cache_read_input_tokens > 0 || u.cache_creation_input_tokens > 0 {
+                tracing::info!(
+                    "🧊 Prompt cache: {} read, {} created (saved ~{}%)",
+                    u.cache_read_input_tokens,
+                    u.cache_creation_input_tokens,
+                    if u.prompt_tokens > 0 {
+                        u.cache_read_input_tokens * 100 / u.prompt_tokens.max(1)
+                    } else { 0 }
+                );
+            }
+            if u.thinking_tokens > 0 {
+                tracing::info!("🧠 Thinking: {} tokens consumed", u.thinking_tokens);
+            }
+        }
 
         Ok(ProviderResponse {
             content,

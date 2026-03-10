@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bizclaw-agent",
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-agent"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-brain"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "byteorder",
@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-channels"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-core"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-db"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "bizclaw-core",
@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-ffi"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "serde",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-gateway"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-knowledge"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "chrono",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-mcp"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "bizclaw-core",
@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-memory"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-orchestrator"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "chrono",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-platform"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-providers"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -683,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-runtime"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-scheduler"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "chrono",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-security"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-skills"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "bizclaw-core",
  "chrono",
@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-tools"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -776,7 +776,7 @@ dependencies = [
 
 [[package]]
 name = "bizclaw-workflows"
-version = "0.3.1"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "bizclaw-core",

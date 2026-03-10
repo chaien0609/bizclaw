@@ -300,6 +300,24 @@ data class DownloadableModel(
 /** Curated list of recommended GGUF models for on-device inference */
 val RECOMMENDED_MODELS = listOf(
     DownloadableModel(
+        name = "⭐ Jan-nano 4B Q4_K_M",
+        description = "Best for tool-calling & agents (8GB+ RAM). DAPO-tuned, beats DeepSeek-671B on SimpleQA",
+        url = "https://huggingface.co/janhq/Jan-nano-GGUF/resolve/main/Jan-nano-Q4_K_M.gguf",
+        sizeBytes = 2_700_000_000L,
+        paramCount = "4B",
+        quantization = "Q4_K_M",
+        chatTemplate = "qwen2",
+    ),
+    DownloadableModel(
+        name = "Qwen3 0.6B Instruct Q4_K_M",
+        description = "Ultra-light (400MB), runs on ANY phone. Perfect for Pi/low-RAM",
+        url = "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/qwen3-0.6b-q4_k_m.gguf",
+        sizeBytes = 400_000_000L,
+        paramCount = "0.6B",
+        quantization = "Q4_K_M",
+        chatTemplate = "qwen2",
+    ),
+    DownloadableModel(
         name = "Qwen2.5 3B Instruct Q4_K_M",
         description = "Best balance of speed and quality for mobile",
         url = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",

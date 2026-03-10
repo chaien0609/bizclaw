@@ -256,15 +256,16 @@ async fn main() -> Result<()> {
                         println!("Starting all configured channels...");
                     }
 
-                    // Start configured channels
-                    if let Some(zalo_config) = &config.channel.zalo
-                        && zalo_config.enabled {
-                            println!("  📱 Zalo ({}) channel starting...", zalo_config.mode);
+                    // Start configured Zalo channels
+                    for zalo_config in &config.channel.zalo {
+                        if zalo_config.enabled {
+                            println!("  📱 Zalo '{}' ({}) channel starting...", zalo_config.name, zalo_config.mode);
                             let mut zalo =
                                 bizclaw_channels::zalo::ZaloChannel::new(zalo_config.clone());
                             use bizclaw_core::traits::Channel;
                             zalo.connect().await?;
                         }
+                    }
 
                     println!("\nChannels are running. Press Ctrl+C to stop.");
                     tokio::signal::ctrl_c().await?;
@@ -273,30 +274,36 @@ async fn main() -> Result<()> {
                 ChannelAction::List => {
                     println!("Available channels:");
                     println!("  ✅ cli       — Interactive terminal");
-                    println!(
-                        "  {} zalo      — Zalo Personal/OA",
-                        if config.channel.zalo.as_ref().is_some_and(|z| z.enabled) {
-                            "✅"
-                        } else {
-                            "⬜"
+
+                    // Zalo instances
+                    if config.channel.zalo.is_empty() {
+                        println!("  ⬜ zalo      — Not configured");
+                    } else {
+                        for z in &config.channel.zalo {
+                            let icon = if z.enabled { "✅" } else { "⬜" };
+                            println!("  {} zalo      — {} ({})", icon, z.name, z.mode);
                         }
-                    );
-                    println!(
-                        "  {} telegram  — Telegram bot",
-                        if config.channel.telegram.is_some() {
-                            "✅"
-                        } else {
-                            "⬜"
+                    }
+
+                    // Telegram instances
+                    if config.channel.telegram.is_empty() {
+                        println!("  ⬜ telegram  — Not configured");
+                    } else {
+                        for t in &config.channel.telegram {
+                            let icon = if t.enabled { "✅" } else { "⬜" };
+                            println!("  {} telegram  — {}", icon, t.name);
                         }
-                    );
-                    println!(
-                        "  {} discord   — Discord bot",
-                        if config.channel.discord.is_some() {
-                            "✅"
-                        } else {
-                            "⬜"
+                    }
+
+                    // Discord instances
+                    if config.channel.discord.is_empty() {
+                        println!("  ⬜ discord   — Not configured");
+                    } else {
+                        for d in &config.channel.discord {
+                            let icon = if d.enabled { "✅" } else { "⬜" };
+                            println!("  {} discord   — {}", icon, d.name);
                         }
-                    );
+                    }
                 }
             }
         }
@@ -500,9 +507,10 @@ async fn main() -> Result<()> {
                     "disabled"
                 }
             );
-            if let Some(zalo) = &config.channel.zalo {
+            for zalo in &config.channel.zalo {
                 println!(
-                    "   Zalo: {} ({})",
+                    "   Zalo '{}': {} ({})",
+                    zalo.name,
                     if zalo.enabled { "enabled" } else { "disabled" },
                     zalo.mode
                 );
@@ -596,10 +604,10 @@ async fn main() -> Result<()> {
             let channel_config = config.channel.clone();
             let agent_config = config.clone();
 
-            // Telegram channel
-            if let Some(tg_config) = &channel_config.telegram
-                && tg_config.enabled && !tg_config.bot_token.is_empty() {
-                    println!("   🤖 Telegram: starting bot...");
+            // Telegram channels (supports multiple bots)
+            for (i, tg_config) in channel_config.telegram.iter().enumerate() {
+                if tg_config.enabled && !tg_config.bot_token.is_empty() {
+                    println!("   🤖 Telegram[{}]: starting '{}'...", i, tg_config.name);
                     let tg = bizclaw_channels::telegram::TelegramChannel::new(
                         bizclaw_channels::telegram::TelegramConfig {
                             bot_token: tg_config.bot_token.clone(),
@@ -608,15 +616,17 @@ async fn main() -> Result<()> {
                         },
                     );
                     let cfg_clone = agent_config.clone();
+                    let ch_name = format!("telegram:{}", tg_config.name);
                     tokio::spawn(async move {
-                        run_channel_loop("telegram", tg.start_polling(), cfg_clone).await;
+                        run_channel_loop(&ch_name, tg.start_polling(), cfg_clone).await;
                     });
                 }
+            }
 
-            // Discord channel
-            if let Some(dc_config) = &channel_config.discord
-                && dc_config.enabled && !dc_config.bot_token.is_empty() {
-                    println!("   🎮 Discord: starting bot...");
+            // Discord channels (supports multiple bots)
+            for (i, dc_config) in channel_config.discord.iter().enumerate() {
+                if dc_config.enabled && !dc_config.bot_token.is_empty() {
+                    println!("   🎮 Discord[{}]: starting '{}'...", i, dc_config.name);
                     let dc = bizclaw_channels::discord::DiscordChannel::new(
                         bizclaw_channels::discord::DiscordConfig {
                             bot_token: dc_config.bot_token.clone(),
@@ -625,15 +635,17 @@ async fn main() -> Result<()> {
                         },
                     );
                     let cfg_clone = agent_config.clone();
+                    let ch_name = format!("discord:{}", dc_config.name);
                     tokio::spawn(async move {
-                        run_channel_loop("discord", dc.start_gateway(), cfg_clone).await;
+                        run_channel_loop(&ch_name, dc.start_gateway(), cfg_clone).await;
                     });
                 }
+            }
 
-            // Email channel
-            if let Some(ref email_cfg) = channel_config.email
-                && email_cfg.enabled && !email_cfg.email.is_empty() {
-                    println!("   📧 Email: starting listener ({})...", email_cfg.email);
+            // Email channels (supports multiple accounts)
+            for (i, email_cfg) in channel_config.email.iter().enumerate() {
+                if email_cfg.enabled && !email_cfg.email.is_empty() {
+                    println!("   📧 Email[{}]: starting listener ({})...", i, email_cfg.email);
                     let em = bizclaw_channels::email::EmailChannel::new(
                         bizclaw_channels::email::EmailConfig {
                             imap_host: email_cfg.imap_host.clone(),
@@ -646,14 +658,16 @@ async fn main() -> Result<()> {
                         },
                     );
                     let cfg_clone = agent_config.clone();
+                    let ch_name = format!("email:{}", email_cfg.email);
                     tokio::spawn(async move {
-                        run_channel_loop("email", em.start_polling(), cfg_clone).await;
+                        run_channel_loop(&ch_name, em.start_polling(), cfg_clone).await;
                     });
                 }
+            }
 
-            // Zalo channel (Personal mode — requires cookie)
-            if let Some(ref zalo_cfg) = channel_config.zalo
-                && zalo_cfg.enabled {
+            // Zalo channels (supports multiple accounts — personal + OA)
+            for (i, zalo_cfg) in channel_config.zalo.iter().enumerate() {
+                if zalo_cfg.enabled {
                     let cookie_path = &zalo_cfg.personal.cookie_path;
                     let expanded_path = if cookie_path.starts_with("~/") {
                         std::env::var("HOME")
@@ -665,26 +679,24 @@ async fn main() -> Result<()> {
                     };
 
                     if expanded_path.exists() {
-                        println!("   💬 Zalo: starting ({} mode)...", zalo_cfg.mode);
+                        println!("   💬 Zalo[{}]: starting '{}' ({} mode)...", i, zalo_cfg.name, zalo_cfg.mode);
                         tracing::info!(
-                            "Zalo channel starting with cookie from: {}",
+                            "Zalo channel '{}' starting with cookie from: {}",
+                            zalo_cfg.name,
                             expanded_path.display()
                         );
-                        // Note: Zalo uses WebSocket-based listening which is handled inside the
-                        // ZaloChannel::connect(). For now, we log that it's ready.
-                        // Full polling requires zpw_enk encryption which is complex.
-                        // The channel will be activated when admin sends a
-                        // "start channel" command via the API.
                     } else {
-                        println!("   💬 Zalo: skipped (no cookie at {})", cookie_path);
+                        println!("   💬 Zalo[{}]: '{}' skipped (no cookie at {})", i, zalo_cfg.name, cookie_path);
                     }
                 }
+            }
 
-            // WhatsApp channel (webhook-based — no background task needed)
-            if let Some(ref wa_cfg) = channel_config.whatsapp
-                && wa_cfg.enabled && !wa_cfg.access_token.is_empty() {
-                    println!("   📱 WhatsApp: enabled (webhook at /api/v1/webhook/whatsapp)");
+            // WhatsApp channels (webhook-based — no background task needed)
+            for (i, wa_cfg) in channel_config.whatsapp.iter().enumerate() {
+                if wa_cfg.enabled && !wa_cfg.access_token.is_empty() {
+                    println!("   📱 WhatsApp[{}]: enabled (webhook at /api/v1/webhook/whatsapp)", i);
                 }
+            }
 
             println!();
 
@@ -1013,8 +1025,8 @@ where
                                                 let indicator = format!("⏳ Đang chạy *{}*...", task_name);
                                                 // Send typing indicator
                                                 match channel_name {
-                                                    "telegram" => {
-                                                        if let Some(ref tg_cfg) = config.channel.telegram {
+                                                    n if n.starts_with("telegram") => {
+                                                        if let Some(tg_cfg) = config.channel.telegram.first() {
                                                             let url = format!(
                                                                 "https://api.telegram.org/bot{}/sendMessage",
                                                                 tg_cfg.bot_token
@@ -1137,53 +1149,57 @@ where
         );
 
         // Send response back through the same channel
-        match channel_name {
-            "telegram" => {
-                if let Some(ref tg_cfg) = config.channel.telegram {
-                    let url = format!(
-                        "https://api.telegram.org/bot{}/sendMessage",
-                        tg_cfg.bot_token
-                    );
-                    let body = serde_json::json!({
-                        "chat_id": incoming.thread_id,
-                        "text": &final_response,
-                        "parse_mode": "Markdown",
-                    });
-                    if let Err(e) = send_client.post(&url).json(&body).send().await {
-                        tracing::error!("[telegram] Send failed: {e}");
-                    }
+        // Channel names are now like "telegram:Bot Name", "discord:Server Bot", etc.
+        if channel_name.starts_with("telegram") {
+            // Find the right telegram config by matching the name suffix
+            let bot_name = channel_name.strip_prefix("telegram:").unwrap_or("");
+            let tg_cfg = config.channel.telegram.iter()
+                .find(|t| t.name == bot_name)
+                .or_else(|| config.channel.telegram.first());
+            if let Some(tg) = tg_cfg {
+                let url = format!(
+                    "https://api.telegram.org/bot{}/sendMessage",
+                    tg.bot_token
+                );
+                let body = serde_json::json!({
+                    "chat_id": incoming.thread_id,
+                    "text": &final_response,
+                    "parse_mode": "Markdown",
+                });
+                if let Err(e) = send_client.post(&url).json(&body).send().await {
+                    tracing::error!("[{}] Send failed: {e}", channel_name);
                 }
             }
-            "discord" => {
-                if let Some(ref dc_cfg) = config.channel.discord {
-                    let url = format!(
-                        "https://discord.com/api/v10/channels/{}/messages",
-                        incoming.thread_id
-                    );
-                    let body = serde_json::json!({ "content": &final_response });
-                    if let Err(e) = send_client
-                        .post(&url)
-                        .header("Authorization", format!("Bot {}", dc_cfg.bot_token))
-                        .json(&body)
-                        .send()
-                        .await
-                    {
-                        tracing::error!("[discord] Send failed: {e}");
-                    }
+        } else if channel_name.starts_with("discord") {
+            let bot_name = channel_name.strip_prefix("discord:").unwrap_or("");
+            let dc_cfg = config.channel.discord.iter()
+                .find(|d| d.name == bot_name)
+                .or_else(|| config.channel.discord.first());
+            if let Some(dc) = dc_cfg {
+                let url = format!(
+                    "https://discord.com/api/v10/channels/{}/messages",
+                    incoming.thread_id
+                );
+                let body = serde_json::json!({ "content": &final_response });
+                if let Err(e) = send_client
+                    .post(&url)
+                    .header("Authorization", format!("Bot {}", dc.bot_token))
+                    .json(&body)
+                    .send()
+                    .await
+                {
+                    tracing::error!("[{}] Send failed: {e}", channel_name);
                 }
             }
-            "email" => {
-                if let Some(ref _email_cfg) = config.channel.email {
-                    tracing::info!(
-                        "[email] Reply to {}: {}...",
-                        incoming.sender_id,
-                        &final_response[..final_response.len().min(60)]
-                    );
-                }
-            }
-            _ => {
-                tracing::warn!("[{channel_name}] No send handler implemented");
-            }
+        } else if channel_name.starts_with("email") {
+            tracing::info!(
+                "[{}] Reply to {}: {}...",
+                channel_name,
+                incoming.sender_id,
+                &final_response[..final_response.len().min(60)]
+            );
+        } else {
+            tracing::warn!("[{channel_name}] No send handler implemented");
         }
     }
 

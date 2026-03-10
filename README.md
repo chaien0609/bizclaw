@@ -14,7 +14,7 @@
 [![Rust](https://img.shields.io/badge/Rust-100%25-orange?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-403%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-v0.3.2-purple)]()
+[![Version](https://img.shields.io/badge/version-v1.0.0-purple)]()
 [![Website](https://img.shields.io/badge/🌐_Website-bizclaw.vn-blue)](https://bizclaw.vn)
 [![Facebook](https://img.shields.io/badge/📘_Fanpage-bizclaw.vn-1877F2?logo=facebook)](https://www.facebook.com/bizclaw.vn)
 
@@ -95,7 +95,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 
 | Hạng mục | Chi tiết |
 |----------|----------|
-| **🔌 16 Providers** | OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, MiniMax, xAI (Grok), Mistral, BytePlus ModelArk, Ollama, llama.cpp, Brain Engine, CLIProxy, vLLM |
+| **🔌 18 Providers** | OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, MiniMax, xAI (Grok), Mistral, BytePlus ModelArk, Cohere, Perplexity, DashScope/Qwen, Ollama, llama.cpp, Brain Engine, CLIProxy, vLLM |
 | **💬 10 Channels** | CLI, Telegram, Discord, Email (IMAP/SMTP), Webhook, WhatsApp, Zalo (Personal + OA), **🎙️ Xiaozhi ESP32 Voice** |
 | **🛠️ 13 Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, Calendar, Doc Reader |
 | **🔗 MCP** | Model Context Protocol — kết nối MCP servers bên ngoài, mở rộng tools không giới hạn |
@@ -286,7 +286,7 @@ ollama pull llama3.2       # 3.8GB — phổ biến nhất
 </p>
 
 <p align="center">
-  <a href="releases/bizclaw-android-debug.apk"><b>📥 Tải xuống APK (Bản Test / Debug)</b></a><br>
+  <a href="releases/bizclaw-android-debug.apk"><b>📥 Tải xuống APK v0.5.0 (Bản Test / Debug)</b></a><br>
   <i>Chạy trực tiếp mô hình AI trên thiết bị — Không chờ đợi, Không cần server</i>
 </p>
 
@@ -300,18 +300,23 @@ ollama pull llama3.2       # 3.8GB — phổ biến nhất
 |-------------------|-------|
 | 💬 **Auto-Reply CSKH** | Tự động trả lời khách trên Zalo, Messenger, Telegram qua thông báo (chạy nền, không cướp màn hình). |
 | 👑 **Mama Tổng Quản** | Nhắn tin cho chính mình (hoặc cho Mama) trên Zalo để ra lệnh cho AI làm việc thay bạn từ xa. |
-| 👁️ **Thân thiện AI** | Chụp màn hình, truyền ảnh qua Social Apps, AI hiểu và trả lời trong nháy mắt. |
-| 📱 **Điều khiển trọn vẹn** | Tự động mở app, lướt feed, post bài, thả tim, gửi tin nhắn theo kịch bản. |
+| ⚡ **Flow Runner** | Macro chạy instant — Cross-post Facebook/Zalo/Instagram/Threads cùng lúc. $0, không cần LLM. |
+| 🔗 **Workflow Engine** | Chain nhiều app: Shopee → Zalo → Facebook. LLM + macro kết hợp. |
+| 📸 **Vision Fallback** | Chụp screenshot → Vision AI phân tích (cho WebView, Flutter, Game). |
+| 🛡️ **Stuck Detection** | Tự phát hiện agent bị kẹt, inject recovery hints. 5 chế độ phát hiện. |
+| 📊 **Screen Diff** | Chỉ gửi thay đổi màn hình cho LLM → tiết kiệm 80% tokens. |
 
-**20 Device Tools tích hợp sẵn:**
+**28 Device Tools tích hợp sẵn:**
 
 | Category | Tools |
 |----------|-------|
-| 📱 Social | `facebook_post`, `facebook_comment`, `messenger_reply`, `zalo_send` |
-| 🖥️ Screen | `screen_read`, `screen_click`, `screen_type`, `screen_tap`, `screen_swipe` |
-| 🔧 System | `open_app`, `open_url`, `device_info`, `press_back`, `press_home`, `notifications` |
+| 📱 Social | `facebook_post`, `facebook_comment`, `messenger_reply`, `zalo_send`, `zalo_post`, `instagram_caption`, `threads_post`, `telegram_send`, `lark_send` |
+| 🖥️ Screen | `screen_read`, `screen_read_diff`, `screen_read_smart`, `screen_capture`, `screen_click`, `screen_type`, `screen_tap`, `screen_swipe` |
+| ⚡ Flows | `flow_run`, `flow_list` |
+| 🔧 System | `open_app`, `open_url`, `device_info`, `press_back`, `press_home`, `press_enter`, `notifications` |
 
 > Tất cả chạy 100% offline. Không cần server, không API key.
+> Flow Runner & Vision Fallback bổ sung ở v0.5.0 cho phép automation không cần LLM và xử lý app phức tạp.
 
 ---
 
@@ -396,7 +401,7 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 |-------|--------|--------|
 | `bizclaw-core` | Traits, types, config, errors | ✅ |
 | `bizclaw-brain` | GGUF inference + SIMD | ✅ |
-| `bizclaw-providers` | 16 LLM providers | ✅ |
+| `bizclaw-providers` | 18 LLM providers | ✅ |
 | `bizclaw-channels` | 10 channel types (incl. Zalo OA, Xiaozhi Voice) | ✅ |
 | `bizclaw-memory` | SQLite + FTS5, Brain workspace | ✅ |
 | `bizclaw-tools` | 13 native tools + MCP bridge | ✅ |
@@ -543,4 +548,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**BizClaw** v0.3.2 — *AI riêng, chạy mọi nơi. / Your own AI, runs everywhere.*
+**BizClaw** v1.0.0 — *AI riêng, chạy mọi nơi. / Your own AI, runs everywhere.*

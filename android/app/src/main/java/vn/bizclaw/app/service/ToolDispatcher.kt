@@ -37,6 +37,9 @@ You have access to these tools to control the Android device:
 
 ### Screen Control Tools
 - `screen_read()` — Read all text/buttons visible on current screen
+- `screen_read_diff()` — Read screen changes only (saves tokens, use after first read)
+- `screen_read_smart()` — Smart read: accessibility first, vision fallback for WebView/Flutter
+- `screen_capture()` — Capture screenshot and analyze with vision AI (for WebView/Flutter/games)
 - `screen_click(text: string)` — Click element containing this text
 - `screen_type(text: string)` — Type text into focused input field
 - `screen_type_into(hint: string, text: string)` — Type into field with matching hint
@@ -47,6 +50,10 @@ You have access to these tools to control the Android device:
 - `press_back()` — Press Back button
 - `press_home()` — Press Home button
 - `press_enter()` — Press Enter/Send
+
+### Flow & Workflow Tools
+- `flow_run(flow_type: string, content: string)` — Run instant macro (no LLM): cross_post, broadcast
+- `flow_list()` — List all saved flows
 
 ### App & System Tools
 - `open_app(package_name: string)` — Open an app (e.g. com.facebook.katana)
@@ -67,6 +74,8 @@ When you're done and have the final answer, respond normally without tool_call t
     // Dispatch: tool name + args → execute → result string
     // ═══════════════════════════════════════════════════════════════
 
+    private val screenDiffer = ScreenDiffer()
+
     suspend fun dispatch(toolName: String, args: JsonObject): ToolResult {
         return try {
             val result = when (toolName) {
@@ -78,6 +87,9 @@ When you're done and have the final answer, respond normally without tool_call t
 
                 // Screen control
                 "screen_read" -> screenRead()
+                "screen_read_diff" -> screenReadDiff()
+                "screen_read_smart" -> screenReadSmart()
+                "screen_capture" -> screenCapture()
                 "screen_click" -> screenClick(args)
                 "screen_type" -> screenType(args)
                 "screen_type_into" -> screenTypeInto(args)
@@ -88,6 +100,10 @@ When you're done and have the final answer, respond normally without tool_call t
                 "press_back" -> pressBack()
                 "press_home" -> pressHome()
                 "press_enter" -> pressEnter()
+
+                // Flow & Workflow
+                "flow_run" -> flowRun(args)
+                "flow_list" -> flowList()
 
                 // App & system
                 "open_app" -> openApp(args)
@@ -162,6 +178,76 @@ When you're done and have the final answer, respond normally without tool_call t
                     appendLine("• ${el.className}: hint=\"${el.hint}\"$tagStr")
                 }
             }
+        }
+        return ToolResult(true, summary)
+    }
+
+    private suspend fun screenReadSmart(): ToolResult {
+        val visionFallback = VisionFallback(context)
+        val provider = vn.bizclaw.app.engine.GlobalLLM.getVisionProvider()
+        val result = visionFallback.smartReadScreen(provider)
+        return ToolResult(true, result)
+    }
+
+    private suspend fun screenCapture(): ToolResult {
+        val provider = vn.bizclaw.app.engine.GlobalLLM.getVisionProvider()
+            ?: return ToolResult(false, "No vision provider configured. Add a Gemini/OpenAI/Ollama provider with API key in Settings → Providers.")
+
+        val visionFallback = VisionFallback(context)
+        val result = visionFallback.analyzeScreen(provider)
+
+        return if (result.success) {
+            ToolResult(true, buildString {
+                appendLine("📸 Screenshot Analysis:")
+                appendLine(result.description)
+                if (result.elements.isNotEmpty()) {
+                    appendLine()
+                    appendLine("Parsed ${result.elements.size} interactive elements.")
+                    appendLine("Use screen_tap(x, y) with coordinates above to interact.")
+                }
+            })
+        } else {
+            ToolResult(false, "Screenshot capture failed: ${result.description}")
+        }
+    }
+
+    private fun screenReadDiff(): ToolResult {
+        val content = BizClawAccessibilityService.readScreen()
+            ?: return ToolResult(false, "Accessibility Service not connected")
+        val diff = screenDiffer.diff(content)
+        return ToolResult(true, diff.formatted)
+    }
+
+    private suspend fun flowRun(args: JsonObject): ToolResult {
+        val flowType = args["flow_type"]?.jsonPrimitive?.content ?: "cross_post"
+        val content = args["content"]?.jsonPrimitive?.content ?: ""
+
+        val flow = when (flowType) {
+            "cross_post" -> FlowRunner.crossPostFlow(content)
+            else -> {
+                val runner = FlowRunner(context)
+                runner.loadFlow(flowType) ?: FlowRunner.crossPostFlow(content)
+            }
+        }
+
+        val runner = FlowRunner(context)
+        val result = runner.run(flow)
+        return ToolResult(result.allSuccess, result.summary())
+    }
+
+    private fun flowList(): ToolResult {
+        val runner = FlowRunner(context)
+        val flows = runner.listFlows()
+        if (flows.isEmpty()) {
+            return ToolResult(true, "No saved flows. Built-in flows: cross_post, broadcast, sales_post")
+        }
+        val summary = buildString {
+            appendLine("📋 Saved flows (${flows.size}):")
+            for (f in flows) {
+                appendLine("  • ${f.id}: ${f.name} — ${f.description} (${f.steps.size} steps)")
+            }
+            appendLine()
+            appendLine("Built-in: cross_post, broadcast, sales_post")
         }
         return ToolResult(true, summary)
     }

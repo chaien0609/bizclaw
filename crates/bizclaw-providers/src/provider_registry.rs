@@ -302,6 +302,57 @@ static LLAMACPP_MODELS: &[ModelDef] = &[ModelDef {
     max_output_tokens: Some(4096),
 }];
 
+static COHERE_MODELS: &[ModelDef] = &[
+    ModelDef {
+        id: "command-r-plus",
+        name: "Command R+ (128K)",
+        context_length: 128000,
+        max_output_tokens: Some(4096),
+    },
+    ModelDef {
+        id: "command-r",
+        name: "Command R",
+        context_length: 128000,
+        max_output_tokens: Some(4096),
+    },
+];
+
+static PERPLEXITY_MODELS: &[ModelDef] = &[
+    ModelDef {
+        id: "sonar-pro",
+        name: "Sonar Pro (Search-augmented)",
+        context_length: 200000,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "sonar",
+        name: "Sonar (Search-augmented)",
+        context_length: 128000,
+        max_output_tokens: Some(8192),
+    },
+];
+
+static DASHSCOPE_MODELS: &[ModelDef] = &[
+    ModelDef {
+        id: "qwen-max",
+        name: "Qwen Max (Alibaba)",
+        context_length: 32768,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "qwen-plus",
+        name: "Qwen Plus",
+        context_length: 131072,
+        max_output_tokens: Some(8192),
+    },
+    ModelDef {
+        id: "qwen-turbo",
+        name: "Qwen Turbo (Fast)",
+        context_length: 131072,
+        max_output_tokens: Some(8192),
+    },
+];
+
 // ─── Registry ────────────────────────────────────────────────────────────────
 
 /// All known providers.
@@ -471,6 +522,36 @@ static PROVIDERS: &[ProviderConfig] = &[
         base_url_env: Some("ARK_BASE_URL"),
         default_models: MODELARK_MODELS,
     },
+    ProviderConfig {
+        name: "cohere",
+        base_url: "https://api.cohere.com/v2",
+        chat_path: "/chat",
+        models_path: "/models",
+        env_keys: &["COHERE_API_KEY", "CO_API_KEY"],
+        auth_style: AuthStyle::Bearer,
+        base_url_env: None,
+        default_models: COHERE_MODELS,
+    },
+    ProviderConfig {
+        name: "perplexity",
+        base_url: "https://api.perplexity.ai",
+        chat_path: "/chat/completions",
+        models_path: "/models",
+        env_keys: &["PERPLEXITY_API_KEY", "PPLX_API_KEY"],
+        auth_style: AuthStyle::Bearer,
+        base_url_env: None,
+        default_models: PERPLEXITY_MODELS,
+    },
+    ProviderConfig {
+        name: "dashscope",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        chat_path: "/chat/completions",
+        models_path: "/models",
+        env_keys: &["DASHSCOPE_API_KEY", "QWEN_API_KEY"],
+        auth_style: AuthStyle::Bearer,
+        base_url_env: None,
+        default_models: DASHSCOPE_MODELS,
+    },
 ];
 
 /// Look up a provider config by name.
@@ -483,6 +564,9 @@ pub fn get_provider_config(name: &str) -> Option<&'static ProviderConfig> {
         "together_ai" | "togetherai" => "together",
         "grok" => "xai",
         "bytedance" | "doubao" | "ark" | "volcengine" => "modelark",
+        "co" | "cohere_ai" => "cohere",
+        "pplx" | "perplexity_ai" => "perplexity",
+        "qwen" | "aliyun" | "alibaba" | "tongyi" => "dashscope",
         other => other,
     };
     PROVIDERS.iter().find(|p| p.name == lookup)
@@ -491,4 +575,113 @@ pub fn get_provider_config(name: &str) -> Option<&'static ProviderConfig> {
 /// List all known provider names.
 pub fn all_provider_names() -> Vec<&'static str> {
     PROVIDERS.iter().map(|p| p.name).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_18_providers_resolvable() {
+        let expected = [
+            "openai", "openrouter", "anthropic", "deepseek", "gemini",
+            "groq", "ollama", "llamacpp", "cliproxy", "vllm",
+            "together", "mistral", "minimax", "xai", "modelark",
+            "cohere", "perplexity", "dashscope",
+        ];
+        for name in &expected {
+            assert!(
+                get_provider_config(name).is_some(),
+                "Provider '{}' not found in registry",
+                name
+            );
+        }
+        assert_eq!(all_provider_names().len(), 18);
+    }
+
+    #[test]
+    fn test_aliases() {
+        let alias_map = [
+            ("google", "gemini"),
+            ("llama.cpp", "llamacpp"),
+            ("grok", "xai"),
+            ("bytedance", "modelark"),
+            ("doubao", "modelark"),
+            ("ark", "modelark"),
+            ("co", "cohere"),
+            ("cohere_ai", "cohere"),
+            ("pplx", "perplexity"),
+            ("perplexity_ai", "perplexity"),
+            ("qwen", "dashscope"),
+            ("alibaba", "dashscope"),
+            ("aliyun", "dashscope"),
+            ("tongyi", "dashscope"),
+        ];
+        for (alias, expected) in &alias_map {
+            let config = get_provider_config(alias);
+            assert!(
+                config.is_some(),
+                "Alias '{}' → '{}' not resolvable",
+                alias, expected
+            );
+            assert_eq!(config.unwrap().name, *expected);
+        }
+    }
+
+    #[test]
+    fn test_cohere_config() {
+        let c = get_provider_config("cohere").unwrap();
+        assert_eq!(c.base_url, "https://api.cohere.com/v2");
+        assert_eq!(c.chat_path, "/chat");
+        assert_eq!(c.auth_style, AuthStyle::Bearer);
+        assert!(!c.default_models.is_empty());
+        assert!(c.env_keys.contains(&"COHERE_API_KEY"));
+    }
+
+    #[test]
+    fn test_perplexity_config() {
+        let c = get_provider_config("perplexity").unwrap();
+        assert_eq!(c.base_url, "https://api.perplexity.ai");
+        assert_eq!(c.chat_path, "/chat/completions");
+        assert!(c.env_keys.contains(&"PERPLEXITY_API_KEY"));
+        assert!(c.default_models.iter().any(|m| m.id == "sonar-pro"));
+    }
+
+    #[test]
+    fn test_dashscope_config() {
+        let c = get_provider_config("dashscope").unwrap();
+        assert!(c.base_url.contains("dashscope.aliyuncs.com"));
+        assert!(c.env_keys.contains(&"DASHSCOPE_API_KEY"));
+        assert!(c.default_models.iter().any(|m| m.id == "qwen-max"));
+        assert_eq!(c.default_models.len(), 3);
+    }
+
+    #[test]
+    fn test_all_providers_have_models() {
+        for p in PROVIDERS.iter() {
+            assert!(
+                !p.default_models.is_empty(),
+                "Provider '{}' has no default models",
+                p.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_providers_have_auth_or_none() {
+        for p in PROVIDERS.iter() {
+            match p.auth_style {
+                AuthStyle::Bearer => {
+                    assert!(
+                        !p.env_keys.is_empty() || p.name == "vllm" || p.name == "cliproxy",
+                        "Provider '{}' has Bearer auth but no env_keys",
+                        p.name
+                    );
+                }
+                AuthStyle::None => {
+                    // Local providers (ollama, llamacpp) — OK without keys
+                }
+            }
+        }
+    }
 }
