@@ -107,7 +107,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | Hạng mục | Chi tiết |
 |----------|----------|
 | **🔌 16 Providers** | OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, MiniMax, xAI (Grok), Mistral, BytePlus ModelArk, Ollama, llama.cpp, Brain Engine, CLIProxy, vLLM |
-| **💬 9 Channels** | CLI, Telegram, Discord, Email (IMAP/SMTP), Webhook, WhatsApp, Zalo (Personal + Official Account) |
+| **💬 10 Channels** | CLI, Telegram, Discord, Email (IMAP/SMTP), Webhook, WhatsApp, Zalo (Personal + OA), **🎙️ Xiaozhi ESP32 Voice** |
 | **🛠️ 13 Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, Calendar, Doc Reader |
 | **🔗 MCP** | Model Context Protocol — kết nối MCP servers bên ngoài, mở rộng tools không giới hạn |
 | **🧠 Brain Engine** | GGUF inference offline: mmap, quantization, Flash Attention, SIMD (ARM NEON, x86 AVX2) |
@@ -118,6 +118,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **⏰ Scheduler** | Cron, interval, one-time tasks. Agent tự chạy background, gửi kết quả qua Telegram/Zalo/Email/Webhook |
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
 | **🌐 Web Dashboard** | 20+ trang UI (VI/EN), WebSocket real-time, Full CRUD, Dark/Light mode |
+| **🎙️ Xiaozhi Voice** | Kết nối ESP32 Xiaozhi (~$5) làm AI Assistant vật lý. Voice → Agent → Voice. OpenAI-compatible API + Webhook. $0/tháng |
 | **🔒 Bảo mật** | AES-256, Command allowlist, Runtime sandbox, HMAC-SHA256, rate limiting |
 | **🖥️ Desktop App** | macOS (.dmg), Windows (.exe), Linux (.deb) — 13MB, auto-open browser, zero config |
 | **☁️ Cloud Platform** | Multi-tenant SaaS, PaaS remote nodes, JWT SSO, PostgreSQL, Nginx auto-config |
@@ -223,7 +224,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
   └─────────────────────────────────────────────────────┘
 ```
 
-- **Gán Agent ↔ Channel**: Mỗi agent gán vào 1+ kênh (Telegram, Zalo, Discord, Webhook, Web)
+- **Gán Agent ↔ Channel**: Mỗi agent gán vào 1+ kênh (Telegram, Zalo, Discord, Webhook, Web, Xiaozhi Voice)
 - **Provider riêng**: Mỗi agent chọn provider/model tối ưu cho vai trò
 - **Group Chat**: Nhiều agent cộng tác giải quyết 1 vấn đề
 
@@ -352,7 +353,7 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | 💬 **WebChat** | Chat trực tiếp với AI, markdown, code highlighting, streaming |
 | 🤖 **AI Agent** | CRUD multi-agent, gán provider/model/channel cho từng agent |
 | 📚 **Knowledge** | Upload tài liệu, quản lý RAG, xoá document |
-| 📡 **Channels** | Kết nối Telegram, Zalo, Discord, Webhook — trạng thái real-time |
+| 📡 **Channels** | Kết nối Telegram, Zalo, Discord, Webhook, Xiaozhi Voice — trạng thái real-time |
 | ⚙️ **Settings** | Cấu hình agent, identity, safety rules |
 | 🔌 **Providers** | Kiểm tra 16 providers, trạng thái kết nối, models available |
 | 🛠️ **Tools** | 13 native tools + MCP tools — enable/disable từng tool |
@@ -386,7 +387,7 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 │  (Orchestrator manages N agents)                      │
 │    ┌──────────────────┼──────────────────┐            │
 │    ▼                  ▼                  ▼            │
-│  16 Providers      9 Channels       13 Tools + MCP    │
+│  16 Providers      10 Channels      13 Tools + MCP    │
 │    ▼                  ▼                  ▼            │
 │  Memory            Hands             Knowledge        │
 │  (SQLite+FTS5)    (Autonomous)      (RAG+Vector)      │
@@ -407,7 +408,7 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | `bizclaw-core` | Traits, types, config, errors | ✅ |
 | `bizclaw-brain` | GGUF inference + SIMD | ✅ |
 | `bizclaw-providers` | 16 LLM providers | ✅ |
-| `bizclaw-channels` | 9 channel types (incl. Zalo OA) | ✅ |
+| `bizclaw-channels` | 10 channel types (incl. Zalo OA, Xiaozhi Voice) | ✅ |
 | `bizclaw-memory` | SQLite + FTS5, Brain workspace | ✅ |
 | `bizclaw-tools` | 13 native tools + MCP bridge | ✅ |
 | `bizclaw-mcp` | MCP client (JSON-RPC 2.0) | ✅ |
@@ -439,6 +440,46 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | **Giá** | **Miễn phí** | Theo gói |
 
 👉 **Tìm hiểu thêm tại [bizclaw.vn](https://bizclaw.vn)** — tab "Cloud"
+
+---
+
+## 🎙️ Xiaozhi ESP32 Voice — AI Assistant vật lý ($5, $0/tháng)
+
+> Kết nối thiết bị **Xiaozhi ESP32** (~$5) làm trợ lý AI giọng nói. Nói chuyện trực tiếp với BizClaw Agent qua loa + mic.
+
+```
+ESP32 Xiaozhi (~$5)              Xiaozhi Server (ASR/TTS)         BizClaw
+┌──────────────┐      WebSocket   ┌──────────────┐    OpenAI API   ┌──────────────┐
+│ 🎤 Mic       │ ──────────────► │ VAD → ASR    │ ──────────────► │ 🧠 Agent     │
+│ 🔊 Speaker   │ ◄────────────── │ TTS ← Text   │ ◄────────────── │ 🛠️ 13 Tools  │
+│ 📡 WiFi      │                 │              │                 │ 📚 Knowledge │
+└──────────────┘                 └──────────────┘                 │ 🔄 Workflows │
+                                                                  └──────────────┘
+```
+
+### Cách kết nối
+
+BizClaw expose **OpenAI-compatible API** — chỉ cần config trên Xiaozhi server:
+
+```yaml
+# Xiaozhi server config.yaml → LLM section
+llm:
+  type: "openai"
+  base_url: "https://your-bizclaw.domain/v1"  # Hoặc http://localhost:3000/v1
+  api_key: ""   # JWT token hoặc để trống (dev mode)
+  model: "default"   # Hoặc tên agent cụ thể
+```
+
+### Tính năng
+
+| Tính năng | Chi tiết |
+|-----------|----------|
+| 🗣️ **Voice ↔ Agent** | Nói → ASR → BizClaw xử lý → TTS → Nghe |
+| 🇻🇳 **Tiếng Việt** | EdgeTTS `vi-VN-HoaiMyNeural` |
+| 🤖 **Multi-Agent** | Mỗi device gắn 1 agent riêng (MAC routing) |
+| 📡 **Webhook** | `POST /api/v1/xiaozhi/webhook` |
+| 💰 **Chi phí** | Hardware ~$5 (1 lần), vận hành **$0/tháng** (local LLM) |
+| 🔌 **Endpoints** | Có sẵn trong Dashboard → Settings → Integration |
 
 ---
 
@@ -477,7 +518,7 @@ cd bizclaw && cargo build --release
 ### Key Features
 
 - **16 AI Providers** — OpenAI, Anthropic, Gemini, DeepSeek, Groq, Ollama, and more
-- **9 Channels** — CLI, Telegram, Discord, Email, Webhook, WhatsApp, Zalo (Personal + OA)
+- **10 Channels** — CLI, Telegram, Discord, Email, Webhook, WhatsApp, Zalo (Personal + OA), Xiaozhi ESP32 Voice
 - **13 Tools** + MCP support for unlimited extensions
 - **Multi-Agent** — Create teams of agents with different roles, assign to channels
 - **Autonomous Hands** — Background agents that run 24/7: Research, Content, Analytics, Monitoring, Security
@@ -491,6 +532,7 @@ cd bizclaw && cargo build --release
 - **Circuit Breaker** — Auto-stops cascading failures when providers go down, with exponential backoff
 - **Model Router** — Intelligent model selection based on task complexity (Fast/Primary/Premium tiers)
 - **Stealth Browser** — Anti-detection headless Chrome with WebGL/navigator/plugin spoofing
+- **Xiaozhi Voice** — ESP32 device (~$5) as physical AI assistant. Voice → ASR → BizClaw Agent → TTS → Speaker. $0/month
 
 > ☁️ **Want the hosted version?** Visit [bizclaw.vn](https://bizclaw.vn) — Cloud tab.
 

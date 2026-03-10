@@ -435,6 +435,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div class="form-row"><span class="form-label" data-i18n="set.autonomy">Mức tự chủ</span><select id="set-auto-level"><option value="readonly" data-i18n="set.readonly">Chỉ đọc</option><option value="supervised" data-i18n="set.supervised">Giám sát</option><option value="full" data-i18n="set.full">Toàn quyền</option></select></div>
         <div class="form-row"><span class="form-label" data-i18n="set.workspace_only">Chỉ Workspace</span><select id="set-auto-workspace"><option value="true">Có</option><option value="false">Không</option></select></div>
       </div>
+      <div class="form-section">
+        <h2>🔌 Tích hợp thiết bị & API Endpoints</h2>
+        <div class="card" style="background:var(--bg);padding:16px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Copy các URL dưới đây để tích hợp với Xiaozhi ESP32, OpenClaw, hoặc bất kỳ ứng dụng OpenAI-compatible nào.</div>
+          <div id="integration-endpoints" style="display:flex;flex-direction:column;gap:8px">
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="copyXzConfig()">📋 Copy Xiaozhi YAML Config</button>
+            <button class="btn btn-outline btn-sm" onclick="copyApiUrl()">🤖 Copy API URL</button>
+            <button class="btn btn-outline btn-sm" onclick="copyWebhookUrl()">🎙️ Copy Webhook URL</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ PROVIDERS ═══ -->
@@ -1108,7 +1121,7 @@ function showPage(name, pushState) {
   if (page) page.style.display = '';
   if (nav) nav.classList.add('active');
   if (name === 'chat') { document.getElementById('chat-input').focus(); refreshChatSidebar(); }
-  if (name === 'settings') loadSettingsForm();
+  if (name === 'settings') { loadSettingsForm(); buildIntegrationEndpoints(); }
   if (name === 'providers') loadProviders();
   if (name === 'channels') { renderChannelCards(); loadChannelInstances(); }
   if (name === 'configfile') loadConfigToml();
@@ -4054,6 +4067,57 @@ function toast(msg) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3000);
+}
+
+// ═══ INTEGRATION ENDPOINTS ═══
+function getBaseUrl() {
+  return `${location.protocol}//${location.host}`;
+}
+function buildIntegrationEndpoints() {
+  const base = getBaseUrl();
+  const el = document.getElementById('integration-endpoints');
+  if(!el) return;
+  const endpoints = [
+    { icon: '🤖', label: 'OpenAI-Compatible API', url: `${base}/v1/chat/completions`, desc: 'Dùng cho Xiaozhi LLM, Cursor, LibreChat, Aider...' },
+    { icon: '📋', label: 'Models List', url: `${base}/v1/models`, desc: 'Liệt kê agents như models' },
+    { icon: '🎙️', label: 'Xiaozhi Webhook', url: `${base}/api/v1/xiaozhi/webhook`, desc: 'ESP32 Xiaozhi voice device webhook' },
+    { icon: '💬', label: 'WebSocket Chat', url: `${base.replace('http','ws')}/ws`, desc: 'Real-time WebSocket connection' },
+  ];
+  el.innerHTML = endpoints.map(e => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="navigator.clipboard.writeText('${e.url}');toast('✅ Copied: ${e.label}')">
+      <span style="font-size:18px;flex-shrink:0">${e.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${e.label}</div>
+        <div style="font-size:11px;color:var(--accent2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.url}</div>
+        <div style="font-size:10px;color:var(--text2)">${e.desc}</div>
+      </div>
+      <span style="font-size:11px;color:var(--text2)">📋</span>
+    </div>
+  `).join('');
+}
+function copyApiUrl() {
+  navigator.clipboard.writeText(`${getBaseUrl()}/v1/chat/completions`);
+  toast('✅ Copied API URL');
+}
+function copyWebhookUrl() {
+  navigator.clipboard.writeText(`${getBaseUrl()}/api/v1/xiaozhi/webhook`);
+  toast('✅ Copied Xiaozhi Webhook URL');
+}
+function copyXzConfig() {
+  const base = getBaseUrl();
+  const config = `# BizClaw × Xiaozhi Integration
+# Paste this into your Xiaozhi server config.yaml → LLM section
+llm:
+  type: "openai"
+  base_url: "${base}/v1"
+  api_key: ""
+  model: "default"
+
+# Alternative: Xiaozhi Webhook
+# POST ${base}/api/v1/xiaozhi/webhook
+# Body: {"content": "user text", "device_mac": "AA:BB:CC", "lang": "vi"}`;
+  navigator.clipboard.writeText(config);
+  toast('✅ Copied Xiaozhi full config!');
 }
 
 // ═══ ORCHESTRATION PAGE ═══
