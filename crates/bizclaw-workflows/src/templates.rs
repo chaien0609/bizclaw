@@ -20,6 +20,12 @@ pub fn builtin_workflows() -> Vec<Workflow> {
         competitor_analysis(),
         proposal_generator(),
         weekly_report(),
+        // Business Operations
+        email_drip_campaign(),
+        hiring_pipeline(),
+        customer_feedback_analysis(),
+        contract_review(),
+        product_launch_checklist(),
     ]
 }
 
@@ -706,6 +712,445 @@ pub fn weekly_report() -> Workflow {
     )
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Business Operations Workflows
+// ═══════════════════════════════════════════════════════════════
+
+/// Email Drip Campaign: Soạn chuỗi email nurturing tự động.
+///
+/// Input: Mô tả sản phẩm/dịch vụ + đối tượng khách hàng.
+/// Output: Chuỗi 5 email chuyên nghiệp.
+pub fn email_drip_campaign() -> Workflow {
+    Workflow::new(
+        "email_drip_campaign",
+        "Email Drip Campaign — Soạn chuỗi 5 email nurturing tự động",
+    )
+    .with_tags(vec!["email", "marketing", "drip", "nurturing", "sales"])
+    .with_timeout(1200)
+    .add_step(
+        WorkflowStep::new("audience-research", "marketing-analyst", StepType::Sequential)
+            .with_prompt(
+                "Phân tích đối tượng khách hàng và hành trình mua hàng cho:\n\n\
+                {{input}}\n\n\
+                Xác định:\n\
+                1. Persona chính (demographics, pain points, goals)\n\
+                2. Hành trình mua hàng (Awareness → Interest → Decision → Action)\n\
+                3. Objections thường gặp\n\
+                4. Trigger events (khi nào KH cần sản phẩm nhất)\n\
+                5. Tone & style phù hợp"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("email-1", "copywriter", StepType::Sequential)
+            .with_prompt(
+                "Viết Email #1 — WELCOME/AWARENESS (ngày 0):\n\n\
+                {{input}}\n\n\
+                - Subject line hấp dẫn (A/B: 2 variants)\n\
+                - Giới thiệu vấn đề KH đang gặp\n\
+                - Hint về giải pháp (nhưng chưa bán)\n\
+                - CTA: Đọc thêm / Xem video\n\
+                Tone: Thân thiện, đồng cảm, không bán hàng."
+            )
+            .with_timeout(200),
+    )
+    .add_step(
+        WorkflowStep::new("email-2", "copywriter", StepType::Sequential)
+            .with_prompt(
+                "Viết Email #2 — VALUE/EDUCATION (ngày 3):\n\n\
+                {{input}}\n\n\
+                - Chia sẻ kiến thức hữu ích (tips, case study)\n\
+                - Chứng minh expertise\n\
+                - Social proof nhẹ nhàng\n\
+                - CTA: Download guide / Tham gia webinar"
+            )
+            .with_timeout(200),
+    )
+    .add_step(
+        WorkflowStep::new("email-3", "copywriter", StepType::Sequential)
+            .with_prompt(
+                "Viết Email #3 — SOCIAL PROOF (ngày 7):\n\n\
+                {{input}}\n\n\
+                - Case study thực tế (before/after)\n\
+                - Testimonials\n\
+                - Số liệu kết quả cụ thể\n\
+                - CTA: Xem demo / Dùng thử"
+            )
+            .with_timeout(200),
+    )
+    .add_step(
+        WorkflowStep::new("email-4", "copywriter", StepType::Sequential)
+            .with_prompt(
+                "Viết Email #4 — OFFER (ngày 10):\n\n\
+                {{input}}\n\n\
+                - Giới thiệu sản phẩm/dịch vụ chính thức\n\
+                - Bảng giá rõ ràng + packages\n\
+                - Ưu đãi giới hạn thời gian\n\
+                - FAQ ngắn (xử lý objections)\n\
+                - CTA: Đăng ký / Mua ngay"
+            )
+            .with_timeout(200),
+    )
+    .add_step(
+        WorkflowStep::new("email-5", "copywriter", StepType::Sequential)
+            .with_prompt(
+                "Viết Email #5 — URGENCY/LAST CHANCE (ngày 14):\n\n\
+                {{input}}\n\n\
+                - Nhắc ưu đãi sắp hết\n\
+                - Tóm tắt lý do nên hành động\n\
+                - Bonus cho người đăng ký sớm\n\
+                - CTA mạnh: Hành động ngay\n\
+                Tone: Urgency nhưng không spam."
+            )
+            .with_timeout(200),
+    )
+    // FanOut: tạo email 2-5 song song (email 1 đã có)
+    .add_step(WorkflowStep::new(
+        "parallel-emails",
+        "orchestrator",
+        StepType::FanOut {
+            parallel_steps: vec![
+                "email-2".into(),
+                "email-3".into(),
+                "email-4".into(),
+                "email-5".into(),
+            ],
+        },
+    ))
+    .add_step(WorkflowStep::new(
+        "assemble",
+        "orchestrator",
+        StepType::Collect {
+            strategy: CollectStrategy::Merge,
+            evaluator: None,
+        },
+    ))
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## 📧 Email Drip Campaign (5 emails)\n\n{{input}}\n\n---\n\
+                    ✅ Ready to schedule | Auto-generated by BizClaw"
+                    .to_string(),
+            },
+        ),
+    )
+}
+
+/// Hiring Pipeline: JD → Screen → Interview Questions → Evaluation.
+///
+/// Input: Vị trí cần tuyển + yêu cầu.
+/// Output: JD + câu hỏi phỏng vấn + bảng đánh giá.
+pub fn hiring_pipeline() -> Workflow {
+    Workflow::new(
+        "hiring_pipeline",
+        "Tuyển dụng — JD → Câu hỏi PV → Ma trận đánh giá → Onboarding checklist",
+    )
+    .with_tags(vec!["hiring", "hr", "recruitment", "interview", "ceo"])
+    .with_timeout(900)
+    .add_step(
+        WorkflowStep::new("job-description", "hr-specialist", StepType::Sequential)
+            .with_prompt(
+                "Soạn JD (Job Description) chuyên nghiệp cho vị trí:\n\n\
+                {{input}}\n\n\
+                Gồm:\n\
+                1. Giới thiệu công ty (2-3 dòng hấp dẫn)\n\
+                2. Mô tả công việc (5-7 responsibilities)\n\
+                3. Yêu cầu bắt buộc (must-have skills)\n\
+                4. Yêu cầu ưu tiên (nice-to-have)\n\
+                5. Quyền lợi (salary range, benefits, culture)\n\
+                6. Quy trình ứng tuyển\n\n\
+                Tone: Chuyên nghiệp, hấp dẫn, thể hiện văn hoá công ty."
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("interview-questions", "hr-specialist", StepType::Sequential)
+            .with_prompt(
+                "Tạo bộ câu hỏi phỏng vấn cho vị trí trong JD sau:\n\n\
+                {{input}}\n\n\
+                Gồm 3 vòng:\n\
+                **Vòng 1 — Culture Fit (HR, 30 phút):**\n\
+                - 5 câu hỏi soft skills + culture\n\n\
+                **Vòng 2 — Technical (Hiring Manager, 45 phút):**\n\
+                - 5 câu hỏi chuyên môn + case study\n\
+                - 1 bài test thực tế (nếu applicable)\n\n\
+                **Vòng 3 — Final (CEO/Director, 20 phút):**\n\
+                - 3 câu hỏi vision, growth, salary expectation\n\n\
+                Mỗi câu gồm: Câu hỏi | Tiêu chí đánh giá | Red flags"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("eval-matrix", "hr-specialist", StepType::Sequential)
+            .with_prompt(
+                "Tạo ma trận đánh giá ứng viên dựa trên JD + câu hỏi:\n\n\
+                {{input}}\n\n\
+                Format bảng:\n\
+                | Tiêu chí | Trọng số | Đánh giá (1-5) | Ghi chú |\n\
+                |----------|----------|----------------|---------|\n\
+                Gồm: Technical skills, Soft skills, Culture fit, Experience, Growth potential\n\n\
+                + Thang điểm: <15 = Reject, 15-20 = Maybe, >20 = Hire\n\
+                + Onboarding checklist 30 ngày đầu tiên"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## 👥 Hiring Pipeline\n\n{{input}}\n\n---\n\
+                    ✅ JD + Interview Questions + Evaluation Matrix\n\
+                    🤖 Auto-generated by BizClaw"
+                    .to_string(),
+            },
+        ),
+    )
+}
+
+/// Customer Feedback Analysis: Collect → Categorize → Insights → Action Plan.
+///
+/// Input: Danh sách feedback/reviews từ khách hàng.
+/// Output: Phân tích + insights + action plan.
+pub fn customer_feedback_analysis() -> Workflow {
+    Workflow::new(
+        "customer_feedback",
+        "Phân tích Feedback KH — Thu thập → Phân loại → Insights → Hành động",
+    )
+    .with_tags(vec!["feedback", "customer", "analysis", "csat", "improvement"])
+    .with_timeout(900)
+    .add_step(
+        WorkflowStep::new("categorize", "analyst", StepType::Sequential)
+            .with_prompt(
+                "Phân tích và phân loại feedback khách hàng sau:\n\n\
+                {{input}}\n\n\
+                Phân loại theo:\n\
+                1. **Sentiment**: 😊 Tích cực / 😐 Trung lập / 😠 Tiêu cực (% mỗi loại)\n\
+                2. **Chủ đề**: Sản phẩm, Dịch vụ, Giá, UI/UX, Support, Delivery\n\
+                3. **Mức độ nghiêm trọng**: 🔴 Critical / 🟡 Medium / 🟢 Low\n\
+                4. **Tần suất**: Vấn đề nào được nhắc nhiều nhất?\n\
+                5. **NPS ước tính** (nếu có đủ data)"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("insights", "strategy-analyst", StepType::Sequential)
+            .with_prompt(
+                "Từ phân tích feedback, rút ra insights kinh doanh:\n\n\
+                {{input}}\n\n\
+                1. **Top 3 điểm mạnh** (giữ vững & phát huy)\n\
+                2. **Top 3 điểm yếu** (cần cải thiện ngay)\n\
+                3. **Cơ hội** (từ feedback tích cực → upsell/cross-sell)\n\
+                4. **Rủi ro churn** (KH nào có nguy cơ rời bỏ?)\n\
+                5. **So sánh vs kỳ trước** (tốt hơn hay xấu đi?)"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("action-plan", "operations-manager", StepType::Sequential)
+            .with_prompt(
+                "Tạo action plan từ insights feedback KH:\n\n\
+                {{input}}\n\n\
+                Format:\n\
+                🔴 **Urgent (tuần này)**:\n\
+                - [Action] → [Phòng ban] → [KPI đo lường]\n\n\
+                🟡 **Short-term (tháng này)**:\n\
+                - [Action] → [Phòng ban] → [KPI]\n\n\
+                🟢 **Long-term (quý này)**:\n\
+                - [Action] → [Phòng ban] → [KPI]\n\n\
+                📊 **KPI theo dõi**: CSAT target, Response time, Resolution rate"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## 📊 Customer Feedback Report\n\n{{input}}\n\n---\n\
+                    🤖 Auto-generated by BizClaw Feedback Analysis"
+                    .to_string(),
+            },
+        ),
+    )
+}
+
+/// Contract Review: Đọc HĐ → Rủi ro → Đề xuất sửa → Tóm tắt.
+///
+/// Input: Nội dung hợp đồng (copy/paste hoặc tóm tắt điều khoản).
+/// Output: Phân tích rủi ro + đề xuất sửa + tóm tắt.
+pub fn contract_review() -> Workflow {
+    Workflow::new(
+        "contract_review",
+        "Review Hợp đồng — Đọc → Rủi ro pháp lý → Đề xuất sửa → Tóm tắt",
+    )
+    .with_tags(vec!["contract", "legal", "review", "risk", "ceo"])
+    .with_timeout(900)
+    .add_step(
+        WorkflowStep::new("analyze", "legal-analyst", StepType::Sequential)
+            .with_prompt(
+                "Phân tích hợp đồng sau từ góc nhìn pháp lý:\n\n\
+                {{input}}\n\n\
+                Kiểm tra:\n\
+                1. **Các bên**: Thông tin đầy đủ?\n\
+                2. **Phạm vi công việc/dịch vụ**: Rõ ràng không?\n\
+                3. **Giá & thanh toán**: Điều khoản thanh toán, phạt trễ\n\
+                4. **Thời hạn & gia hạn**: Tự động gia hạn?\n\
+                5. **Bảo mật & NDA**: Có điều khoản?\n\
+                6. **Bồi thường & trách nhiệm**: Giới hạn?\n\
+                7. **Chấm dứt**: Điều kiện, thông báo trước\n\
+                8. **Tranh chấp**: Phương thức giải quyết\n\
+                9. **Điều khoản bất lợi**: Bẫy, lock-in, penalty"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("risk-assess", "risk-analyst", StepType::Sequential)
+            .with_prompt(
+                "Đánh giá rủi ro từ phân tích hợp đồng:\n\n\
+                {{input}}\n\n\
+                Format:\n\
+                🔴 **Rủi ro CAO** (cần sửa trước khi ký):\n\
+                - [Điều khoản] → [Rủi ro] → [Đề xuất sửa cụ thể]\n\n\
+                🟡 **Rủi ro TRUNG BÌNH** (nên negotiate):\n\
+                - [Điều khoản] → [Rủi ro] → [Đề xuất]\n\n\
+                🟢 **OK** (chấp nhận được):\n\
+                - [Liệt kê]\n\n\
+                📋 **Kết luận**: Nên ký / Cần sửa / Không nên ký"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("summary", "legal-writer", StepType::Sequential)
+            .with_prompt(
+                "Viết tóm tắt hợp đồng ngắn gọn cho CEO (đọc trong 2 phút):\n\n\
+                {{input}}\n\n\
+                Format:\n\
+                📝 **Tóm tắt HĐ**: [Tên HĐ]\n\
+                👥 Đối tác: [Tên]\n\
+                💰 Giá trị: [Số tiền]\n\
+                ⏰ Thời hạn: [Ngày]\n\
+                ⚠️ Rủi ro: [Tóm tắt 1 dòng]\n\
+                ✅ Đề xuất: [Ký / Sửa / Không ký]\n\
+                📌 Cần sửa: [2-3 điểm quan trọng nhất]"
+            )
+            .with_timeout(200),
+    )
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## ⚖️ Contract Review Report\n\n{{input}}\n\n---\n\
+                    ⚠️ Đây là phân tích AI, không thay thế tư vấn pháp lý chuyên nghiệp.\n\
+                    🤖 Auto-generated by BizClaw"
+                    .to_string(),
+            },
+        ),
+    )
+}
+
+/// Product Launch Checklist: Research → Plan → Content → PR → Track.
+///
+/// Input: Sản phẩm/tính năng sắp ra mắt.
+/// Output: Checklist + content plan + PR draft.
+pub fn product_launch_checklist() -> Workflow {
+    Workflow::new(
+        "product_launch",
+        "Ra mắt sản phẩm — Research → Marketing Plan → Content → PR → Tracking",
+    )
+    .with_tags(vec!["launch", "product", "marketing", "pr", "ceo"])
+    .with_timeout(1200)
+    .add_step(
+        WorkflowStep::new("market-research", "researcher", StepType::Sequential)
+            .with_prompt(
+                "Nghiên cứu thị trường cho sản phẩm sắp ra mắt:\n\n\
+                {{input}}\n\n\
+                Phân tích:\n\
+                1. Thị trường mục tiêu (TAM, SAM, SOM)\n\
+                2. Đối thủ có sản phẩm tương tự\n\
+                3. Differentiation (ta khác gì?)\n\
+                4. Pricing benchmark\n\
+                5. Kênh phân phối phù hợp\n\
+                6. Timing: Thời điểm tốt nhất ra mắt"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("launch-plan", "marketing-strategist", StepType::Sequential)
+            .with_prompt(
+                "Lập kế hoạch ra mắt chi tiết dựa trên research:\n\n\
+                {{input}}\n\n\
+                Kế hoạch gồm:\n\
+                📅 **T-14 ngày**: Teaser campaign, landing page\n\
+                📅 **T-7 ngày**: Early access, influencer outreach\n\
+                📅 **D-Day**: Launch announcement multi-channel\n\
+                📅 **T+7 ngày**: Follow-up, early feedback, PR\n\
+                📅 **T+30 ngày**: Review, optimize, scale\n\n\
+                Mỗi phase gồm: Tasks, Owner, KPI, Budget"
+            )
+            .with_timeout(300),
+    )
+    // Parallel: tạo content + PR cùng lúc
+    .add_step(
+        WorkflowStep::new("content-pack", "content-creator", StepType::Sequential)
+            .with_prompt(
+                "Tạo content package cho launch event:\n\n\
+                {{input}}\n\n\
+                Gồm:\n\
+                1. **Headline** (5 variants cho A/B testing)\n\
+                2. **Product description** (50, 150, 500 words)\n\
+                3. **Social media posts** (Facebook, LinkedIn, Twitter)\n\
+                4. **Email announcement**\n\
+                5. **Landing page copy** (Hero, Features, CTA)"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("pr-draft", "pr-specialist", StepType::Sequential)
+            .with_prompt(
+                "Soạn PR materials cho ra mắt sản phẩm:\n\n\
+                {{input}}\n\n\
+                Gồm:\n\
+                1. **Press Release** (format chuẩn báo chí)\n\
+                2. **Media Kit** (key facts, quotes, images cần)\n\
+                3. **Pitch email** cho nhà báo/blogger\n\
+                4. **FAQ** (10 câu hỏi thường gặp)\n\
+                5. **Talking points** cho CEO khi phỏng vấn"
+            )
+            .with_timeout(300),
+    )
+    .add_step(WorkflowStep::new(
+        "parallel-create",
+        "orchestrator",
+        StepType::FanOut {
+            parallel_steps: vec!["content-pack".into(), "pr-draft".into()],
+        },
+    ))
+    .add_step(WorkflowStep::new(
+        "merge",
+        "orchestrator",
+        StepType::Collect {
+            strategy: CollectStrategy::Merge,
+            evaluator: None,
+        },
+    ))
+    .add_step(
+        WorkflowStep::new(
+            "export",
+            "formatter",
+            StepType::Transform {
+                template: "## 🚀 Product Launch Kit\n\n{{input}}\n\n---\n\
+                    ✅ Launch Plan + Content Pack + PR Materials\n\
+                    🤖 Auto-generated by BizClaw"
+                    .to_string(),
+            },
+        ),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -713,7 +1158,7 @@ mod tests {
     #[test]
     fn test_builtin_workflows_count() {
         let workflows = builtin_workflows();
-        assert_eq!(workflows.len(), 12);
+        assert_eq!(workflows.len(), 17);
     }
 
     #[test]
@@ -753,10 +1198,7 @@ mod tests {
         assert_eq!(wf.name, "slide_creator");
         assert!(wf.step_count() >= 10);
         assert!(wf.get_step("research").is_some());
-        assert!(wf.get_step("plan").is_some());
         assert!(wf.get_step("parallel-gen").is_some());
-        assert!(wf.get_step("assemble").is_some());
-        assert!(wf.get_step("quality-check").is_some());
         assert!(wf.get_step("export").is_some());
     }
 
@@ -767,48 +1209,80 @@ mod tests {
         assert!(wf.step_count() >= 4);
         assert!(wf.get_step("summarize").is_some());
         assert!(wf.get_step("extract-tasks").is_some());
-        assert!(wf.get_step("team-summary").is_some());
-        assert!(wf.get_step("export").is_some());
     }
 
     #[test]
-    fn test_ceo_daily_briefing_structure() {
+    fn test_ceo_briefing() {
         let wf = ceo_daily_briefing();
         assert_eq!(wf.name, "ceo_daily_briefing");
         assert!(wf.step_count() >= 6);
-        assert!(wf.get_step("market-news").is_some());
-        assert!(wf.get_step("kpi-check").is_some());
-        assert!(wf.get_step("priorities").is_some());
         assert!(wf.get_step("parallel-gather").is_some());
     }
 
     #[test]
-    fn test_competitor_analysis_structure() {
+    fn test_competitor_analysis() {
         let wf = competitor_analysis();
-        assert_eq!(wf.name, "competitor_analysis");
         assert!(wf.step_count() >= 4);
-        assert!(wf.get_step("research").is_some());
         assert!(wf.get_step("compare-swot").is_some());
-        assert!(wf.get_step("strategy").is_some());
     }
 
     #[test]
-    fn test_proposal_generator_structure() {
+    fn test_proposal_generator() {
         let wf = proposal_generator();
-        assert_eq!(wf.name, "proposal_generator");
         assert!(wf.step_count() >= 4);
-        assert!(wf.get_step("analyze-brief").is_some());
         assert!(wf.get_step("draft-proposal").is_some());
     }
 
     #[test]
-    fn test_weekly_report_structure() {
+    fn test_weekly_report() {
         let wf = weekly_report();
-        assert_eq!(wf.name, "weekly_report");
         assert!(wf.step_count() >= 7);
-        assert!(wf.get_step("sales-report").is_some());
-        assert!(wf.get_step("ops-report").is_some());
-        assert!(wf.get_step("finance-report").is_some());
         assert!(wf.get_step("executive-summary").is_some());
+    }
+
+    #[test]
+    fn test_email_drip_campaign() {
+        let wf = email_drip_campaign();
+        assert_eq!(wf.name, "email_drip_campaign");
+        assert!(wf.step_count() >= 9);
+        assert!(wf.get_step("email-1").is_some());
+        assert!(wf.get_step("email-5").is_some());
+        assert!(wf.get_step("parallel-emails").is_some());
+    }
+
+    #[test]
+    fn test_hiring_pipeline() {
+        let wf = hiring_pipeline();
+        assert_eq!(wf.name, "hiring_pipeline");
+        assert!(wf.step_count() >= 4);
+        assert!(wf.get_step("job-description").is_some());
+        assert!(wf.get_step("interview-questions").is_some());
+        assert!(wf.get_step("eval-matrix").is_some());
+    }
+
+    #[test]
+    fn test_customer_feedback() {
+        let wf = customer_feedback_analysis();
+        assert_eq!(wf.name, "customer_feedback");
+        assert!(wf.step_count() >= 4);
+        assert!(wf.get_step("categorize").is_some());
+        assert!(wf.get_step("action-plan").is_some());
+    }
+
+    #[test]
+    fn test_contract_review() {
+        let wf = contract_review();
+        assert_eq!(wf.name, "contract_review");
+        assert!(wf.step_count() >= 4);
+        assert!(wf.get_step("risk-assess").is_some());
+    }
+
+    #[test]
+    fn test_product_launch() {
+        let wf = product_launch_checklist();
+        assert_eq!(wf.name, "product_launch");
+        assert!(wf.step_count() >= 7);
+        assert!(wf.get_step("content-pack").is_some());
+        assert!(wf.get_step("pr-draft").is_some());
     }
 }

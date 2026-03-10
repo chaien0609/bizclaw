@@ -114,7 +114,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **🤖 Multi-Agent** | Tạo nhiều agent với vai trò khác nhau, gán vào kênh. Orchestrator quản lý N agents |
 | **📚 Knowledge RAG** | Hybrid search (FTS5 + Vector cosine similarity). Upload tài liệu → AI tự trả lời |
 | **🖐️ Autonomous Hands** | Agent chạy background 24/7 — Research, Analytics, Content, Monitoring, Security. Tự retry, tự report |
-| **🔄 Workflows** | Tạo workflow multi-step (Sequential, FanOut, Collect, Conditional, Loop, Transform). Chạy pipeline AI tự động |
+| **🔄 Workflows** | 17 workflow templates có sẵn. Multi-step pipeline: Sequential, FanOut, Collect, Conditional, Loop, Transform |
 | **⏰ Scheduler** | Cron, interval, one-time tasks. Agent tự chạy background, gửi kết quả qua Telegram/Zalo/Email/Webhook |
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
 | **🌐 Web Dashboard** | 20+ trang UI (VI/EN), WebSocket real-time, Full CRUD, Dark/Light mode |
@@ -184,7 +184,27 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
   Output: Bài viết hoàn chỉnh
 ```
 
-**6 Template mẫu có sẵn:** Content Pipeline, Expert Consensus, Quality Gate, Research Pipeline, Translation Pipeline, Code Review Pipeline.
+**17 Workflow Templates có sẵn:**
+
+| # | Category | Workflow | Flow |
+|---|----------|----------|------|
+| 1 | 📝 General | **Content Pipeline** | Draft → Review → Edit → Publish |
+| 2 | 📝 General | **Expert Consensus** | 3 experts FanOut → Vote/Merge |
+| 3 | 📝 General | **Quality Pipeline** | Generate → Loop Review → Approve |
+| 4 | 📝 General | **Research Pipeline** | Search → Analyze → Synthesize → Report |
+| 5 | 📝 General | **Translation** | Translate → Verify quality |
+| 6 | 📝 General | **Code Review** | Analyze → Security → Style → Summary |
+| 7 | 📊 Slides | **AI Slide Creator** | Research → Plan → FanOut 4 nhóm → Quality Loop → PPTX |
+| 8 | 🧑‍💼 CEO | **Meeting Recap** | Tóm tắt → Trích tasks → Phân công → Gửi team |
+| 9 | 🧑‍💼 CEO | **CEO Daily Briefing** | News + KPIs + Priorities (FanOut) → Morning briefing |
+| 10 | 🧑‍💼 CEO | **Competitor Analysis** | Research → SWOT → Chiến lược cạnh tranh |
+| 11 | 🧑‍💼 CEO | **Proposal Generator** | Brief KH → Soạn → Quality Loop → Send |
+| 12 | 🧑‍💼 CEO | **Weekly Report** | Sales+Ops+Finance (FanOut) → Executive Summary |
+| 13 | 📧 Biz | **Email Drip Campaign** | 5 emails nurturing (FanOut parallel) → Assemble |
+| 14 | 👥 Biz | **Hiring Pipeline** | JD → Interview Questions → Evaluation Matrix |
+| 15 | 💬 Biz | **Customer Feedback** | Thu thập → Phân loại → Insights → Action Plan |
+| 16 | ⚖️ Biz | **Contract Review** | Đọc HĐ → Rủi ro pháp lý → Đề xuất sửa → Tóm tắt CEO |
+| 17 | 🚀 Biz | **Product Launch** | Research → Plan → Content + PR (FanOut) → Launch Kit |
 
 ---
 
@@ -430,6 +450,7 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 | **Crates** | 19 |
 | **Lines of Code** | ~55,000+ |
 | **Tests** | 403 passing |
+| **Workflow Templates** | 17 |
 | **Binary Size** | bizclaw ~12MB |
 | **Dashboard Pages** | 20+ |
 | **Agent Templates** | 51 |
@@ -460,7 +481,7 @@ cd bizclaw && cargo build --release
 - **13 Tools** + MCP support for unlimited extensions
 - **Multi-Agent** — Create teams of agents with different roles, assign to channels
 - **Autonomous Hands** — Background agents that run 24/7: Research, Content, Analytics, Monitoring, Security
-- **Workflows** — Multi-step AI pipelines: Sequential, FanOut, Collect, Loop, Conditional, Transform
+- **Workflows** — 17 pre-built multi-step AI pipelines: Content, Research, Meeting Recap, CEO Briefing, Competitor Analysis, Proposal, Weekly Report, Slide Creator, Email Drip, Hiring, Feedback, Contract, Product Launch
 - **51 Agent Templates** — Pre-built for HR, Sales, Finance, Marketing, Legal, IT
 - **Knowledge RAG** — Hybrid FTS5 + Vector search. Upload docs, AI answers from your content
 - **Scheduler** — Cron, interval, one-time tasks with retry and multi-channel notification (Telegram, Zalo OA, Email)
