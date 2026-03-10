@@ -77,16 +77,7 @@ cd bizclaw && docker-compose -f docker-compose.standalone.yml up -d
 # → Dashboard tại http://localhost:3000
 ```
 
-### ☁️ Cách 4: Cloud Multi-Tenant (SaaS / Enterprise)
-
-```bash
-git clone https://github.com/nguyenduchoai/bizclaw.git
-cd bizclaw && docker-compose up -d
-# → Admin Platform tại http://localhost:3001
-# → Tạo tenant → Auto-provision gateway port
-```
-
-### 🌐 Cách 5: One-Click Install (VPS / Raspberry Pi / PaaS)
+### 🌐 Cách 4: One-Click Install (VPS / Raspberry Pi)
 
 ```bash
 curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
@@ -94,8 +85,6 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
   --admin-email admin@company.vn
 # → Dashboard tại https://bot.company.vn
 ```
-
-> 💡 **PaaS Mode**: Cloud platform có thể quản lý remote VPS nodes — chỉ cần IP + root password, hệ thống tự SSH cài đặt, monitor health, và SSO qua JWT token.
 
 > 💡 **Chỉ cần 1 file `config.toml`** — không cần PostgreSQL, không cần Nginx, không cần domain.
 > Database sử dụng SQLite embedded, mọi thứ chạy trong 1 binary duy nhất.
