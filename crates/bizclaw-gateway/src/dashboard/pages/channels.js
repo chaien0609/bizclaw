@@ -193,10 +193,15 @@ function ChannelsPage({ lang }) {
     setZaloLoading(false);
   };
 
-  const statusBadge = s => {
-    if (s === 'active') return html`<span class="badge badge-green" style="font-size:11px">● Hoạt động</span>`;
-    if (s === 'configured') return html`<span class="badge badge-blue" style="font-size:11px">○ Tắt</span>`;
-    return html`<span class="badge" style="font-size:11px;opacity:0.6">+ Thêm</span>`;
+  // ── Color map for channel types ──
+  const typeColors = {
+    cli: { bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)', glow: 'rgba(139,92,246,0.15)' },
+    telegram: { bg: 'rgba(0,136,204,0.1)', border: 'rgba(0,136,204,0.3)', glow: 'rgba(0,136,204,0.15)' },
+    zalo: { bg: 'rgba(0,106,255,0.1)', border: 'rgba(0,106,255,0.3)', glow: 'rgba(0,106,255,0.15)' },
+    discord: { bg: 'rgba(88,101,242,0.1)', border: 'rgba(88,101,242,0.3)', glow: 'rgba(88,101,242,0.15)' },
+    email: { bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.3)', glow: 'rgba(234,179,8,0.15)' },
+    whatsapp: { bg: 'rgba(37,211,102,0.1)', border: 'rgba(37,211,102,0.3)', glow: 'rgba(37,211,102,0.15)' },
+    webhook: { bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.3)', glow: 'rgba(249,115,22,0.15)' },
   };
 
   if (loading) return html`<div class="card" style="text-align:center;padding:40px;color:var(--text2)">Đang tải kênh liên lạc...</div>`;
@@ -205,13 +210,6 @@ function ChannelsPage({ lang }) {
   const activeCount = displayList.filter(i => i.status === 'active').length;
   const totalInstances = instances.length;
   const multiCapable = channelDefs.filter(d => d.multi);
-
-  // Group instances by type for the grid
-  const typeGroups = {};
-  for (const inst of displayList) {
-    if (!typeGroups[inst.channel_type]) typeGroups[inst.channel_type] = [];
-    typeGroups[inst.channel_type].push(inst);
-  }
 
   return html`<div>
     <div class="page-header"><div><h1>📡 ${t('channels.title', lang)}</h1><div class="sub">${t('channels.subtitle', lang)} — Hỗ trợ nhiều kênh cùng loại (multi-instance)</div></div>
@@ -331,42 +329,70 @@ function ChannelsPage({ lang }) {
       </div>
     `}
 
-    ${Object.entries(typeGroups).map(([type, items]) => {
-      const def = channelDefs.find(d => d.name === type);
-      const hasMultiple = items.length > 1 || (def?.multi && items.some(i => i.status !== 'available'));
-      return html`
-        <div class="card" style="margin-bottom:10px" key=${type}>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <h3 style="margin:0;display:flex;align-items:center;gap:6px">
-              <span style="font-size:20px">${def?.icon || '📡'}</span>
-              ${def?.label || type}
-              ${items.length > 1 ? html`<span style="font-size:12px;color:var(--text2);font-weight:normal">(${items.filter(i => i.status !== 'available').length} instance${items.filter(i => i.status !== 'available').length > 1 ? 's' : ''})</span>` : ''}
-            </h3>
-            ${def?.multi && html`
-              <button class="btn btn-outline btn-sm" onClick=${() => { setNewChType(type); addNewChannel(); }} style="font-size:11px">+ Thêm ${def.label}</button>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+      ${displayList.map(inst => {
+        const def = channelDefs.find(d => d.name === inst.channel_type);
+        const colors = typeColors[inst.channel_type] || typeColors.webhook;
+        const isAvailable = inst.status === 'available';
+        const isActive = inst.status === 'active';
+
+        return html`
+          <div key=${inst.id}
+            style="position:relative;padding:20px;border-radius:14px;
+              background:${isAvailable ? 'transparent' : colors.bg};
+              border:${isAvailable ? '2px dashed var(--border)' : `1px solid ${colors.border}`};
+              ${isActive ? `box-shadow:0 0 20px ${colors.glow},0 4px 15px rgba(0,0,0,0.1)` : ''};
+              transition:all 0.3s ease;cursor:pointer;
+              opacity:${isAvailable ? '0.6' : '1'}"
+            onClick=${() => { if (isAvailable && def?.multi) { setNewChType(inst.channel_type); addNewChannel(); } else if (def?.fields) openConfig(inst); }}
+            onMouseOver=${e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 0 25px ${colors.glow},0 8px 25px rgba(0,0,0,0.15)`; }}
+            onMouseOut=${e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isActive ? `0 0 20px ${colors.glow},0 4px 15px rgba(0,0,0,0.1)` : ''; }}>
+
+            ${isActive && html`<div style="position:absolute;top:12px;right:14px;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite"></div>`}
+            ${!isActive && !isAvailable && html`<div style="position:absolute;top:12px;right:14px;width:8px;height:8px;border-radius:50%;background:var(--text2);opacity:0.4"></div>`}
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="width:48px;height:48px;border-radius:12px;background:${colors.bg};border:1px solid ${colors.border};display:flex;align-items:center;justify-content:center;font-size:24px">
+                ${inst.icon || def?.icon || '📡'}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${inst.name || def?.label}</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px">${def?.label || inst.channel_type}</div>
+              </div>
+            </div>
+
+            ${!isAvailable && html`
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+                ${isActive ? html`<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.15);color:var(--green);font-weight:500">● Hoạt động</span>`
+                  : html`<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:var(--bg3);color:var(--text2)">○ Tắt</span>`}
+                ${inst.agent_name && html`<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(139,92,246,0.15);color:var(--accent)">🤖 ${inst.agent_name}</span>`}
+              </div>
+            `}
+
+            ${isAvailable ? html`
+              <div style="text-align:center;padding:8px 0;color:var(--text2);font-size:12px">
+                Click để thêm ${def?.label}
+              </div>
+            ` : html`
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px" onClick=${e => e.stopPropagation()}>
+                ${def?.fields && html`<button class="btn btn-outline btn-sm" onClick=${() => openConfig(inst)} style="font-size:11px;padding:4px 10px">⚙️ Cấu hình</button>`}
+                ${inst.id && inst.id !== 'cli' && html`<button class="btn btn-outline btn-sm" onClick=${() => setDeleteConfirm(inst)} style="font-size:11px;padding:4px 10px;color:var(--red);border-color:var(--red)">🗑️</button>`}
+              </div>
             `}
           </div>
-          <div style="display:grid;gap:8px">
-            ${items.map(inst => html`
-              <div key=${inst.id} style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border-radius:8px;border:1px solid ${inst.status === 'active' ? 'var(--green)' : inst.status === 'configured' ? 'var(--accent)' : 'var(--border)'}">
-                <div style="flex:1">
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <strong style="font-size:13px">${inst.name || def?.label}</strong>
-                    ${inst.agent_name ? html`<span style="font-size:11px;padding:2px 6px;background:var(--accent);color:#fff;border-radius:4px">🤖 ${inst.agent_name}</span>` : ''}
-                  </div>
-                  ${inst.id && !inst.id.startsWith('avail_') && html`<div style="font-size:11px;color:var(--text2);margin-top:2px">ID: ${inst.id}</div>`}
-                </div>
-                ${statusBadge(inst.status)}
-                ${def?.fields && html`<button class="btn btn-outline btn-sm" onClick=${() => openConfig(inst)} title="Cấu hình">⚙️</button>`}
-                ${inst.id && !inst.id.startsWith('avail_') && inst.id !== 'cli' && html`
-                  <button class="btn btn-outline btn-sm" onClick=${() => setDeleteConfirm(inst)} title="Xoá" style="color:var(--red);border-color:var(--red)">🗑️</button>
-                `}
-              </div>
-            `)}
-          </div>
-        </div>
-      `;
-    })}
+        `;
+      })}
+
+      ${''}
+      <div
+        style="padding:20px;border-radius:14px;border:2px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;opacity:0.5;transition:all 0.3s"
+        onClick=${() => setShowAddNew(true)}
+        onMouseOver=${e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+        onMouseOut=${e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.borderColor = ''; }}>
+        <div style="font-size:28px">➕</div>
+        <div style="font-size:13px;color:var(--text2)">Thêm kênh mới</div>
+      </div>
+    </div>
   </div>`;
 }
 
