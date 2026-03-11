@@ -112,10 +112,11 @@ impl BrainWorkspace {
 
             if !ctx_content.is_empty() {
                 // Limit to prevent context window overflow (max ~4KB from context tree)
-                let truncated = if ctx_content.len() > 4096 {
+                let truncated = if ctx_content.chars().count() > 4096 {
+                    let t: String = ctx_content.chars().take(4096).collect();
                     format!(
                         "{}...\n(truncated — {} total files)",
-                        &ctx_content[..4096],
+                        t,
                         files_loaded
                     )
                 } else {

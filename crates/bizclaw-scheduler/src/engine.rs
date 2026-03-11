@@ -16,6 +16,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
+use bizclaw_core::safe_truncate;
 use crate::cron;
 use crate::notify::{NotifyPriority, NotifyRouter};
 use crate::store::TaskStore;
@@ -315,11 +316,7 @@ pub async fn spawn_scheduler_with_agent<F, Fut, R, RFut>(
                     tracing::info!(
                         "🤖 Executing agent prompt for task '{}': {}",
                         task_name,
-                        if prompt.len() > 100 {
-                            &prompt[..100]
-                        } else {
-                            prompt
-                        }
+                        safe_truncate(prompt, 100)
                     );
                     agent_callback(prompt.clone()).await
                 }
@@ -349,12 +346,7 @@ pub async fn spawn_scheduler_with_agent<F, Fut, R, RFut>(
                 match execution_result {
                     Ok(ref response) => {
                         task.mark_success();
-                        let truncated = if response.len() > 200 {
-                            format!("{}...", &response[..200])
-                        } else {
-                            response.clone()
-                        };
-                        tracing::info!("✅ Task '{}' succeeded: {}", task_name, truncated);
+                        tracing::info!("✅ Task '{}' succeeded: {}", task_name, safe_truncate(response, 200));
                     }
                     Err(ref e) => {
                         let will_retry = task.schedule_retry(e);
@@ -368,7 +360,7 @@ pub async fn spawn_scheduler_with_agent<F, Fut, R, RFut>(
                                      Action: {}",
                                     task_name,
                                     task.fail_count,
-                                    if e.len() > 200 { &e[..200] } else { e },
+                                    if e.len() > 200 { safe_truncate(e, 200) } else { e },
                                     action_summary(action),
                                 ),
                                 "scheduler",
@@ -434,12 +426,12 @@ async fn execute_webhook(
 fn action_summary(action: &TaskAction) -> String {
     match action {
         TaskAction::AgentPrompt(p) => {
-            let truncated = if p.len() > 100 { &p[..100] } else { p };
+            let truncated = safe_truncate(p, 100);
             format!("Agent: {}", truncated)
         }
         TaskAction::Webhook { url, method, .. } => format!("Webhook: {} {}", method, url),
         TaskAction::Notify(m) => {
-            let truncated = if m.len() > 100 { &m[..100] } else { m };
+            let truncated = safe_truncate(m, 100);
             format!("Notify: {}", truncated)
         }
     }

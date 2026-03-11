@@ -1131,7 +1131,7 @@ impl GatewayDb {
         let id = uuid::Uuid::new_v4().to_string();
         // Generate a secure random key with bz_ prefix
         let raw_key = format!("bz_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
-        let key_prefix = &raw_key[..10];
+        let key_prefix: String = raw_key.chars().take(10).collect();
         // Hash the key for storage
         let key_hash = {
             use sha2::Digest;

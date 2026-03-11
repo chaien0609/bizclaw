@@ -106,7 +106,11 @@ impl OpenAiCompatibleProvider {
             models_path: registry.models_path.to_string(),
             auth_style: registry.auth_style,
             default_models,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .user_agent(format!("BizClaw/{}", env!("CARGO_PKG_VERSION")))
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
             no_tool_models: std::sync::Mutex::new(std::collections::HashSet::new()),
         })
     }
@@ -139,7 +143,11 @@ impl OpenAiCompatibleProvider {
             models_path: "/models".to_string(),
             auth_style,
             default_models: vec![],
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .user_agent(format!("BizClaw/{}", env!("CARGO_PKG_VERSION")))
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
             no_tool_models: std::sync::Mutex::new(std::collections::HashSet::new()),
         })
     }
@@ -346,9 +354,11 @@ impl Provider for OpenAiCompatibleProvider {
                 });
             }
 
+            // Sanitize error text: truncate and mask anything that looks like an API key
+            let sanitized = sanitize_error_text(&text, 300);
             return Err(BizClawError::Provider(format!(
                 "{} API error {}: {}",
-                self.name, status, text
+                self.name, status, sanitized
             )));
         }
 
@@ -362,7 +372,26 @@ impl Provider for OpenAiCompatibleProvider {
             .get(0)
             .ok_or_else(|| BizClawError::Provider("No choices in response".into()))?;
 
-        let content = choice["message"]["content"].as_str().map(String::from);
+        let mut content = choice["message"]["content"].as_str().map(String::from);
+
+        // ═══ Capture reasoning_content from local LLMs (DeepSeek-R1, Qwen3) ═══
+        // These models put their reasoning in a separate field and leave content empty.
+        // If content is empty/None but reasoning_content exists, synthesize a response.
+        let reasoning_content = choice["message"]["reasoning_content"]
+            .as_str()
+            .map(String::from);
+        if content.as_ref().map(|c| c.trim().is_empty()).unwrap_or(true) {
+            if let Some(ref reasoning) = reasoning_content {
+                if !reasoning.trim().is_empty() {
+                    tracing::info!(
+                        "🧠 Model returned empty content but has reasoning_content ({} chars) — synthesizing response",
+                        reasoning.len()
+                    );
+                    // Use the reasoning as the response content
+                    content = Some(reasoning.clone());
+                }
+            }
+        }
 
         // Parse tool_calls FIRST so we can inspect them in detection below
         let tool_calls: Vec<ToolCall> = if let Some(tc) = choice["message"]["tool_calls"].as_array()
@@ -577,4 +606,28 @@ impl Provider for OpenAiCompatibleProvider {
         let resp = self.client.get(&url).send().await;
         Ok(resp.is_ok())
     }
+}
+
+/// Sanitize error text for safe logging/display.
+/// Truncates to `max_len` chars and masks anything that looks like an API key.
+fn sanitize_error_text(text: &str, max_len: usize) -> String {
+    let truncated = if text.chars().count() > max_len {
+        let t: String = text.chars().take(max_len).collect();
+        format!("{}... [truncated, {} total chars]", t, text.chars().count())
+    } else {
+        text.to_string()
+    };
+    
+    // Mask anything that looks like an API key
+    let mut result = truncated;
+    for prefix in &["sk-", "key-", "api-", "Bearer "] {
+        while let Some(idx) = result.find(prefix) {
+            let start = idx + prefix.len();
+            let end = (start + 8).min(result.len());
+            let before = &result[..start];
+            let after = if end < result.len() { &result[end..] } else { "" };
+            result = format!("{}••••{}", before, after);
+        }
+    }
+    result
 }

@@ -282,10 +282,11 @@ impl Tool for ExecuteCodeTool {
                 );
 
                 if !stdout.is_empty() {
-                    let stdout_display = if stdout.len() > 5000 {
+                    let stdout_display = if stdout.chars().count() > 5000 {
+                        let t: String = stdout.chars().take(5000).collect();
                         format!(
                             "{}...\n[truncated, {} bytes total]",
-                            &stdout[..5000],
+                            t,
                             stdout.len()
                         )
                     } else {
@@ -294,8 +295,9 @@ impl Tool for ExecuteCodeTool {
                     result.push_str(&format!("\nSTDOUT:\n{}", stdout_display));
                 }
                 if !stderr.is_empty() {
-                    let stderr_display = if stderr.len() > 2000 {
-                        format!("{}...\n[truncated]", &stderr[..2000])
+                    let stderr_display = if stderr.chars().count() > 2000 {
+                        let t: String = stderr.chars().take(2000).collect();
+                        format!("{}...\n[truncated]", t)
                     } else {
                         stderr.to_string()
                     };

@@ -229,8 +229,9 @@ pub async fn spawn_proactive_loop<F, Fut, S, SFut>(
                     Ok(response) => {
                         tracing::info!(
                             "  🤖 Agent response: {}",
-                            if response.len() > 200 {
-                                format!("{}...", &response[..200])
+                            if response.chars().count() > 200 {
+                                let t: String = response.chars().take(200).collect();
+                                format!("{}...", t)
                             } else {
                                 response
                             }

@@ -7,6 +7,8 @@ pub mod config;
 pub mod error;
 pub mod traits;
 pub mod types;
+pub mod utils;
 
 pub use config::BizClawConfig;
 pub use error::{BizClawError, Result};
+pub use utils::safe_truncate;

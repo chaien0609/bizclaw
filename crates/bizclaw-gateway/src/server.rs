@@ -966,8 +966,9 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                         agent: task_name.clone(),
                         detail: format!(
                             "{}",
-                            if response.len() > 150 {
-                                format!("{}...", &response[..150])
+                            if response.chars().count() > 150 {
+                                let t: String = response.chars().take(150).collect();
+                                format!("{}...", t)
                             } else {
                                 response.clone()
                             }
@@ -987,8 +988,9 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                                 let msg = format!(
                                     "🤚 *Hand Report: {}*\n\n{}\n\n_— BizClaw Autonomous Hands_",
                                     task_name,
-                                    if response.len() > 3500 {
-                                        format!("{}...", &response[..3500])
+                                    if response.chars().count() > 3500 {
+                                        let t: String = response.chars().take(3500).collect();
+                                        format!("{}...", t)
                                     } else {
                                         response.clone()
                                     }

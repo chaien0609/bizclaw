@@ -139,8 +139,9 @@ fn search_file(path: &Path, re: &regex::Regex, matches: &mut Vec<String>, max: u
             break;
         }
         if re.is_match(line) {
-            let display_line = if line.len() > 200 {
-                format!("{}...", &line[..200])
+            let display_line = if line.chars().count() > 200 {
+                let t: String = line.chars().take(200).collect();
+                format!("{}...", t)
             } else {
                 line.to_string()
             };

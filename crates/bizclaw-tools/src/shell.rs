@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use bizclaw_core::error::Result;
+use bizclaw_core::safe_truncate;
 use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
 
@@ -62,7 +63,7 @@ impl ShellTool {
         if command.chars().any(|c| DANGEROUS_CHARS.contains(&c)) {
             return Some(format!(
                 "🔒 Blocked: command contains shell metacharacters (;|&`$(){{}}><). Use simple commands without chaining. Attempted: '{}'",
-                &command[..command.len().min(60)]
+                safe_truncate(command, 60)
             ));
         }
 
@@ -72,7 +73,7 @@ impl ShellTool {
                 return Some(format!(
                     "🔒 Blocked: command matches dangerous pattern '{}'. Command: '{}'",
                     pattern,
-                    &command[..command.len().min(60)]
+                    safe_truncate(command, 60)
                 ));
             }
         }
@@ -83,7 +84,7 @@ impl ShellTool {
                 return Some(format!(
                     "🔒 Blocked: command accesses forbidden path '{}'. Command: '{}'",
                     path,
-                    &command[..command.len().min(60)]
+                    safe_truncate(command, 60)
                 ));
             }
         }
@@ -178,7 +179,7 @@ impl Tool for ShellTool {
         tracing::info!(
             "🖥️ ShellTool: executing (timeout={}s): {}",
             timeout_secs,
-            &command[..command.len().min(100)]
+            safe_truncate(command, 100)
         );
 
         let output = tokio::time::timeout(
@@ -187,10 +188,10 @@ impl Tool for ShellTool {
         )
         .await
         .map_err(|_| {
-            tracing::warn!("⏰ ShellTool: command timed out after {}s: {}", timeout_secs, &command[..command.len().min(100)]);
+            tracing::warn!("⏰ ShellTool: command timed out after {}s: {}", timeout_secs, safe_truncate(command, 100));
             bizclaw_core::error::BizClawError::Timeout(
                 format!("Command timed out after {}s ({}min). Command: {}. Increase timeout with timeout_secs parameter or BIZCLAW_SHELL_TIMEOUT_SECS env var.",
-                    timeout_secs, timeout_secs / 60, &command[..command.len().min(80)])
+                    timeout_secs, timeout_secs / 60, safe_truncate(command, 80))
             )
         })?
         .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
@@ -199,8 +200,9 @@ impl Tool for ShellTool {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         // Truncate large outputs (1MB max)
-        let stdout = if stdout.len() > 1_048_576 {
-            format!("{}...\n[truncated at 1MB]", &stdout[..1_048_576])
+        let stdout = if stdout.chars().count() > 1_000_000 {
+            let t: String = stdout.chars().take(1_000_000).collect();
+            format!("{}...\n[truncated at 1M chars]", t)
         } else {
             stdout
         };

@@ -149,8 +149,9 @@ impl Ticket {
         let id = format!("TK-{}", &uuid::Uuid::new_v4().to_string()[..8]);
 
         // Auto-generate subject from first message
-        let subject = if first_message.len() > 80 {
-            format!("{}...", &first_message[..77])
+        let subject = if first_message.chars().count() > 80 {
+            let t: String = first_message.chars().take(77).collect();
+            format!("{}...", t)
         } else {
             first_message.to_string()
         };

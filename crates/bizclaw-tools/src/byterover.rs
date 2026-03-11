@@ -315,8 +315,9 @@ fn search_context_tree(dir: &std::path::Path, query: &str) -> Result<String> {
                                 .to_string();
 
                             // Extract first ~500 chars
-                            let snippet = if content.len() > 500 {
-                                format!("{}...", &content[..500])
+                            let snippet = if content.chars().count() > 500 {
+                                let t: String = content.chars().take(500).collect();
+                                format!("{}...", t)
                             } else {
                                 content.clone()
                             };

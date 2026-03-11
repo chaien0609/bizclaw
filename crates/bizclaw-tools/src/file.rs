@@ -174,13 +174,14 @@ impl Tool for FileTool {
                 } else {
                     // If file is very large, show line count
                     let line_count = content.lines().count();
-                    if content.len() > 10000 {
+                    if content.chars().count() > 10000 {
+                        let t: String = content.chars().take(10000).collect();
                         format!(
-                            "File: {} ({} lines, {} bytes):\n{}...\n[truncated at 10000 bytes]",
+                            "File: {} ({} lines, {} bytes):\n{}...\n[truncated at 10000 chars]",
                             path,
                             line_count,
                             content.len(),
-                            &content[..10000]
+                            t
                         )
                     } else {
                         content

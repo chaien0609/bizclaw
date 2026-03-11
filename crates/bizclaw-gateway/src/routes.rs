@@ -5151,7 +5151,7 @@ pub async fn create_api_key(
 
     match state.db.create_api_key(name, scopes, expires_days) {
         Ok((id, raw_key)) => {
-            tracing::info!("🔑 API key created: {} ({})", name, &raw_key[..10]);
+            tracing::info!("🔑 API key created: {} ({})", name, raw_key.chars().take(10).collect::<String>());
             // Track usage
             let _ = state.db.track_usage("api_keys_created", 1.0);
             Json(serde_json::json!({

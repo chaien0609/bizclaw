@@ -87,8 +87,9 @@ impl Tool for MemorySearchTool {
                         query
                     );
                     for (i, r) in results.iter().enumerate() {
-                        let content = if r.entry.content.len() > 500 {
-                            format!("{}...", &r.entry.content[..500])
+                        let content = if r.entry.content.chars().count() > 500 {
+                            let t: String = r.entry.content.chars().take(500).collect();
+                            format!("{}...", t)
                         } else {
                             r.entry.content.clone()
                         };

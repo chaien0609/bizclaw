@@ -478,8 +478,9 @@ impl Agent {
                 if let Some(tool) = self.tools.get(&tc.function.name) {
                     match tool.execute(&tc.function.arguments).await {
                         Ok(r) => {
-                            let out = if r.output.len() > 4000 {
-                                format!("{}...[truncated]", &r.output[..4000])
+                            let out = if r.output.chars().count() > 4000 {
+                                let truncated: String = r.output.chars().take(4000).collect();
+                                format!("{}...[truncated]", truncated)
                             } else {
                                 r.output
                             };
@@ -794,8 +795,9 @@ impl Agent {
                 bizclaw_core::types::Role::Tool => "Tool",
             };
             // Take first 100 chars of each message
-            let content = if msg.content.len() > 100 {
-                format!("{}...", &msg.content[..100])
+            let content = if msg.content.chars().count() > 100 {
+                let truncated: String = msg.content.chars().take(100).collect();
+                format!("{}...", truncated)
             } else {
                 msg.content.clone()
             };
