@@ -284,11 +284,11 @@ impl Tool for BrowserTool {
                     })?;
 
                 let body = resp.text().await.unwrap_or_default();
-                // Truncate if too large
                 let display = if body.len() > 6000 {
+                    let truncated: String = body.chars().take(6000).collect();
                     format!(
                         "{}...\n[truncated, {} bytes total]",
-                        &body[..6000],
+                        truncated,
                         body.len()
                     )
                 } else {
@@ -379,7 +379,8 @@ impl Tool for BrowserTool {
 
                 let body = resp.text().await.unwrap_or_default();
                 let display = if body.len() > 6000 {
-                    format!("{}...\n[truncated, {} bytes]", &body[..6000], body.len())
+                    let truncated: String = body.chars().take(6000).collect();
+                    format!("{}...\n[truncated, {} bytes]", truncated, body.len())
                 } else {
                     body
                 };

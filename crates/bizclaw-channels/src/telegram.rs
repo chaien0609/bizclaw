@@ -84,13 +84,16 @@ impl TelegramChannel {
         Ok(updates)
     }
 
-    /// Send a text message.
-    pub async fn send_message(&self, chat_id: i64, text: &str) -> Result<()> {
-        let body = serde_json::json!({
+    /// Send a text message, optionally with a thread/topic ID.
+    pub async fn send_message(&self, chat_id: i64, message_thread_id: Option<i64>, text: &str) -> Result<()> {
+        let mut body = serde_json::json!({
             "chat_id": chat_id,
             "text": text,
             "parse_mode": "Markdown",
         });
+        if let Some(mtid) = message_thread_id {
+            body["message_thread_id"] = serde_json::json!(mtid);
+        }
 
         let response = self
             .client
@@ -115,11 +118,14 @@ impl TelegramChannel {
     }
 
     /// Send typing indicator.
-    pub async fn send_typing(&self, chat_id: i64) -> Result<()> {
-        let body = serde_json::json!({
+    pub async fn send_typing(&self, chat_id: i64, message_thread_id: Option<i64>) -> Result<()> {
+        let mut body = serde_json::json!({
             "chat_id": chat_id,
             "action": "typing",
         });
+        if let Some(mtid) = message_thread_id {
+            body["message_thread_id"] = serde_json::json!(mtid);
+        }
         let _ = self
             .client
             .post(self.api_url("sendChatAction"))
@@ -225,16 +231,29 @@ impl Channel for TelegramChannel {
     }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        let chat_id: i64 = message
-            .thread_id
+        let parts: Vec<&str> = message.thread_id.split(':').collect();
+        let chat_id: i64 = parts[0]
             .parse()
             .map_err(|_| BizClawError::Channel("Invalid chat_id".into()))?;
-        self.send_message(chat_id, &message.content).await
+        
+        let message_thread_id = if parts.len() > 1 {
+            parts[1].parse::<i64>().ok()
+        } else {
+            None
+        };
+
+        self.send_message(chat_id, message_thread_id, &message.content).await
     }
 
     async fn send_typing(&self, thread_id: &str) -> Result<()> {
-        if let Ok(chat_id) = thread_id.parse::<i64>() {
-            self.send_typing(chat_id).await?;
+        let parts: Vec<&str> = thread_id.split(':').collect();
+        if let Ok(chat_id) = parts[0].parse::<i64>() {
+            let message_thread_id = if parts.len() > 1 {
+                parts[1].parse::<i64>().ok()
+            } else {
+                None
+            };
+            self.send_typing(chat_id, message_thread_id).await?;
         }
         Ok(())
     }
@@ -264,6 +283,7 @@ pub struct TelegramUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelegramMessage {
     pub message_id: i64,
+    pub message_thread_id: Option<i64>,
     pub from: Option<TelegramUser>,
     pub chat: TelegramChat,
     pub text: Option<String>,
@@ -300,9 +320,15 @@ impl TelegramUpdate {
             return None;
         }
 
+        let thread_id = if let Some(mtid) = msg.message_thread_id {
+            format!("{}:{}", msg.chat.id, mtid)
+        } else {
+            msg.chat.id.to_string()
+        };
+
         Some(IncomingMessage {
             channel: "telegram".into(),
-            thread_id: msg.chat.id.to_string(),
+            thread_id,
             sender_id: from.id.to_string(),
             sender_name: Some(format!(
                 "{}{}",

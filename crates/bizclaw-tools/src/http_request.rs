@@ -189,9 +189,10 @@ impl Tool for HttpRequestTool {
 
         // Truncate very large responses
         let body_display = if body_text.len() > 8000 {
+            let truncated: String = body_text.chars().take(8000).collect();
             format!(
                 "{}...\n\n[truncated, {} total bytes]",
-                &body_text[..8000],
+                truncated,
                 body_text.len()
             )
         } else {

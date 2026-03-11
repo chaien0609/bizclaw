@@ -163,13 +163,19 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                                 };
 
                                 match result {
-                                    Ok(response) => {
+                                    Ok(mut response) => {
+                                        response = strip_think_tags(&response);
                                         if stream {
                                             let chunk_size = 8;
                                             let chars: Vec<char> = response.chars().collect();
                                             let mut idx: u64 = 0;
+                                            let mut think_filter = StreamingThinkFilter::new();
                                             for chunk in chars.chunks(chunk_size) {
-                                                let text: String = chunk.iter().collect();
+                                                let raw_text: String = chunk.iter().collect();
+                                                let text = think_filter.process(&raw_text);
+                                                if text.is_empty() {
+                                                    continue;
+                                                }
                                                 let _ = send_json(
                                                     &mut socket,
                                                     &serde_json::json!({
@@ -289,14 +295,20 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                             };
 
                             match result {
-                                Some(Ok(response)) => {
+                                Some(Ok(mut response)) => {
+                                    response = strip_think_tags(&response);
                                     if stream {
                                         // Emit as rapid chunks for streaming UX
                                         let chunk_size = 8; // chars per chunk
                                         let chars: Vec<char> = response.chars().collect();
                                         let mut idx: u64 = 0;
+                                        let mut think_filter = StreamingThinkFilter::new();
                                         for chunk in chars.chunks(chunk_size) {
-                                            let text: String = chunk.iter().collect();
+                                            let raw_text: String = chunk.iter().collect();
+                                            let text = think_filter.process(&raw_text);
+                                            if text.is_empty() {
+                                                continue;
+                                            }
                                             let _ = send_json(
                                                 &mut socket,
                                                 &serde_json::json!({
@@ -572,6 +584,8 @@ async fn chat_ollama(
         let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
         let text = String::from_utf8_lossy(&bytes);
 
+        let mut think_filter = StreamingThinkFilter::new();
+
         for line in text.lines() {
             if line.trim().is_empty() {
                 continue;
@@ -581,12 +595,16 @@ async fn chat_ollama(
                 && !content.is_empty()
             {
                 full_content.push_str(content);
+                let filtered = think_filter.process(content);
+                if filtered.is_empty() {
+                    continue;
+                }
                 let _ = send_json(
                     socket,
                     &serde_json::json!({
                         "type": "chat_chunk",
                         "request_id": request_id,
-                        "content": content,
+                        "content": filtered,
                         "index": chunk_idx,
                     }),
                 )
@@ -623,10 +641,12 @@ async fn chat_ollama(
             .map_err(|e| format!("Ollama connection failed: {e}"))?;
 
         let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        let content = json["message"]["content"]
+        let mut content = json["message"]["content"]
             .as_str()
             .unwrap_or("")
             .to_string();
+            
+        content = strip_think_tags(&content);
 
         let _ = send_json(
             socket,
@@ -709,6 +729,8 @@ async fn chat_openai(
         let mut full_content = String::new();
         let mut chunk_idx: u64 = 0;
 
+        let mut think_filter = StreamingThinkFilter::new();
+
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() || line == "data: [DONE]" {
@@ -720,12 +742,16 @@ async fn chat_openai(
                 && !content.is_empty()
             {
                 full_content.push_str(content);
+                let filtered = think_filter.process(content);
+                if filtered.is_empty() {
+                    continue;
+                }
                 let _ = send_json(
                     socket,
                     &serde_json::json!({
                         "type": "chat_chunk",
                         "request_id": request_id,
-                        "content": content,
+                        "content": filtered,
                         "index": chunk_idx,
                     }),
                 )
@@ -767,10 +793,12 @@ async fn chat_openai(
         }
 
         let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        let content = json["choices"][0]["message"]["content"]
+        let mut content = json["choices"][0]["message"]["content"]
             .as_str()
             .unwrap_or("")
             .to_string();
+            
+        content = strip_think_tags(&content);
 
         let _ = send_json(
             socket,
@@ -807,4 +835,86 @@ async fn send_error(socket: &mut WebSocket, message: &str) {
         "message": message,
     });
     let _ = send_json(socket, &error).await;
+}
+
+/// Strip <think>...</think> tags generated by reasoner models (DeepSeek-R1, Qwen3)
+/// If the resulting text is empty, returns a placeholder.
+fn strip_think_tags(text: &str) -> String {
+    let mut output = String::new();
+    let mut current = text;
+    
+    while let Some(start_idx) = current.find("<think>") {
+        output.push_str(&current[..start_idx]);
+        if let Some(end_idx) = current[start_idx..].find("</think>") {
+            current = &current[start_idx + end_idx + 8..];
+        } else {
+            // Unclosed think tag
+            current = "";
+            break;
+        }
+    }
+    output.push_str(current);
+    
+    let trimmed = output.trim();
+    if trimmed.is_empty() && !text.trim().is_empty() {
+        return "*(Đã suy nghĩ xong, nhưng không có thông điệp trả lời)*".to_string();
+    }
+    trimmed.to_string()
+}
+
+/// A stateful filter to strip <think>...</think> tags during a streaming response.
+struct StreamingThinkFilter {
+    in_think: bool,
+    buffer: String,
+}
+
+impl StreamingThinkFilter {
+    fn new() -> Self {
+        Self {
+            in_think: false,
+            buffer: String::new(),
+        }
+    }
+
+    fn process(&mut self, chunk: &str) -> String {
+        self.buffer.push_str(chunk);
+        
+        let mut result = String::new();
+        loop {
+            if !self.in_think {
+                if let Some(idx) = self.buffer.find("<think>") {
+                    result.push_str(&self.buffer[..idx]);
+                    self.in_think = true;
+                    self.buffer = self.buffer[idx + 7..].to_string();
+                } else if self.buffer.contains("<t") || self.buffer.contains("<th") || self.buffer.contains("<thi") || self.buffer.contains("<thin") || self.buffer.contains("<think") {
+                    // Possible start of <think>, hold in buffer
+                    break;
+                } else {
+                    result.push_str(&self.buffer);
+                    self.buffer.clear();
+                    break;
+                }
+            } else {
+                if let Some(idx) = self.buffer.find("</think>") {
+                    self.in_think = false;
+                    self.buffer = self.buffer[idx + 8..].to_string();
+                } else {
+                    // Inside think block, discard safely
+                    // Keep the end if it looks like the start of </think>
+                    let mut safe_idx = self.buffer.len();
+                    if self.buffer.ends_with("<") { safe_idx -= 1; }
+                    else if self.buffer.ends_with("</") { safe_idx -= 2; }
+                    else if self.buffer.ends_with("</t") { safe_idx -= 3; }
+                    else if self.buffer.ends_with("</th") { safe_idx -= 4; }
+                    else if self.buffer.ends_with("</thi") { safe_idx -= 5; }
+                    else if self.buffer.ends_with("</thin") { safe_idx -= 6; }
+                    else if self.buffer.ends_with("</think") { safe_idx -= 7; }
+                    
+                    self.buffer = self.buffer[safe_idx..].to_string();
+                    break;
+                }
+            }
+        }
+        result
+    }
 }

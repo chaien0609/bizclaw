@@ -50,10 +50,11 @@ fn mask_secret(s: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
-    if s.len() <= 4 {
+    if s.chars().count() <= 4 {
         return "••••".to_string();
     }
-    format!("{}••••", &s[..4])
+    let prefix: String = s.chars().take(4).collect();
+    format!("{}••••", prefix)
 }
 
 /// Enrich agent config with per-provider API key and base_url from the gateway DB.
@@ -1144,12 +1145,15 @@ pub async fn spawn_telegram_polling(
                         Ok(updates) => {
                             for update in updates {
                                 if let Some(msg) = update.to_incoming() {
-                                    let chat_id: i64 = msg.thread_id.parse().unwrap_or(0);
+                                    let parts: Vec<&str> = msg.thread_id.split(':').collect();
+                                    let chat_id: i64 = parts[0].parse().unwrap_or(0);
+                                    let message_thread_id: Option<i64> = parts.get(1).and_then(|id| id.parse().ok());
+                                    
                                     let sender = msg.sender_name.clone().unwrap_or_default();
                                     let text = msg.content.clone();
 
                                     tracing::info!("[telegram] {} → agent '{}': {}", sender, agent_name_clone, safe_truncate(&text, 100));
-                                    let _ = channel.send_typing(chat_id).await;
+                                    let _ = channel.send_typing(chat_id, message_thread_id).await;
 
                                     // Route to agent
                                     let response = {
@@ -1160,7 +1164,7 @@ pub async fn spawn_telegram_polling(
                                         }
                                     };
 
-                                    if let Err(e) = channel.send_message(chat_id, &response).await {
+                                    if let Err(e) = channel.send_message(chat_id, message_thread_id, &response).await {
                                         tracing::error!("[telegram] Reply failed: {e}");
                                     }
                                 }
@@ -3090,14 +3094,17 @@ pub async fn connect_telegram(
                         Ok(updates) => {
                             for update in updates {
                                 if let Some(msg) = update.to_incoming() {
-                                    let chat_id: i64 = msg.thread_id.parse().unwrap_or(0);
+                                    let parts: Vec<&str> = msg.thread_id.split(':').collect();
+                                    let chat_id: i64 = parts[0].parse().unwrap_or(0);
+                                    let message_thread_id: Option<i64> = parts.get(1).and_then(|id| id.parse().ok());
+                                    
                                     let sender = msg.sender_name.clone().unwrap_or_default();
                                     let text = msg.content.clone();
 
                                     tracing::info!("[telegram] {} → agent '{}': {}", sender, agent_name_clone, safe_truncate(&text, 100));
 
                                     // Send typing indicator
-                                    let _ = channel.send_typing(chat_id).await;
+                                    let _ = channel.send_typing(chat_id, message_thread_id).await;
 
                                     // Route to agent
                                     let response = {
@@ -3109,7 +3116,7 @@ pub async fn connect_telegram(
                                     };
 
                                     // Reply via Telegram
-                                    if let Err(e) = channel.send_message(chat_id, &response).await {
+                                    if let Err(e) = channel.send_message(chat_id, message_thread_id, &response).await {
                                         tracing::error!("[telegram] Reply failed: {e}");
                                     }
                                 }
