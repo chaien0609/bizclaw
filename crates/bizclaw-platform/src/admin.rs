@@ -298,7 +298,7 @@ impl AdminServer {
 
     /// Start the admin server.
     pub async fn start(state: Arc<AdminState>, port: u16) -> bizclaw_core::error::Result<()> {
-        let app = Self::router(state);
+        let app = Self::router(state.clone());
         // Bind to 127.0.0.1 — only accessible via reverse proxy (Nginx)
         // Set BIZCLAW_BIND_ALL=1 to allow direct external access (dev only)
         let bind_addr = if std::env::var("BIZCLAW_BIND_ALL").unwrap_or_default() == "1" {
@@ -312,6 +312,34 @@ impl AdminServer {
         let listener = tokio::net::TcpListener::bind(addr)
             .await
             .map_err(|e| bizclaw_core::error::BizClawError::Gateway(format!("Bind error: {e}")))?;
+
+        let watchdog_state = state.clone();
+        tokio::spawn(async move {
+            tracing::info!("🐕 Watchdog auto-healing started.");
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+                let db = watchdog_state.db.lock().await;
+                if let Ok(tenants) = db.list_tenants() {
+                    let mut mgr = watchdog_state.manager.lock().await;
+                    for t in tenants {
+                        if t.status == "running" && !mgr.is_running(&t.id) {
+                            tracing::warn!("🐕 Watchdog: Tenant {} marked 'running' but process missing. Restarting...", t.slug);
+                            // Avoid dropping lock while restarting
+                            match mgr.start_tenant(&t, &watchdog_state.bizclaw_bin, &*db) {
+                                Ok(pid) => {
+                                    db.update_tenant_status(&t.id, "running", Some(pid)).ok();
+                                    tracing::info!("🐕 Watchdog: Restarted tenant {} (pid={})", t.slug, pid);
+                                }
+                                Err(e) => {
+                                    db.update_tenant_status(&t.id, "error", None).ok();
+                                    tracing::error!("🐕 Watchdog: Failed to restart tenant {}: {}", t.slug, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         axum::serve(listener, app).await.map_err(|e| {
             bizclaw_core::error::BizClawError::Gateway(format!("Server error: {e}"))
@@ -738,21 +766,17 @@ async fn create_tenant(
         clean_slug
     };
 
-    let port = {
-        let db = state.db.lock().await;
-        let used_ports = db.used_ports().unwrap_or_default();
-        let mut port = state.base_port;
-        while used_ports.contains(&port) {
-            port += 1;
-        }
-        port
-    };
-
-    // Owner is the logged-in user (unless super-admin creates for someone else)
     let owner_id = claims.sub.clone();
 
-    // IMPORTANT: separate lock scopes to avoid Mutex deadlock
-    let create_result = state.db.lock().await.create_tenant(
+    // Lock DB for both getting port and creating tenant atomically
+    let db = state.db.lock().await;
+    let used_ports = db.used_ports().unwrap_or_default();
+    let mut port = state.base_port;
+    while used_ports.contains(&port) {
+        port += 1;
+    }
+
+    let create_result = db.create_tenant(
         &req.name,
         &slug,
         port,
@@ -761,13 +785,10 @@ async fn create_tenant(
         req.plan.as_deref().unwrap_or("free"),
         Some(&owner_id),
     );
+
     match create_result {
         Ok(tenant) => {
-            state
-                .db
-                .lock()
-                .await
-                .log_event(
+            db.log_event(
                     "tenant_created",
                     "admin",
                     &tenant.id,
@@ -778,16 +799,9 @@ async fn create_tenant(
             // Auto-start the tenant so subdomain works immediately
             {
                 let mut mgr = state.manager.lock().await;
-                let db = state.db.lock().await;
-                match mgr.start_tenant(&tenant, &state.bizclaw_bin, &db) {
+                match mgr.start_tenant(&tenant, &state.bizclaw_bin, &*db) {
                     Ok(pid) => {
-                        drop(db);
-                        state
-                            .db
-                            .lock()
-                            .await
-                            .update_tenant_status(&tenant.id, "running", Some(pid))
-                            .ok();
+                        db.update_tenant_status(&tenant.id, "running", Some(pid)).ok();
                         tracing::info!(
                             "auto-start: tenant '{}' started on port {} (pid={})",
                             slug,
@@ -796,18 +810,15 @@ async fn create_tenant(
                         );
                     }
                     Err(e) => {
-                        drop(db);
-                        state
-                            .db
-                            .lock()
-                            .await
-                            .update_tenant_status(&tenant.id, "error", None)
-                            .ok();
-                        tracing::warn!("auto-start: failed to start tenant '{}': {e}", slug);
+                        db.update_tenant_status(&tenant.id, "error", None).ok();
+                        tracing::error!(
+                            "auto-start failed for tenant '{}': {}",
+                            slug,
+                            e
+                        );
                     }
                 }
             }
-
             sync_nginx_routing(&state).await;
             Json(serde_json::json!({"ok": true, "tenant": tenant}))
         }

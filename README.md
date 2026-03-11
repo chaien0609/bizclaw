@@ -366,25 +366,31 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 
 ---
 
-## 🏗️ Kiến trúc
+## 🏗️ Kiến trúc Cấp Doanh Nghiệp (Enterprise Architecture)
+
+BizClaw Platform được thiết kế với kiến trúc **Process-level Isolation (Cách ly cấp tiến trình)**, đảm bảo dữ liệu của mỗi tenant (doanh nghiệp) được biệt lập hoàn toàn ở level hệ điều hành (OS), loại bỏ hoàn toàn rủi ro rò rỉ dữ liệu chéo thường thấy ở các hệ thống Chatbot SaaS thông thường.
+
+<p align="center">
+  <img src="docs/bizclaw_architecture.png" alt="BizClaw Enterprise Architecture Diagram" width="800">
+</p>
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │          bizclaw (Gateway + Dashboard)                │
 │  ┌────────────────────────────────────────────┐       │
 │  │ Axum HTTP + WebSocket + Dashboard UI (20+) │       │
-│  │ SQLite gateway.db (embedded)               │       │
+│  │ PostgreSQL + Dynamic Nginx Routing         │       │
 │  └────────────────────┬───────────────────────┘       │
 │    ┌──────────────────┼──────────────────┐            │
 │    ▼                  ▼                  ▼            │
 │  bizclaw-agent      bizclaw-agent      bizclaw-agent  │
-│  (Orchestrator manages N agents)                      │
+│  (Single-Tenant Process Isolation)                    │
 │    ┌──────────────────┼──────────────────┐            │
 │    ▼                  ▼                  ▼            │
-│  16 Providers      10 Channels      13 Tools + MCP    │
+│  18 Providers      10 Channels      13 Tools + MCP    │
 │    ▼                  ▼                  ▼            │
 │  Memory            Hands             Knowledge        │
-│  (SQLite+FTS5)    (Autonomous)      (RAG+Vector)      │
+│  (ReMe System)    (Autonomous)      (RAG+Vector)      │
 │    ▼                  ▼                  ▼            │
 │  Workflows         Scheduler         Security         │
 │  (6 step types)   (Cron+Retry)      (AES+Sandbox)     │

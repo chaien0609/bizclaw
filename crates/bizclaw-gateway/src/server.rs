@@ -1079,6 +1079,39 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
 
     tracing::info!("🌐 Gateway server listening on http://{}", addr);
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+
+    tracing::info!("🛑 Gateway server gracefully shutdown.");
     Ok(())
+}
+
+/// Listen for CTRL+C (SIGINT) and SIGTERM (from `kill`) to trigger graceful shutdown.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install CTRL+C signal handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("🔄 Received CTRL+C, starting graceful shutdown...");
+        },
+        _ = terminate => {
+            tracing::info!("🔄 Received SIGTERM (kill), starting graceful shutdown...");
+        },
+    }
 }
