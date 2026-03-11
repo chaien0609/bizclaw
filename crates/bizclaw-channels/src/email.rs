@@ -86,14 +86,10 @@ pub struct ParsedEmail {
 }
 
 /// Type alias for the TLS IMAP stream used throughout this module.
-type ImapTlsStream =
-    async_imap::Client<tokio_native_tls::TlsStream<tokio::net::TcpStream>>;
+type ImapTlsStream = async_imap::Client<tokio_native_tls::TlsStream<tokio::net::TcpStream>>;
 
 /// Create TLS-wrapped IMAP connection (async, tokio-native).
-async fn connect_imap_tls(
-    host: &str,
-    port: u16,
-) -> Result<ImapTlsStream> {
+async fn connect_imap_tls(host: &str, port: u16) -> Result<ImapTlsStream> {
     let tcp = tokio::net::TcpStream::connect((host, port))
         .await
         .map_err(|e| BizClawError::Channel(format!("TCP connect: {e}")))?;
@@ -359,19 +355,17 @@ async fn imap_fetch_async(
             max_uid = uid;
         }
         if let Some(body) = msg.body()
-            && let Some(parsed) = parse_email_bytes(body, uid) {
-                emails.push(parsed);
-            }
+            && let Some(parsed) = parse_email_bytes(body, uid)
+        {
+            emails.push(parsed);
+        }
     }
 
     // Drop the messages stream before using session again
     drop(messages);
 
     if mark_as_read && !new_uids.is_empty() {
-        session
-            .uid_store(&uid_set, "+FLAGS (\\Seen)")
-            .await
-            .ok();
+        session.uid_store(&uid_set, "+FLAGS (\\Seen)").await.ok();
     }
 
     *last_seen_uid.lock().unwrap() = max_uid;

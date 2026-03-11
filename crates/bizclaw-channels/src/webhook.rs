@@ -32,7 +32,8 @@ pub struct WebhookChannel {
     connected: bool,
     /// Sender for injecting inbound messages.
     inbound_tx: mpsc::UnboundedSender<IncomingMessage>,
-    #[allow(dead_code)] // Part of channel architecture — consumed when listen() is fully implemented
+    #[allow(dead_code)]
+    // Part of channel architecture — consumed when listen() is fully implemented
     inbound_rx: Option<mpsc::UnboundedReceiver<IncomingMessage>>,
 }
 

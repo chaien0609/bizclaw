@@ -1,19 +1,18 @@
 //! HTTP server implementation using Axum.
 
-
+use axum::extract::DefaultBodyLimit;
 use axum::{
     Json, Router,
     extract::State,
     routing::{get, post, put},
 };
 use bizclaw_core::config::{BizClawConfig, GatewayConfig};
+use bizclaw_db::DataStore;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-use axum::extract::DefaultBodyLimit;
-use bizclaw_db::DataStore;
 
 /// Shared state for the gateway server.
 #[derive(Clone)]
@@ -49,7 +48,8 @@ pub struct AppState {
     /// Activity log — keeps recent events for REST polling.
     pub activity_log: Arc<Mutex<Vec<super::openai_compat::ActivityEvent>>>,
     /// Rate limiter — IP → (count, window_start) for public endpoints.
-    pub rate_limiter: Arc<tokio::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>>,
+    pub rate_limiter:
+        Arc<tokio::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>>,
 }
 
 /// State for an active Telegram bot connected to an agent.
@@ -119,7 +119,8 @@ async fn require_auth(
 
     // ── Check JWT token from multiple sources ──
     // Source 1: Authorization: Bearer <JWT>
-    let auth_header = req.headers()
+    let auth_header = req
+        .headers()
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -130,7 +131,8 @@ async fn require_auth(
     }
 
     // Source 2: Cookie: bizclaw_token=<JWT>
-    let cookie_header = req.headers()
+    let cookie_header = req
+        .headers()
         .get("Cookie")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -158,7 +160,10 @@ async fn require_auth(
     {
         let failures = state.auth_failures.lock().await;
         if failures.0 >= 5 && failures.1.elapsed().as_secs() < 60 {
-            tracing::warn!("[security] Auth locked out — {} failed attempts", failures.0);
+            tracing::warn!(
+                "[security] Auth locked out — {} failed attempts",
+                failures.0
+            );
             return axum::response::Response::builder()
                 .status(axum::http::StatusCode::TOO_MANY_REQUESTS)
                 .header("Content-Type", "application/json")
@@ -175,7 +180,10 @@ async fn require_auth(
         let mut failures = state.auth_failures.lock().await;
         failures.0 += 1;
         failures.1 = std::time::Instant::now();
-        tracing::warn!("[security] Failed auth attempt #{} from request", failures.0);
+        tracing::warn!(
+            "[security] Failed auth attempt #{} from request",
+            failures.0
+        );
     }
     axum::response::Response::builder()
         .status(axum::http::StatusCode::UNAUTHORIZED)
@@ -193,7 +201,8 @@ async fn rate_limit(
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    let ip = req.headers()
+    let ip = req
+        .headers()
         .get("x-real-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
         .and_then(|v| v.to_str().ok())
@@ -206,7 +215,9 @@ async fn rate_limit(
 
     {
         let mut limiter = state.rate_limiter.lock().await;
-        let entry = limiter.entry(ip.clone()).or_insert_with(|| (0, std::time::Instant::now()));
+        let entry = limiter
+            .entry(ip.clone())
+            .or_insert_with(|| (0, std::time::Instant::now()));
 
         // Reset window after 60 seconds
         if entry.1.elapsed().as_secs() >= 60 {
@@ -259,9 +270,13 @@ async fn verify_auth(
 fn validate_jwt(token: &str, secret: &str) -> std::result::Result<JwtClaims, String> {
     use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
     let validation = Validation::new(Algorithm::HS256);
-    decode::<JwtClaims>(token, &DecodingKey::from_secret(secret.as_bytes()), &validation)
-        .map(|data| data.claims)
-        .map_err(|e| format!("JWT validation failed: {e}"))
+    decode::<JwtClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )
+    .map(|data| data.claims)
+    .map_err(|e| format!("JWT validation failed: {e}"))
 }
 
 /// Public wrapper for JWT validation — used by openai_compat module.
@@ -293,10 +308,16 @@ async fn security_headers(
     let headers = response.headers_mut();
     headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
     headers.insert("X-Frame-Options", "DENY".parse().unwrap());
-    headers.insert("Referrer-Policy", "strict-origin-when-cross-origin".parse().unwrap());
+    headers.insert(
+        "Referrer-Policy",
+        "strict-origin-when-cross-origin".parse().unwrap(),
+    );
     headers.insert("X-XSS-Protection", "1; mode=block".parse().unwrap());
     // HSTS — tell browsers to always use HTTPS (1 year)
-    headers.insert("Strict-Transport-Security", "max-age=31536000; includeSubDomains".parse().unwrap());
+    headers.insert(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains".parse().unwrap(),
+    );
     // CSP — restrict script/style sources (includes esm.sh for Preact CDN)
     headers.insert("Content-Security-Policy",
         "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://esm.sh; frame-ancestors 'none'"
@@ -310,7 +331,6 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
-
     // Protected routes — require valid JWT token
     let protected = Router::new()
         .route("/api/v1/info", get(super::routes::system_info))
@@ -319,18 +339,36 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/api/v1/config/full", get(super::routes::get_full_config))
         .route("/api/v1/providers", get(super::routes::list_providers))
         .route("/api/v1/providers", post(super::routes::create_provider))
-        .route("/api/v1/providers/{name}", put(super::routes::update_provider))
-        .route("/api/v1/providers/{name}", axum::routing::delete(super::routes::delete_provider))
-        .route("/api/v1/providers/{name}/models", get(super::routes::fetch_provider_models))
+        .route(
+            "/api/v1/providers/{name}",
+            put(super::routes::update_provider),
+        )
+        .route(
+            "/api/v1/providers/{name}",
+            axum::routing::delete(super::routes::delete_provider),
+        )
+        .route(
+            "/api/v1/providers/{name}/models",
+            get(super::routes::fetch_provider_models),
+        )
         .route("/api/v1/channels", get(super::routes::list_channels))
         .route(
             "/api/v1/channels/update",
             post(super::routes::update_channel),
         )
         // Multi-instance channel management
-        .route("/api/v1/channel-instances", get(super::routes::list_channel_instances))
-        .route("/api/v1/channel-instances", post(super::routes::save_channel_instance))
-        .route("/api/v1/channel-instances/{id}", axum::routing::delete(super::routes::delete_channel_instance))
+        .route(
+            "/api/v1/channel-instances",
+            get(super::routes::list_channel_instances),
+        )
+        .route(
+            "/api/v1/channel-instances",
+            post(super::routes::save_channel_instance),
+        )
+        .route(
+            "/api/v1/channel-instances/{id}",
+            axum::routing::delete(super::routes::delete_channel_instance),
+        )
         .route("/api/v1/ollama/models", get(super::routes::ollama_models))
         .route(
             "/api/v1/brain/models",
@@ -397,14 +435,38 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
             post(super::routes::agent_broadcast),
         )
         // Orchestration API
-        .route("/api/v1/orchestration/delegate", post(super::routes::orch_delegate))
-        .route("/api/v1/orchestration/handoff", post(super::routes::orch_handoff))
-        .route("/api/v1/orchestration/handoff/{session_id}", axum::routing::delete(super::routes::orch_clear_handoff))
-        .route("/api/v1/orchestration/evaluate", post(super::routes::orch_evaluate))
-        .route("/api/v1/orchestration/links", get(super::routes::orch_list_links).post(super::routes::orch_create_link))
-        .route("/api/v1/orchestration/links/{id}", axum::routing::delete(super::routes::orch_delete_link))
-        .route("/api/v1/orchestration/delegations", get(super::routes::orch_list_delegations))
-        .route("/api/v1/orchestration/traces", get(super::routes::orch_list_traces))
+        .route(
+            "/api/v1/orchestration/delegate",
+            post(super::routes::orch_delegate),
+        )
+        .route(
+            "/api/v1/orchestration/handoff",
+            post(super::routes::orch_handoff),
+        )
+        .route(
+            "/api/v1/orchestration/handoff/{session_id}",
+            axum::routing::delete(super::routes::orch_clear_handoff),
+        )
+        .route(
+            "/api/v1/orchestration/evaluate",
+            post(super::routes::orch_evaluate),
+        )
+        .route(
+            "/api/v1/orchestration/links",
+            get(super::routes::orch_list_links).post(super::routes::orch_create_link),
+        )
+        .route(
+            "/api/v1/orchestration/links/{id}",
+            axum::routing::delete(super::routes::orch_delete_link),
+        )
+        .route(
+            "/api/v1/orchestration/delegations",
+            get(super::routes::orch_list_delegations),
+        )
+        .route(
+            "/api/v1/orchestration/traces",
+            get(super::routes::orch_list_traces),
+        )
         // Gallery API
         .route("/api/v1/gallery", get(super::routes::gallery_list))
         .route("/api/v1/gallery", post(super::routes::gallery_create))
@@ -465,43 +527,91 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/api/v1/health", get(super::routes::system_health_check))
         // LLM Traces & Cost API
         .route("/api/v1/traces", get(super::openai_compat::list_traces))
-        .route("/api/v1/traces", axum::routing::delete(super::routes::clear_traces))
-        .route("/api/v1/traces/cost", get(super::openai_compat::cost_breakdown))
+        .route(
+            "/api/v1/traces",
+            axum::routing::delete(super::routes::clear_traces),
+        )
+        .route(
+            "/api/v1/traces/cost",
+            get(super::openai_compat::cost_breakdown),
+        )
         .route("/api/v1/activity", get(super::openai_compat::list_activity))
-        .route("/api/v1/activity", axum::routing::delete(super::routes::clear_activity))
+        .route(
+            "/api/v1/activity",
+            axum::routing::delete(super::routes::clear_activity),
+        )
         // Tools CRUD API
         .route("/api/v1/tools", get(super::routes::tools_list))
         .route("/api/v1/tools", post(super::routes::tools_create))
-        .route("/api/v1/tools/{name}/toggle", post(super::routes::tools_toggle))
-        .route("/api/v1/tools/{name}", axum::routing::delete(super::routes::tools_delete))
+        .route(
+            "/api/v1/tools/{name}/toggle",
+            post(super::routes::tools_toggle),
+        )
+        .route(
+            "/api/v1/tools/{name}",
+            axum::routing::delete(super::routes::tools_delete),
+        )
         // MCP Servers API (stub — returns configured MCP servers)
         .route("/api/v1/mcp/servers", get(super::routes::mcp_list_servers))
         // Workflows + Skills + TTS API
         .route("/api/v1/workflows", get(super::routes::workflows_list))
         .route("/api/v1/workflows", post(super::routes::workflows_create))
         .route("/api/v1/workflows/run", post(super::routes::workflows_run))
-        .route("/api/v1/workflows/{id}", axum::routing::put(super::routes::workflows_update))
-        .route("/api/v1/workflows/{id}", axum::routing::delete(super::routes::workflows_delete))
-        .route("/api/v1/workflow-rules", get(super::routes::workflow_rules_list))
-        .route("/api/v1/workflow-rules", post(super::routes::workflow_rules_add))
-        .route("/api/v1/workflow-rules/{id}", axum::routing::delete(super::routes::workflow_rules_delete))
+        .route(
+            "/api/v1/workflows/{id}",
+            axum::routing::put(super::routes::workflows_update),
+        )
+        .route(
+            "/api/v1/workflows/{id}",
+            axum::routing::delete(super::routes::workflows_delete),
+        )
+        .route(
+            "/api/v1/workflow-rules",
+            get(super::routes::workflow_rules_list),
+        )
+        .route(
+            "/api/v1/workflow-rules",
+            post(super::routes::workflow_rules_add),
+        )
+        .route(
+            "/api/v1/workflow-rules/{id}",
+            axum::routing::delete(super::routes::workflow_rules_delete),
+        )
         .route("/api/v1/skills", get(super::routes::skills_list))
         .route("/api/v1/skills", post(super::routes::skills_create))
-        .route("/api/v1/skills/install", post(super::routes::skills_install))
-        .route("/api/v1/skills/uninstall", post(super::routes::skills_uninstall))
+        .route(
+            "/api/v1/skills/install",
+            post(super::routes::skills_install),
+        )
+        .route(
+            "/api/v1/skills/uninstall",
+            post(super::routes::skills_uninstall),
+        )
         .route("/api/v1/skills/{id}", get(super::routes::skills_detail))
-        .route("/api/v1/skills/{id}", axum::routing::put(super::routes::skills_update))
-        .route("/api/v1/skills/{id}", axum::routing::delete(super::routes::skills_delete))
+        .route(
+            "/api/v1/skills/{id}",
+            axum::routing::put(super::routes::skills_update),
+        )
+        .route(
+            "/api/v1/skills/{id}",
+            axum::routing::delete(super::routes::skills_delete),
+        )
         .route("/api/v1/tts/voices", get(super::routes::tts_voices))
         // PaaS: API Key Management
         .route("/api/v1/api-keys", get(super::routes::list_api_keys))
         .route("/api/v1/api-keys", post(super::routes::create_api_key))
-        .route("/api/v1/api-keys/{id}", axum::routing::delete(super::routes::revoke_api_key))
+        .route(
+            "/api/v1/api-keys/{id}",
+            axum::routing::delete(super::routes::revoke_api_key),
+        )
         // PaaS: Usage & Quotas
         .route("/api/v1/usage", get(super::routes::get_usage))
         .route("/api/v1/usage/daily", get(super::routes::get_usage_daily))
         .route("/api/v1/usage/limits", get(super::routes::get_plan_limits))
-        .route("/api/v1/usage/limits", axum::routing::put(super::routes::update_plan_limits))
+        .route(
+            "/api/v1/usage/limits",
+            axum::routing::put(super::routes::update_plan_limits),
+        )
         // PaaS: System Metrics
         .route("/api/v1/metrics", get(super::routes::get_system_metrics))
         .route("/ws", get(super::ws::ws_handler))
@@ -516,18 +626,27 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/legacy", get(legacy_dashboard_page))
         .route("/static/dashboard/{*path}", get(dashboard_static))
         .route("/health", get(super::routes::health_check))
-        .route("/api/v1/verify-pairing", post(verify_auth))  // kept same path for backward compat
+        .route("/api/v1/verify-pairing", post(verify_auth)) // kept same path for backward compat
         // WhatsApp webhook — must be public for Meta verification
         .route(
             "/api/v1/webhook/whatsapp",
             get(super::routes::whatsapp_webhook_verify).post(super::routes::whatsapp_webhook),
         )
         // Webhook inbound — public, auth via HMAC signature in header
-        .route("/api/v1/webhook/inbound", post(super::routes::webhook_inbound))
+        .route(
+            "/api/v1/webhook/inbound",
+            post(super::routes::webhook_inbound),
+        )
         // Xiaozhi webhook — public, auth via header signature
-        .route("/api/v1/xiaozhi/webhook", post(super::routes::xiaozhi_webhook))
+        .route(
+            "/api/v1/xiaozhi/webhook",
+            post(super::routes::xiaozhi_webhook),
+        )
         // OpenAI-Compatible API — public with own auth (Bearer token)
-        .route("/v1/chat/completions", post(super::openai_compat::chat_completions))
+        .route(
+            "/v1/chat/completions",
+            post(super::openai_compat::chat_completions),
+        )
         .route("/v1/models", get(super::openai_compat::list_models))
         // Rate limiting for all public routes
         .route_layer(axum::middleware::from_fn_with_state(
@@ -588,24 +707,23 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     };
 
     // Create the Agent engine (sync — no MCP to avoid startup hang)
-    let agent: Option<bizclaw_agent::Agent> =
-        match bizclaw_agent::Agent::new(full_config.clone()) {
-            Ok(a) => {
-                let tool_count = a.tool_count();
-                tracing::info!(
-                    "✅ Agent engine initialized (provider={}, tools={})",
-                    a.provider_name(),
-                    tool_count
-                );
-                Some(a)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "⚠️ Agent engine not available: {e} — falling back to direct provider calls"
-                );
-                None
-            }
-        };
+    let agent: Option<bizclaw_agent::Agent> = match bizclaw_agent::Agent::new(full_config.clone()) {
+        Ok(a) => {
+            let tool_count = a.tool_count();
+            tracing::info!(
+                "✅ Agent engine initialized (provider={}, tools={})",
+                a.provider_name(),
+                tool_count
+            );
+            Some(a)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "⚠️ Agent engine not available: {e} — falling back to direct provider calls"
+            );
+            None
+        }
+    };
 
     // Initialize Scheduler engine
     let sched_dir = config_path
@@ -661,27 +779,32 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         .parent()
         .unwrap_or(std::path::Path::new("."))
         .join("orchestration.db");
-    let orch_store: Arc<dyn bizclaw_db::DataStore> = match bizclaw_db::SqliteStore::open(&orch_db_path) {
-        Ok(store) => {
-            let store = Arc::new(store);
-            // Run migrations
-            if let Err(e) = store.migrate().await {
-                tracing::error!("❌ Orchestration DB migration failed: {e}");
-            } else {
-                tracing::info!("🔗 Orchestration DB initialized: {}", orch_db_path.display());
+    let orch_store: Arc<dyn bizclaw_db::DataStore> =
+        match bizclaw_db::SqliteStore::open(&orch_db_path) {
+            Ok(store) => {
+                let store = Arc::new(store);
+                // Run migrations
+                if let Err(e) = store.migrate().await {
+                    tracing::error!("❌ Orchestration DB migration failed: {e}");
+                } else {
+                    tracing::info!(
+                        "🔗 Orchestration DB initialized: {}",
+                        orch_db_path.display()
+                    );
+                }
+                store
             }
-            store
-        }
-        Err(e) => {
-            tracing::warn!("⚠️ Orchestration DB failed, using in-memory: {e}");
-            let store = Arc::new(bizclaw_db::SqliteStore::in_memory().unwrap());
-            let _ = store.migrate().await;
-            store
-        }
-    };
+            Err(e) => {
+                tracing::warn!("⚠️ Orchestration DB failed, using in-memory: {e}");
+                let store = Arc::new(bizclaw_db::SqliteStore::in_memory().unwrap());
+                let _ = store.migrate().await;
+                store
+            }
+        };
 
     // Initialize Multi-Agent Orchestrator with DataStore
-    let mut orchestrator = bizclaw_agent::orchestrator::Orchestrator::with_store(orch_store.clone());
+    let mut orchestrator =
+        bizclaw_agent::orchestrator::Orchestrator::with_store(orch_store.clone());
 
     // Migrate from legacy agents.json if it exists AND DB is empty
     let agents_path = config_path
@@ -695,7 +818,10 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
             bizclaw_agent::orchestrator::Orchestrator::load_agents_metadata(&agents_path);
         if !saved_agents.is_empty() {
             match gateway_db.migrate_from_agents_json(&saved_agents) {
-                Ok(count) => tracing::info!("📦 Migrated {} agent(s) from agents.json → gateway.db", count),
+                Ok(count) => tracing::info!(
+                    "📦 Migrated {} agent(s) from agents.json → gateway.db",
+                    count
+                ),
                 Err(e) => tracing::warn!("⚠️ Migration from agents.json failed: {e}"),
             }
         }
@@ -722,7 +848,11 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                     ("analyst-bot", "coder-bot"),
                 ];
                 for (src, tgt) in &demo_links {
-                    let link = bizclaw_core::types::AgentLink::new(src, tgt, bizclaw_core::types::LinkDirection::Outbound);
+                    let link = bizclaw_core::types::AgentLink::new(
+                        src,
+                        tgt,
+                        bizclaw_core::types::LinkDirection::Outbound,
+                    );
                     let _ = orch_store.create_link(&link).await;
                 }
                 tracing::info!("  🔗 Seeded {} orchestration links", demo_links.len());
@@ -778,8 +908,17 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
             // Use sync Agent::new() for fast startup — MCP tools loaded lazily on first chat
             match bizclaw_agent::Agent::new(agent_cfg) {
                 Ok(agent) => {
-                    orchestrator.add_agent(&agent_rec.name, &agent_rec.role, &agent_rec.description, agent);
-                    tracing::info!("  ✅ Agent '{}' restored ({})", agent_rec.name, agent_rec.role);
+                    orchestrator.add_agent(
+                        &agent_rec.name,
+                        &agent_rec.role,
+                        &agent_rec.description,
+                        agent,
+                    );
+                    tracing::info!(
+                        "  ✅ Agent '{}' restored ({})",
+                        agent_rec.name,
+                        agent_rec.role
+                    );
                 }
                 Err(e) => {
                     tracing::warn!("  ⚠️ Failed to restore agent '{}': {}", agent_rec.name, e);
@@ -795,7 +934,8 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     // Wrap orchestrator in Arc for shared access
     let orchestrator_arc = Arc::new(tokio::sync::Mutex::new(orchestrator));
 
-    let (activity_tx, _rx) = tokio::sync::broadcast::channel::<super::openai_compat::ActivityEvent>(256);
+    let (activity_tx, _rx) =
+        tokio::sync::broadcast::channel::<super::openai_compat::ActivityEvent>(256);
 
     // Spawn scheduler background loop with Agent integration (check every 30 seconds)
     let sched_clone = scheduler.clone();
@@ -902,8 +1042,6 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         .await;
     });
 
-
-
     let state = AppState {
         gateway_config: config.clone(),
         full_config: Arc::new(Mutex::new(full_config)),
@@ -944,4 +1082,3 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
     Ok(())
 }
-

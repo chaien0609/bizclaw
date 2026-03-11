@@ -267,9 +267,10 @@ impl ZaloBotClient {
 
         // Track last update ID for polling
         if let Some(last) = updates.last()
-            && let Some(id) = last.update_id {
-                self.last_update_id = Some(id);
-            }
+            && let Some(id) = last.update_id
+        {
+            self.last_update_id = Some(id);
+        }
 
         Ok(updates)
     }

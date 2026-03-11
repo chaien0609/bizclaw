@@ -39,7 +39,9 @@ pub fn generate_agents_md(agents: &[AgentInfo]) -> String {
         }
 
         md.push_str("## How to Delegate\n");
-        md.push_str("Use the `delegate` tool: `{\"to\": \"agent-name\", \"task\": \"description\"}`\n\n");
+        md.push_str(
+            "Use the `delegate` tool: `{\"to\": \"agent-name\", \"task\": \"description\"}`\n\n",
+        );
         md.push_str("## How to Handoff\n");
         md.push_str("Use the `handoff` tool: `{\"to\": \"agent-name\", \"reason\": \"why\"}`\n");
     } else {
@@ -57,7 +59,10 @@ pub fn generate_agents_md(agents: &[AgentInfo]) -> String {
             } else {
                 &agent.model
             };
-            md.push_str(&format!("| {} | {} | {} |\n", agent.name, agent.role, model));
+            md.push_str(&format!(
+                "| {} | {} | {} |\n",
+                agent.name, agent.role, model
+            ));
         }
     }
 
@@ -96,11 +101,7 @@ pub fn search_agents<'a>(agents: &'a [AgentInfo], query: &str) -> Vec<&'a AgentI
                 .filter(|kw| searchable.contains(**kw))
                 .count() as u32;
 
-            if score > 0 {
-                Some((a, score))
-            } else {
-                None
-            }
+            if score > 0 { Some((a, score)) } else { None }
         })
         .collect();
 

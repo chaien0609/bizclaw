@@ -11,10 +11,11 @@
 pub fn extract_text_from_pdf(data: &[u8]) -> Result<String, String> {
     use pdf_oxide::PdfDocument;
 
-    let mut doc = PdfDocument::open_from_bytes(data.to_vec())
-        .map_err(|e| format!("PDF parse error: {e}"))?;
+    let mut doc =
+        PdfDocument::open_from_bytes(data.to_vec()).map_err(|e| format!("PDF parse error: {e}"))?;
 
-    let page_count = doc.page_count()
+    let page_count = doc
+        .page_count()
         .map_err(|e| format!("PDF page count error: {e}"))?;
     tracing::debug!("📄 PDF opened: {} pages", page_count);
 
@@ -37,7 +38,11 @@ pub fn extract_text_from_pdf(data: &[u8]) -> Result<String, String> {
         return Err("PDF contains no extractable text (may be scanned/image-only)".into());
     }
 
-    tracing::info!("📄 PDF extracted: {} pages → {} chars", page_count, text.len());
+    tracing::info!(
+        "📄 PDF extracted: {} pages → {} chars",
+        page_count,
+        text.len()
+    );
     Ok(text)
 }
 
@@ -48,15 +53,19 @@ pub fn extract_text_from_pdf(data: &[u8]) -> Result<String, String> {
 /// Falls back to plain text extraction if markdown conversion fails.
 pub fn extract_markdown_from_pdf(data: &[u8]) -> Result<String, String> {
     use pdf_oxide::PdfDocument;
-    use pdf_oxide::pipeline::{TextPipeline, TextPipelineConfig};
     use pdf_oxide::pipeline::converters::{MarkdownOutputConverter, OutputConverter};
+    use pdf_oxide::pipeline::{TextPipeline, TextPipelineConfig};
 
-    let mut doc = PdfDocument::open_from_bytes(data.to_vec())
-        .map_err(|e| format!("PDF parse error: {e}"))?;
+    let mut doc =
+        PdfDocument::open_from_bytes(data.to_vec()).map_err(|e| format!("PDF parse error: {e}"))?;
 
-    let page_count = doc.page_count()
+    let page_count = doc
+        .page_count()
         .map_err(|e| format!("PDF page count error: {e}"))?;
-    tracing::debug!("📄 PDF opened for markdown extraction: {} pages", page_count);
+    tracing::debug!(
+        "📄 PDF opened for markdown extraction: {} pages",
+        page_count
+    );
 
     let config = TextPipelineConfig::default();
     let pipeline = TextPipeline::with_config(config.clone());
@@ -68,11 +77,14 @@ pub fn extract_markdown_from_pdf(data: &[u8]) -> Result<String, String> {
     for page_idx in 0..page_count {
         // Try markdown extraction via pipeline
         let page_result: Result<String, String> = (|| -> Result<String, String> {
-            let spans = doc.extract_spans(page_idx)
+            let spans = doc
+                .extract_spans(page_idx)
                 .map_err(|e| format!("spans: {e}"))?;
-            let ordered = pipeline.process(spans, Default::default())
+            let ordered = pipeline
+                .process(spans, Default::default())
                 .map_err(|e| format!("pipeline: {e}"))?;
-            let md: String = converter.convert(&ordered, &config)
+            let md: String = converter
+                .convert(&ordered, &config)
                 .map_err(|e| format!("convert: {e}"))?;
             Ok(md)
         })();
@@ -104,12 +116,15 @@ pub fn extract_markdown_from_pdf(data: &[u8]) -> Result<String, String> {
     if fallback_count > 0 {
         tracing::info!(
             "📄 PDF markdown: {} pages ({} plain text fallback) → {} chars",
-            page_count, fallback_count, markdown.len()
+            page_count,
+            fallback_count,
+            markdown.len()
         );
     } else {
         tracing::info!(
             "📄 PDF markdown: {} pages → {} chars",
-            page_count, markdown.len()
+            page_count,
+            markdown.len()
         );
     }
 
@@ -120,9 +135,10 @@ pub fn extract_markdown_from_pdf(data: &[u8]) -> Result<String, String> {
 pub fn pdf_info(data: &[u8]) -> Result<PdfInfo, String> {
     use pdf_oxide::PdfDocument;
 
-    let mut doc = PdfDocument::open_from_bytes(data.to_vec())
-        .map_err(|e| format!("PDF parse error: {e}"))?;
-    let page_count = doc.page_count()
+    let mut doc =
+        PdfDocument::open_from_bytes(data.to_vec()).map_err(|e| format!("PDF parse error: {e}"))?;
+    let page_count = doc
+        .page_count()
         .map_err(|e| format!("PDF page count error: {e}"))?;
 
     Ok(PdfInfo { page_count })

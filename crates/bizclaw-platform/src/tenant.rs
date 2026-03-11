@@ -51,28 +51,34 @@ impl TenantManager {
             tracing::info!("📥 Importing config_sync.json for tenant {}", tenant.slug);
             if let Ok(content) = std::fs::read_to_string(&sync_path)
                 && let Ok(sync_data) = serde_json::from_str::<serde_json::Value>(&content)
-                    && let Some(obj) = sync_data.as_object() {
-                        for (key, value) in obj {
-                            if key == "updated_at" { continue; }
-                            let val_str = match value {
-                                serde_json::Value::String(s) => s.clone(),
-                                serde_json::Value::Bool(b) => b.to_string(),
-                                serde_json::Value::Number(n) => n.to_string(),
-                                other => other.to_string(),
-                            };
-                            if !val_str.is_empty() {
-                                db.set_config(&tenant.id, key, &val_str).ok();
-                            }
-                        }
-                        tracing::info!("  ✅ Imported {} config keys into DB", obj.len() - 1);
+                && let Some(obj) = sync_data.as_object()
+            {
+                for (key, value) in obj {
+                    if key == "updated_at" {
+                        continue;
                     }
+                    let val_str = match value {
+                        serde_json::Value::String(s) => s.clone(),
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        other => other.to_string(),
+                    };
+                    if !val_str.is_empty() {
+                        db.set_config(&tenant.id, key, &val_str).ok();
+                    }
+                }
+                tracing::info!("  ✅ Imported {} config keys into DB", obj.len() - 1);
+            }
             // Remove sync file after import
             std::fs::remove_file(&sync_path).ok();
         }
 
         // ── Generate config.toml from DB (always regenerate) ──────────
         let config_path = tenant_dir.join("config.toml");
-        tracing::info!("📝 Generating config.toml for tenant {} from DB", tenant.slug);
+        tracing::info!(
+            "📝 Generating config.toml for tenant {} from DB",
+            tenant.slug
+        );
 
         // Start with tenant-level defaults
         let mut provider = tenant.provider.clone();
@@ -120,13 +126,19 @@ require_pairing = false
 
         // ── Inject brain/memory/autonomy configs from DB ──────────
         if let Ok(configs) = db.list_configs(&tenant.id) {
-            let brain_keys: Vec<_> = configs.iter().filter(|c| c.key.starts_with("brain.")).collect();
+            let brain_keys: Vec<_> = configs
+                .iter()
+                .filter(|c| c.key.starts_with("brain."))
+                .collect();
             if !brain_keys.is_empty() {
                 config_content.push_str("\n[brain]\n");
                 for cfg in &brain_keys {
                     let field = cfg.key.strip_prefix("brain.").unwrap_or(&cfg.key);
                     // Detect booleans and numbers
-                    if cfg.value == "true" || cfg.value == "false" || cfg.value.parse::<f64>().is_ok() {
+                    if cfg.value == "true"
+                        || cfg.value == "false"
+                        || cfg.value.parse::<f64>().is_ok()
+                    {
                         config_content.push_str(&format!("{} = {}\n", field, cfg.value));
                     } else {
                         config_content.push_str(&format!("{} = \"{}\"\n", field, cfg.value));
@@ -224,40 +236,53 @@ require_pairing = false
             if channels_sync_path.exists() {
                 tracing::info!("📥 Reading channels_sync.json for tenant {}", tenant.slug);
                 if let Ok(content) = std::fs::read_to_string(&channels_sync_path)
-                    && let Ok(channels) = serde_json::from_str::<serde_json::Value>(&content) {
-                        // Telegram
-                        if let Some(tg) = channels["telegram"].as_object()
-                            && tg.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                let token = tg.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
-                                if !token.is_empty() {
+                    && let Ok(channels) = serde_json::from_str::<serde_json::Value>(&content)
+                {
+                    // Telegram
+                    if let Some(tg) = channels["telegram"].as_object()
+                        && tg.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        let token = tg.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
+                        if !token.is_empty() {
+                            config_content.push_str(&format!(
+                                "\n[channel.telegram]\nenabled = true\nbot_token = \"{}\"\n",
+                                token
+                            ));
+                            if let Some(ids) = tg.get("allowed_chat_ids").and_then(|v| v.as_str()) {
+                                let parsed: Vec<&str> = ids
+                                    .split(',')
+                                    .map(|s| s.trim())
+                                    .filter(|s| !s.is_empty())
+                                    .collect();
+                                if !parsed.is_empty() {
                                     config_content.push_str(&format!(
-                                        "\n[channel.telegram]\nenabled = true\nbot_token = \"{}\"\n", token
-                                    ));
-                                    if let Some(ids) = tg.get("allowed_chat_ids").and_then(|v| v.as_str()) {
-                                        let parsed: Vec<&str> = ids.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                                        if !parsed.is_empty() {
-                                            config_content.push_str(&format!("allowed_chat_ids = [{}]\n", parsed.join(", ")));
-                                        }
-                                    }
-                                }
-                            }
-                        // Discord
-                        if let Some(dc) = channels["discord"].as_object()
-                            && dc.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                let token = dc.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
-                                if !token.is_empty() {
-                                    config_content.push_str(&format!(
-                                        "\n[channel.discord]\nenabled = true\nbot_token = \"{}\"\n", token
+                                        "allowed_chat_ids = [{}]\n",
+                                        parsed.join(", ")
                                     ));
                                 }
                             }
-                        // Email
-                        if let Some(em) = channels["email"].as_object()
-                            && em.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                let email = em.get("email").and_then(|v| v.as_str()).unwrap_or("");
-                                let password = em.get("password").and_then(|v| v.as_str()).unwrap_or("");
-                                if !email.is_empty() {
-                                    config_content.push_str(&format!(
+                        }
+                    }
+                    // Discord
+                    if let Some(dc) = channels["discord"].as_object()
+                        && dc.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        let token = dc.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
+                        if !token.is_empty() {
+                            config_content.push_str(&format!(
+                                "\n[channel.discord]\nenabled = true\nbot_token = \"{}\"\n",
+                                token
+                            ));
+                        }
+                    }
+                    // Email
+                    if let Some(em) = channels["email"].as_object()
+                        && em.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        let email = em.get("email").and_then(|v| v.as_str()).unwrap_or("");
+                        let password = em.get("password").and_then(|v| v.as_str()).unwrap_or("");
+                        if !email.is_empty() {
+                            config_content.push_str(&format!(
                                         "\n[channel.email]\nenabled = true\nsmtp_host = \"{}\"\nsmtp_port = {}\nemail = \"{}\"\npassword = \"{}\"\nimap_host = \"{}\"\nimap_port = {}\n",
                                         em.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("smtp.gmail.com"),
                                         em.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587),
@@ -265,37 +290,43 @@ require_pairing = false
                                         em.get("imap_host").and_then(|v| v.as_str()).unwrap_or("imap.gmail.com"),
                                         em.get("imap_port").and_then(|v| v.as_u64()).unwrap_or(993),
                                     ));
-                                }
-                            }
-                        // Webhook
-                        if let Some(wh) = channels["webhook"].as_object()
-                            && wh.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                let url = wh.get("outbound_url").and_then(|v| v.as_str()).unwrap_or("");
-                                config_content.push_str(&format!(
+                        }
+                    }
+                    // Webhook
+                    if let Some(wh) = channels["webhook"].as_object()
+                        && wh.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        let url = wh
+                            .get("outbound_url")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        config_content.push_str(&format!(
                                     "\n[channel.webhook]\nenabled = true\noutbound_url = \"{}\"\nsecret = \"{}\"\n",
                                     url, wh.get("secret").and_then(|v| v.as_str()).unwrap_or("")
                                 ));
-                            }
-                        // WhatsApp
-                        if let Some(wa) = channels["whatsapp"].as_object()
-                            && wa.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                config_content.push_str(&format!(
+                    }
+                    // WhatsApp
+                    if let Some(wa) = channels["whatsapp"].as_object()
+                        && wa.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        config_content.push_str(&format!(
                                     "\n[channel.whatsapp]\nenabled = true\nphone_number_id = \"{}\"\naccess_token = \"{}\"\nwebhook_verify_token = \"{}\"\n",
                                     wa.get("phone_number_id").and_then(|v| v.as_str()).unwrap_or(""),
                                     wa.get("access_token").and_then(|v| v.as_str()).unwrap_or(""),
                                     wa.get("webhook_verify_token").and_then(|v| v.as_str()).unwrap_or(""),
                                 ));
-                            }
-                        // Zalo
-                        if let Some(zl) = channels["zalo"].as_object()
-                            && zl.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                                let imei = zl.get("imei").and_then(|v| v.as_str()).unwrap_or("");
-                                config_content.push_str(&format!(
+                    }
+                    // Zalo
+                    if let Some(zl) = channels["zalo"].as_object()
+                        && zl.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+                    {
+                        let imei = zl.get("imei").and_then(|v| v.as_str()).unwrap_or("");
+                        config_content.push_str(&format!(
                                     "\n[channel.zalo]\nenabled = true\nmode = \"personal\"\n\n[channel.zalo.personal]\nimei = \"{}\"\n",
                                     imei
                                 ));
-                            }
                     }
+                }
             }
         }
 
@@ -305,34 +336,42 @@ require_pairing = false
         let agents_file = tenant_dir.join("agents.json");
         if agents_file.exists()
             && let Ok(content) = std::fs::read_to_string(&agents_file)
-                && let Ok(agents_arr) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
-                    let db_agents = db.list_agents(&tenant.id).unwrap_or_default();
-                    let db_names: Vec<String> = db_agents.iter().map(|a| a.name.clone()).collect();
-                    let mut imported = 0;
-                    for meta in &agents_arr {
-                        let name = meta["name"].as_str().unwrap_or("agent");
-                        if !db_names.contains(&name.to_string()) {
-                            db.upsert_agent(
-                                &tenant.id,
-                                name,
-                                meta["role"].as_str().unwrap_or("assistant"),
-                                meta["description"].as_str().unwrap_or(""),
-                                meta["provider"].as_str().unwrap_or(&tenant.provider),
-                                meta["model"].as_str().unwrap_or(&tenant.model),
-                                meta["system_prompt"].as_str().unwrap_or(""),
-                            ).ok();
-                            imported += 1;
-                        }
-                    }
-                    if imported > 0 {
-                        tracing::info!("  📥 Imported {} agent(s) from agents.json into DB", imported);
-                    }
+            && let Ok(agents_arr) = serde_json::from_str::<Vec<serde_json::Value>>(&content)
+        {
+            let db_agents = db.list_agents(&tenant.id).unwrap_or_default();
+            let db_names: Vec<String> = db_agents.iter().map(|a| a.name.clone()).collect();
+            let mut imported = 0;
+            for meta in &agents_arr {
+                let name = meta["name"].as_str().unwrap_or("agent");
+                if !db_names.contains(&name.to_string()) {
+                    db.upsert_agent(
+                        &tenant.id,
+                        name,
+                        meta["role"].as_str().unwrap_or("assistant"),
+                        meta["description"].as_str().unwrap_or(""),
+                        meta["provider"].as_str().unwrap_or(&tenant.provider),
+                        meta["model"].as_str().unwrap_or(&tenant.model),
+                        meta["system_prompt"].as_str().unwrap_or(""),
+                    )
+                    .ok();
+                    imported += 1;
                 }
+            }
+            if imported > 0 {
+                tracing::info!(
+                    "  📥 Imported {} agent(s) from agents.json into DB",
+                    imported
+                );
+            }
+        }
 
         // ── Generate agents.json from DB ──────────
         if let Ok(agents) = db.list_agents(&tenant.id)
-            && !agents.is_empty() {
-                let agents_json: Vec<serde_json::Value> = agents.iter().map(|a| {
+            && !agents.is_empty()
+        {
+            let agents_json: Vec<serde_json::Value> = agents
+                .iter()
+                .map(|a| {
                     serde_json::json!({
                         "name": a.name,
                         "role": a.role,
@@ -341,12 +380,13 @@ require_pairing = false
                         "model": a.model,
                         "system_prompt": a.system_prompt,
                     })
-                }).collect();
-                if let Ok(json_str) = serde_json::to_string_pretty(&agents_json) {
-                    std::fs::write(tenant_dir.join("agents.json"), json_str).ok();
-                }
-                tracing::info!("  📋 Generated agents.json with {} agent(s)", agents.len());
+                })
+                .collect();
+            if let Ok(json_str) = serde_json::to_string_pretty(&agents_json) {
+                std::fs::write(tenant_dir.join("agents.json"), json_str).ok();
             }
+            tracing::info!("  📋 Generated agents.json with {} agent(s)", agents.len());
+        }
 
         // (pairing_code removed — SaaS uses JWT from Platform login)
 
@@ -357,13 +397,24 @@ require_pairing = false
             .append(true)
             .open(&log_path)
             .ok();
-        let stdout = log_file.as_ref().map(|f| std::process::Stdio::from(f.try_clone().unwrap())).unwrap_or(std::process::Stdio::null());
-        let stderr = log_file.map(std::process::Stdio::from).unwrap_or(std::process::Stdio::null());
+        let stdout = log_file
+            .as_ref()
+            .map(|f| std::process::Stdio::from(f.try_clone().unwrap()))
+            .unwrap_or(std::process::Stdio::null());
+        let stderr = log_file
+            .map(std::process::Stdio::from)
+            .unwrap_or(std::process::Stdio::null());
 
         let mut cmd = Command::new(bizclaw_bin);
-        cmd.args(["serve", "--port", &tenant.port.to_string(), "--config", config_path.to_str().unwrap_or("")])
-            .env("BIZCLAW_CONFIG", config_path.to_str().unwrap_or(""))
-            .env("BIZCLAW_DATA_DIR", tenant_dir.to_str().unwrap_or(""));
+        cmd.args([
+            "serve",
+            "--port",
+            &tenant.port.to_string(),
+            "--config",
+            config_path.to_str().unwrap_or(""),
+        ])
+        .env("BIZCLAW_CONFIG", config_path.to_str().unwrap_or(""))
+        .env("BIZCLAW_DATA_DIR", tenant_dir.to_str().unwrap_or(""));
 
         // (pairing_code env var removed — SaaS uses JWT from Platform login)
 
@@ -372,7 +423,6 @@ require_pairing = false
             .stderr(stderr)
             .spawn()
             .map_err(|e| BizClawError::provider(format!("Failed to start tenant: {e}")))?;
-
 
         let pid = child.id();
         self.processes.insert(

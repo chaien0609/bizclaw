@@ -34,19 +34,33 @@ const MIN_PASSWORD_LENGTH: usize = 8;
 fn is_valid_email(email: &str) -> bool {
     // Must contain exactly one @, at least one char before @, domain with dot
     let parts: Vec<&str> = email.split('@').collect();
-    if parts.len() != 2 { return false; }
+    if parts.len() != 2 {
+        return false;
+    }
     let local = parts[0];
     let domain = parts[1];
     // Local part: non-empty, no spaces
-    if local.is_empty() || local.contains(' ') { return false; }
+    if local.is_empty() || local.contains(' ') {
+        return false;
+    }
     // Domain: must have at least one dot, no spaces, min 3 chars (a.b)
-    if domain.len() < 3 || !domain.contains('.') || domain.contains(' ') { return false; }
+    if domain.len() < 3 || !domain.contains('.') || domain.contains(' ') {
+        return false;
+    }
     // Domain must not start/end with dot or hyphen
-    if domain.starts_with('.') || domain.ends_with('.') 
-       || domain.starts_with('-') || domain.ends_with('-') { return false; }
+    if domain.starts_with('.')
+        || domain.ends_with('.')
+        || domain.starts_with('-')
+        || domain.ends_with('-')
+    {
+        return false;
+    }
     // TLD must be at least 2 chars
     if let Some(tld) = domain.rsplit('.').next()
-        && (tld.len() < 2 || !tld.chars().all(|c| c.is_ascii_alphanumeric())) { return false; }
+        && (tld.len() < 2 || !tld.chars().all(|c| c.is_ascii_alphanumeric()))
+    {
+        return false;
+    }
     // Total length check
     email.len() >= 5 && email.len() <= 254
 }
@@ -69,19 +83,29 @@ pub fn generate_safe_slug(company_name: &str) -> String {
         .split_whitespace()
         .collect::<Vec<&str>>()
         .join("-");
-    
+
     // Collapse multiple hyphens and trim
     while slug.contains("--") {
         slug = slug.replace("--", "-");
     }
     slug = slug.trim_matches('-').to_string();
-        
-    let blacklist = ["dev", "admin", "app", "apps", "www", "test", "staging", "api", "smtp", "mail", "ftp", "ns", "cdn", "local", "root", "sys", "system"];
-    
+
+    let blacklist = [
+        "dev", "admin", "app", "apps", "www", "test", "staging", "api", "smtp", "mail", "ftp",
+        "ns", "cdn", "local", "root", "sys", "system",
+    ];
+
     if blacklist.contains(&slug.as_str()) || slug.is_empty() {
-        slug = format!("tenant-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
+        slug = format!(
+            "tenant-{}",
+            uuid::Uuid::new_v4()
+                .to_string()
+                .chars()
+                .take(8)
+                .collect::<String>()
+        );
     }
-    
+
     slug
 }
 
@@ -109,7 +133,9 @@ pub async fn register_handler(
     }
 
     if req.email.is_empty() || req.password.is_empty() || req.company_name.is_empty() {
-        return Json(serde_json::json!({"ok": false, "error": "Email, password, and company name are required"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Email, password, and company name are required"}),
+        );
     }
     // Email format validation (stricter)
     if !is_valid_email(&req.email) {
@@ -117,18 +143,27 @@ pub async fn register_handler(
     }
     // Password strength validation (unified constant)
     if req.password.len() < MIN_PASSWORD_LENGTH {
-        return Json(serde_json::json!({"ok": false, "error": format!("Mật khẩu phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}));
+        return Json(
+            serde_json::json!({"ok": false, "error": format!("Mật khẩu phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}),
+        );
     }
 
     let password = req.password.clone();
-    let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&password)).await.unwrap_or_else(|e| Err(e.to_string())) {
+    let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&password))
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()))
+    {
         Ok(h) => h,
-        Err(e) => return Json(serde_json::json!({"ok": false, "error": sanitize_error(&format!("Hash error: {e}"))})),
+        Err(e) => {
+            return Json(
+                serde_json::json!({"ok": false, "error": sanitize_error(&format!("Hash error: {e}"))}),
+            );
+        }
     };
 
     let base_slug = generate_safe_slug(&req.company_name);
     let mut final_slug = base_slug.clone();
-    
+
     // Find unique slug
     {
         let db = state.db.lock().await;
@@ -140,41 +175,64 @@ pub async fn register_handler(
     }
 
     let db = state.db.lock().await;
-    
+
     // Check if user already exists
     if let Ok(Some(_)) = db.get_user_by_email(&req.email) {
         return Json(serde_json::json!({"ok": false, "error": "Email is already registered"}));
     }
 
-    let current_max = db.get_max_port().unwrap_or(Some(state.base_port)).unwrap_or(state.base_port);
+    let current_max = db
+        .get_max_port()
+        .unwrap_or(Some(state.base_port))
+        .unwrap_or(state.base_port);
     let new_port = std::cmp::max(current_max, state.base_port) + 1;
 
     // Create User first (status=pending — needs Super Admin approval)
     let user_id = match db.create_user(&req.email, &hash, "admin", None) {
         Ok(id) => id,
-        Err(e) => return Json(serde_json::json!({"ok": false, "error": sanitize_error(&format!("Failed to create user: {e}"))})),
+        Err(e) => {
+            return Json(
+                serde_json::json!({"ok": false, "error": sanitize_error(&format!("Failed to create user: {e}"))}),
+            );
+        }
     };
-    
+
     // Set user status to pending
     let _ = db.update_user_status(&user_id, "pending");
 
     // Create tenant with owner_id linking to the user (tenant stays stopped until approved)
-    match db.create_tenant(&req.company_name, &final_slug, new_port, "openai", "gpt-4o-mini", "free", Some(&user_id)) {
+    match db.create_tenant(
+        &req.company_name,
+        &final_slug,
+        new_port,
+        "openai",
+        "gpt-4o-mini",
+        "free",
+        Some(&user_id),
+    ) {
         Ok(tenant) => {
             // Update user's tenant_id
             let _ = db.update_user_tenant(&user_id, Some(&tenant.id));
-            db.log_event("saas_registration", "user", &user_id, Some(&format!("tenant={},status=pending", tenant.slug))).ok();
-            
+            db.log_event(
+                "saas_registration",
+                "user",
+                &user_id,
+                Some(&format!("tenant={},status=pending", tenant.slug)),
+            )
+            .ok();
+
             Json(serde_json::json!({
-                "ok": true, 
-                "slug": final_slug, 
+                "ok": true,
+                "slug": final_slug,
                 "message": "Đăng ký thành công! Tài khoản đang chờ duyệt bởi Admin. Bạn sẽ nhận được thông báo khi được kích hoạt."
             }))
         }
         Err(e) => {
             // Rollback: delete the user if tenant creation fails
             let _ = db.delete_user_cascade(&user_id);
-            Json(serde_json::json!({"ok": false, "error": sanitize_error(&format!("Failed to create tenant: {e}"))}))
+            Json(
+                serde_json::json!({"ok": false, "error": sanitize_error(&format!("Failed to create tenant: {e}"))}),
+            )
         }
     }
 }
@@ -186,21 +244,29 @@ pub async fn change_password_handler(
 ) -> Json<serde_json::Value> {
     // Password strength validation (unified)
     if req.new_password.len() < MIN_PASSWORD_LENGTH {
-        return Json(serde_json::json!({"ok": false, "error": format!("Mật khẩu mới phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}));
+        return Json(
+            serde_json::json!({"ok": false, "error": format!("Mật khẩu mới phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}),
+        );
     }
 
     let current_user_opt = {
         let db = state.db.lock().await;
         db.get_user_by_email(&claims.email)
     };
-    
+
     if let Ok(Some((id, old_hash, _))) = current_user_opt {
         let current_password = req.current_password.clone();
-        let is_valid = tokio::task::spawn_blocking(move || crate::auth::verify_password(&current_password, &old_hash)).await.unwrap_or(false);
-        
+        let is_valid = tokio::task::spawn_blocking(move || {
+            crate::auth::verify_password(&current_password, &old_hash)
+        })
+        .await
+        .unwrap_or(false);
+
         if is_valid {
             let new_pwd = req.new_password.clone();
-            if let Ok(Ok(new_hash)) = tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await {
+            if let Ok(Ok(new_hash)) =
+                tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await
+            {
                 let db = state.db.lock().await;
                 if db.update_user_password(&id, &new_hash).is_ok() {
                     db.log_event("password_changed", "user", &id, None).ok();
@@ -227,7 +293,9 @@ pub async fn forgot_password_handler(
             if now.duration_since(*first_at).as_secs() < 900 && *count >= 3 {
                 // Note: Still return OK to prevent email enumeration
                 tracing::warn!("[security] Password reset rate limit hit for {}", req.email);
-                return Json(serde_json::json!({"ok": true, "message": "If this email is registered, a reset link will be sent."}));
+                return Json(
+                    serde_json::json!({"ok": true, "message": "If this email is registered, a reset link will be sent."}),
+                );
             }
             if now.duration_since(*first_at).as_secs() >= 900 {
                 attempts.remove(&key);
@@ -244,25 +312,32 @@ pub async fn forgot_password_handler(
     {
         let db = state.db.lock().await;
         if let Ok(Some(_)) = db.get_user_by_email(&req.email) {
-            db.save_password_reset_token(&req.email, &token, expires_at).ok();
-            
+            db.save_password_reset_token(&req.email, &token, expires_at)
+                .ok();
+
             let smtp_host = db.get_platform_config("smtp.host").unwrap_or_default();
             let smtp_user = db.get_platform_config("smtp.user").unwrap_or_default();
             let smtp_pass = db.get_platform_config("smtp.pass").unwrap_or_default();
-            
+
             // SMTP implementation via lettre
             if !smtp_host.is_empty() && !smtp_user.is_empty() {
                 tokio::spawn(async move {
-                    use lettre::{Message, SmtpTransport, Transport};
                     use lettre::transport::smtp::authentication::Credentials;
-                    
+                    use lettre::{Message, SmtpTransport, Transport};
+
                     let from_addr = match smtp_user.parse() {
                         Ok(a) => a,
-                        Err(e) => { tracing::warn!("SMTP from address invalid: {e}"); return; }
+                        Err(e) => {
+                            tracing::warn!("SMTP from address invalid: {e}");
+                            return;
+                        }
                     };
                     let to_addr = match req.email.parse() {
                         Ok(a) => a,
-                        Err(e) => { tracing::warn!("SMTP to address invalid: {e}"); return; }
+                        Err(e) => {
+                            tracing::warn!("SMTP to address invalid: {e}");
+                            return;
+                        }
                     };
                     let email = match Message::builder()
                         .from(from_addr)
@@ -279,24 +354,33 @@ pub async fn forgot_password_handler(
                     let mailer = match SmtpTransport::relay(&smtp_host) {
                         Ok(m) => m.credentials(creds).build(),
                         Err(e) => {
-                            tracing::error!("[security] SMTP relay error for host '{}': {e}", smtp_host);
+                            tracing::error!(
+                                "[security] SMTP relay error for host '{}': {e}",
+                                smtp_host
+                            );
                             return;
                         }
                     };
-                        
+
                     match mailer.send(&email) {
                         Ok(_) => tracing::info!("Password reset email sent successfully"),
-                        Err(e) => tracing::warn!("[security] Failed to send password reset email: {e}"),
+                        Err(e) => {
+                            tracing::warn!("[security] Failed to send password reset email: {e}")
+                        }
                     }
                 });
             } else {
-                tracing::warn!("SMTP is not configured — password reset token generated but cannot be sent. Configure SMTP in platform settings.");
+                tracing::warn!(
+                    "SMTP is not configured — password reset token generated but cannot be sent. Configure SMTP in platform settings."
+                );
             }
-            
+
             // Note: Even if user is not found, we return OK to prevent email enumeration
         }
     }
-    Json(serde_json::json!({"ok": true, "message": "If this email is registered, a reset link will be sent."}))
+    Json(
+        serde_json::json!({"ok": true, "message": "If this email is registered, a reset link will be sent."}),
+    )
 }
 
 pub async fn reset_password_handler(
@@ -305,7 +389,9 @@ pub async fn reset_password_handler(
 ) -> Json<serde_json::Value> {
     // Password strength validation (unified)
     if req.new_password.len() < MIN_PASSWORD_LENGTH {
-        return Json(serde_json::json!({"ok": false, "error": format!("Mật khẩu phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}));
+        return Json(
+            serde_json::json!({"ok": false, "error": format!("Mật khẩu phải có ít nhất {} ký tự", MIN_PASSWORD_LENGTH)}),
+        );
     }
 
     let reset_info = {
@@ -317,14 +403,16 @@ pub async fn reset_password_handler(
                 } else {
                     None
                 }
-            },
+            }
             Err(_) => None,
         }
     };
 
     if let Some((email, id)) = reset_info {
         let new_pwd = req.new_password.clone();
-        if let Ok(Ok(hash)) = tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await {
+        if let Ok(Ok(hash)) =
+            tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await
+        {
             let db = state.db.lock().await;
             if db.update_user_password(&id, &hash).is_ok() {
                 db.delete_password_reset_token(&email).ok();

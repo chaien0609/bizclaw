@@ -8,9 +8,9 @@
 //! - Multi-device routing by MAC address
 //! - Session management per device
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Xiaozhi webhook bridge configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,9 +35,15 @@ pub struct XiaozhiConfig {
     pub device_routing: HashMap<String, String>,
 }
 
-fn default_tts() -> String { "edge".to_string() }
-fn default_voice() -> String { "vi-VN-HoaiMyNeural".to_string() }
-fn default_agent() -> String { "default".to_string() }
+fn default_tts() -> String {
+    "edge".to_string()
+}
+fn default_voice() -> String {
+    "vi-VN-HoaiMyNeural".to_string()
+}
+fn default_agent() -> String {
+    "default".to_string()
+}
 
 impl Default for XiaozhiConfig {
     fn default() -> Self {
@@ -74,8 +80,12 @@ pub struct XiaozhiRequest {
     pub lang: String,
 }
 
-fn default_audio_format() -> String { "mp3".to_string() }
-fn default_lang() -> String { "vi".to_string() }
+fn default_audio_format() -> String {
+    "mp3".to_string()
+}
+fn default_lang() -> String {
+    "vi".to_string()
+}
 
 /// Response to Xiaozhi Server (for TTS).
 #[derive(Debug, Clone, Serialize)]
@@ -129,13 +139,16 @@ impl XiaozhiBridge {
     /// Returns the agent name to use.
     pub fn route_request(&mut self, req: &XiaozhiRequest) -> String {
         // Check device-specific routing
-        let agent = self.config.device_routing
+        let agent = self
+            .config
+            .device_routing
             .get(&req.device_mac)
             .cloned()
             .unwrap_or_else(|| self.config.default_agent.clone());
 
         // Update or create session
-        let session = self.sessions
+        let session = self
+            .sessions
             .entry(req.device_mac.clone())
             .or_insert_with(|| DeviceSession {
                 session_id: if req.session_id.is_empty() {
@@ -168,7 +181,8 @@ impl XiaozhiBridge {
         processing_ms: u64,
         has_audio: bool,
     ) -> XiaozhiResponse {
-        let session_id = self.sessions
+        let session_id = self
+            .sessions
             .get(device_mac)
             .map(|s| s.session_id.clone())
             .unwrap_or_else(|| "unknown".to_string());

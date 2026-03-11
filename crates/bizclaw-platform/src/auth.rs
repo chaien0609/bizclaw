@@ -72,7 +72,14 @@ mod tests {
     #[test]
     fn test_jwt_roundtrip() {
         let secret = "test-secret-key-bizclaw";
-        let token = create_token("user-1", "admin@test.com", "admin", Some("tenant-1"), secret).unwrap();
+        let token = create_token(
+            "user-1",
+            "admin@test.com",
+            "admin",
+            Some("tenant-1"),
+            secret,
+        )
+        .unwrap();
         let claims = validate_token(&token, secret).unwrap();
         assert_eq!(claims.sub, "user-1");
         assert_eq!(claims.email, "admin@test.com");

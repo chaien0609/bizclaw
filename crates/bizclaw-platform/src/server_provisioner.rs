@@ -28,7 +28,7 @@ pub struct RemoteServer {
     pub ip: String,
     pub domain: Option<String>,
     pub port: i32,
-    pub status: String,      // provisioning, online, offline, error
+    pub status: String, // provisioning, online, offline, error
     pub version: Option<String>,
     pub last_health_check: Option<String>,
     pub tenant_count: i32,
@@ -111,7 +111,26 @@ impl PgDb {
         domain: Option<&str>,
         port: i32,
     ) -> Result<RemoteServer> {
-        let row = sqlx::query_as::<_, (String, String, String, String, i32, String, Option<String>, Option<String>, i32, Option<f32>, Option<f32>, Option<f32>, Option<String>, String, String)>(
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                String,
+                i32,
+                String,
+                Option<String>,
+                Option<String>,
+                i32,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<String>,
+                String,
+                String,
+            ),
+        >(
             r#"
             INSERT INTO remote_servers (name, ip, domain, port)
             VALUES ($1, $2, $3, $4)
@@ -148,7 +167,26 @@ impl PgDb {
 
     /// List all remote servers.
     pub async fn list_servers(&self) -> Result<Vec<RemoteServer>> {
-        let rows = sqlx::query_as::<_, (String, String, String, Option<String>, i32, String, Option<String>, Option<String>, i32, Option<f32>, Option<f32>, Option<f32>, Option<String>, String, String)>(
+        let rows = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                Option<String>,
+                i32,
+                String,
+                Option<String>,
+                Option<String>,
+                i32,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<String>,
+                String,
+                String,
+            ),
+        >(
             r#"
             SELECT id, name, ip, domain, port, status, version,
                    last_health_check::TEXT, tenant_count, cpu_usage, ram_usage, disk_usage,
@@ -160,23 +198,26 @@ impl PgDb {
         .fetch_all(self.pool())
         .await?;
 
-        Ok(rows.into_iter().map(|r| RemoteServer {
-            id: r.0,
-            name: r.1,
-            ip: r.2,
-            domain: r.3,
-            port: r.4,
-            status: r.5,
-            version: r.6,
-            last_health_check: r.7,
-            tenant_count: r.8,
-            cpu_usage: r.9,
-            ram_usage: r.10,
-            disk_usage: r.11,
-            notes: r.12,
-            created_at: r.13,
-            updated_at: r.14,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| RemoteServer {
+                id: r.0,
+                name: r.1,
+                ip: r.2,
+                domain: r.3,
+                port: r.4,
+                status: r.5,
+                version: r.6,
+                last_health_check: r.7,
+                tenant_count: r.8,
+                cpu_usage: r.9,
+                ram_usage: r.10,
+                disk_usage: r.11,
+                notes: r.12,
+                created_at: r.13,
+                updated_at: r.14,
+            })
+            .collect())
     }
 
     /// Update server status after health check.
@@ -247,10 +288,13 @@ pub async fn provision_server(req: &ProvisionRequest) -> Result<ProvisionResult>
 
     let output = tokio::process::Command::new("sshpass")
         .args([
-            "-p", &req.root_password,
+            "-p",
+            &req.root_password,
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=30",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "ConnectTimeout=30",
             &format!("root@{}", ip),
             &install_cmd,
         ])
@@ -270,7 +314,10 @@ pub async fn provision_server(req: &ProvisionRequest) -> Result<ProvisionResult>
         return Ok(ProvisionResult {
             success: false,
             server_id: String::new(),
-            message: format!("Provision failed: {}", stderr.lines().last().unwrap_or("unknown error")),
+            message: format!(
+                "Provision failed: {}",
+                stderr.lines().last().unwrap_or("unknown error")
+            ),
             logs,
         });
     }
@@ -299,7 +346,16 @@ async fn deploy_ssh_key(ip: &str, password: &str) -> Result<()> {
 
     if !tokio::fs::try_exists(&key_path).await.unwrap_or(false) {
         tokio::process::Command::new("ssh-keygen")
-            .args(["-t", "ed25519", "-f", &key_path, "-N", "", "-C", "bizclaw-provisioner"])
+            .args([
+                "-t",
+                "ed25519",
+                "-f",
+                &key_path,
+                "-N",
+                "",
+                "-C",
+                "bizclaw-provisioner",
+            ])
             .output()
             .await?;
     }
@@ -311,7 +367,15 @@ async fn deploy_ssh_key(ip: &str, password: &str) -> Result<()> {
     );
 
     tokio::process::Command::new("sshpass")
-        .args(["-p", password, "ssh", "-o", "StrictHostKeyChecking=no", &format!("root@{}", ip), &cmd])
+        .args([
+            "-p",
+            password,
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=no",
+            &format!("root@{}", ip),
+            &cmd,
+        ])
         .output()
         .await?;
 
@@ -325,9 +389,12 @@ pub async fn remote_exec(ip: &str, command: &str) -> Result<String> {
 
     let output = tokio::process::Command::new("ssh")
         .args([
-            "-i", &key_path,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
+            "-i",
+            &key_path,
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "ConnectTimeout=10",
             &format!("root@{}", ip),
             command,
         ])
@@ -404,10 +471,17 @@ pub fn start_health_monitor(db: PgDb) {
                 let health = health_check(&server.ip, server.port).await;
                 let status = if health.online { "online" } else { "offline" };
 
-                let _ = db.update_server_health(
-                    &server.id, status, health.version.as_deref(), health.tenants,
-                    health.cpu, health.ram, health.disk,
-                ).await;
+                let _ = db
+                    .update_server_health(
+                        &server.id,
+                        status,
+                        health.version.as_deref(),
+                        health.tenants,
+                        health.cpu,
+                        health.ram,
+                        health.disk,
+                    )
+                    .await;
             }
         }
     });

@@ -325,7 +325,6 @@ impl Default for GatewayConfig {
     }
 }
 
-
 /// Autonomy / security configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutonomyConfig {
@@ -636,8 +635,12 @@ pub struct TelegramChannelConfig {
     pub allowed_chat_ids: Vec<i64>,
 }
 
-fn default_telegram_name() -> String { "Telegram".into() }
-fn default_zalo_name() -> String { "Zalo".into() }
+fn default_telegram_name() -> String {
+    "Telegram".into()
+}
+fn default_zalo_name() -> String {
+    "Zalo".into()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscordChannelConfig {
@@ -650,7 +653,9 @@ pub struct DiscordChannelConfig {
     pub allowed_channel_ids: Vec<u64>,
 }
 
-fn default_discord_name() -> String { "Discord".into() }
+fn default_discord_name() -> String {
+    "Discord".into()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailChannelConfig {

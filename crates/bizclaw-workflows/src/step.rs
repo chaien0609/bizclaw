@@ -46,12 +46,8 @@ impl Condition {
             "neq" => input != self.value,
             "contains" => input.contains(&self.value),
             "not_contains" => !input.contains(&self.value),
-            "gt" => {
-                input.parse::<f64>().unwrap_or(0.0) > self.value.parse::<f64>().unwrap_or(0.0)
-            }
-            "lt" => {
-                input.parse::<f64>().unwrap_or(0.0) < self.value.parse::<f64>().unwrap_or(0.0)
-            }
+            "gt" => input.parse::<f64>().unwrap_or(0.0) > self.value.parse::<f64>().unwrap_or(0.0),
+            "lt" => input.parse::<f64>().unwrap_or(0.0) < self.value.parse::<f64>().unwrap_or(0.0),
             "starts_with" => input.starts_with(&self.value),
             "ends_with" => input.ends_with(&self.value),
             "empty" => input.is_empty(),

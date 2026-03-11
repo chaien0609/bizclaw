@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use bizclaw_core::error::{BizClawError, Result};
 use bizclaw_core::types::*;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -256,8 +256,12 @@ impl DataStore for SqliteStore {
                 d.from_agent,
                 d.to_agent,
                 d.task,
-                serde_json::to_string(&d.mode).unwrap_or_default().trim_matches('"'),
-                serde_json::to_string(&d.status).unwrap_or_default().trim_matches('"'),
+                serde_json::to_string(&d.mode)
+                    .unwrap_or_default()
+                    .trim_matches('"'),
+                serde_json::to_string(&d.status)
+                    .unwrap_or_default()
+                    .trim_matches('"'),
                 d.created_at.to_rfc3339(),
             ],
         )
@@ -277,11 +281,12 @@ impl DataStore for SqliteStore {
             .unwrap_or_default()
             .trim_matches('"')
             .to_string();
-        let completed = if status == DelegationStatus::Completed || status == DelegationStatus::Failed {
-            Some(chrono::Utc::now().to_rfc3339())
-        } else {
-            None
-        };
+        let completed =
+            if status == DelegationStatus::Completed || status == DelegationStatus::Failed {
+                Some(chrono::Utc::now().to_rfc3339())
+            } else {
+                None
+            };
         conn.execute(
             "UPDATE delegations SET status = ?1, result = ?2, error = ?3, completed_at = ?4 WHERE id = ?5",
             params![status_str, result, error, completed, id],
@@ -310,9 +315,7 @@ impl DataStore for SqliteStore {
                     result: row.get(6)?,
                     error: row.get(7)?,
                     created_at: parse_datetime(&row.get::<_, String>(8)?),
-                    completed_at: row
-                        .get::<_, Option<String>>(9)?
-                        .map(|s| parse_datetime(&s)),
+                    completed_at: row.get::<_, Option<String>>(9)?.map(|s| parse_datetime(&s)),
                 })
             })
             .ok();
@@ -340,9 +343,7 @@ impl DataStore for SqliteStore {
                     result: row.get(6)?,
                     error: row.get(7)?,
                     created_at: parse_datetime(&row.get::<_, String>(8)?),
-                    completed_at: row
-                        .get::<_, Option<String>>(9)?
-                        .map(|s| parse_datetime(&s)),
+                    completed_at: row.get::<_, Option<String>>(9)?.map(|s| parse_datetime(&s)),
                 })
             })
             .map_err(|e| BizClawError::Database(format!("List delegations query: {e}")))?;

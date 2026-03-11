@@ -134,7 +134,7 @@ impl InjectionScanner {
                     "| sh",
                     "curl | sh",
                     "wget | sh",
-                    "eval $(", 
+                    "eval $(",
                     "base64 -d |",
                     "reverse shell",
                     "; cat /etc/passwd",

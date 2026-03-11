@@ -584,10 +584,24 @@ mod tests {
     #[test]
     fn test_all_18_providers_resolvable() {
         let expected = [
-            "openai", "openrouter", "anthropic", "deepseek", "gemini",
-            "groq", "ollama", "llamacpp", "cliproxy", "vllm",
-            "together", "mistral", "minimax", "xai", "modelark",
-            "cohere", "perplexity", "dashscope",
+            "openai",
+            "openrouter",
+            "anthropic",
+            "deepseek",
+            "gemini",
+            "groq",
+            "ollama",
+            "llamacpp",
+            "cliproxy",
+            "vllm",
+            "together",
+            "mistral",
+            "minimax",
+            "xai",
+            "modelark",
+            "cohere",
+            "perplexity",
+            "dashscope",
         ];
         for name in &expected {
             assert!(
@@ -622,7 +636,8 @@ mod tests {
             assert!(
                 config.is_some(),
                 "Alias '{}' → '{}' not resolvable",
-                alias, expected
+                alias,
+                expected
             );
             assert_eq!(config.unwrap().name, *expected);
         }

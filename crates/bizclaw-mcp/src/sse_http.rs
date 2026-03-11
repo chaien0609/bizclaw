@@ -82,10 +82,7 @@ impl SseTransport {
             .map_err(|e| format!("SSE request error: {e}"))?;
 
         if !response.status().is_success() {
-            return Err(format!(
-                "SSE server returned status {}",
-                response.status()
-            ));
+            return Err(format!("SSE server returned status {}", response.status()));
         }
 
         let body: String = response
@@ -97,14 +94,16 @@ impl SseTransport {
         for raw_line in body.lines() {
             let trimmed = raw_line.trim();
             if let Some(data) = trimmed.strip_prefix("data: ")
-                && let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(data) {
-                    return Ok(resp);
-                }
+                && let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(data)
+            {
+                return Ok(resp);
+            }
             // Also try parsing the whole body as JSON (non-SSE response)
             if trimmed.starts_with('{')
-                && let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(trimmed) {
-                    return Ok(resp);
-                }
+                && let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(trimmed)
+            {
+                return Ok(resp);
+            }
         }
 
         // Try parsing the entire body as JSON
@@ -130,7 +129,7 @@ impl SseTransport {
 }
 
 /// Streamable HTTP transport for MCP — uses standard HTTP POST.
-/// 
+///
 /// This is the simplest transport: just POST JSON-RPC to an HTTP endpoint.
 #[allow(dead_code)]
 pub struct HttpTransport {
@@ -232,8 +231,7 @@ mod tests {
 
     #[test]
     fn test_http_transport_creation() {
-        let transport = HttpTransport::new("http://localhost:3000/v1/mcp")
-            .with_auth("sk-test");
+        let transport = HttpTransport::new("http://localhost:3000/v1/mcp").with_auth("sk-test");
 
         assert_eq!(transport.endpoint(), "http://localhost:3000/v1/mcp");
     }

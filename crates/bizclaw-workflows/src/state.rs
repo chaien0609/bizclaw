@@ -128,9 +128,7 @@ impl WorkflowState {
 
     /// Get the last output (input for the next step).
     pub fn last_output(&self) -> &str {
-        self.final_output
-            .as_deref()
-            .unwrap_or(&self.initial_input)
+        self.final_output.as_deref().unwrap_or(&self.initial_input)
     }
 
     /// Execution duration in seconds.

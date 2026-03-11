@@ -10,17 +10,39 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 
 /// Forbidden paths that should never appear in shell commands.
 const FORBIDDEN_PATH_PATTERNS: &[&str] = &[
-    "/etc/shadow", "/etc/passwd", ".ssh/", "authorized_keys",
-    "/proc/", "/sys/", "/dev/", "secrets.enc",
+    "/etc/shadow",
+    "/etc/passwd",
+    ".ssh/",
+    "authorized_keys",
+    "/proc/",
+    "/sys/",
+    "/dev/",
+    "secrets.enc",
 ];
 
 /// Dangerous command patterns that bypass simple allowlists.
 const DANGEROUS_PATTERNS: &[&str] = &[
-    "rm -rf", "mkfs", "dd if=", ":(){ :|:", "chmod 777",
-    "chown root", "curl|", "wget|", "nc -l", "ncat",
-    "python -c", "python3 -c", "perl -e", "ruby -e",
-    "base64 -d", "eval ", "exec ", "> /dev/",
-    "history", ".bash_history", "id_rsa",
+    "rm -rf",
+    "mkfs",
+    "dd if=",
+    ":(){ :|:",
+    "chmod 777",
+    "chown root",
+    "curl|",
+    "wget|",
+    "nc -l",
+    "ncat",
+    "python -c",
+    "python3 -c",
+    "perl -e",
+    "ruby -e",
+    "base64 -d",
+    "eval ",
+    "exec ",
+    "> /dev/",
+    "history",
+    ".bash_history",
+    "id_rsa",
 ];
 
 pub struct ShellTool;
@@ -49,7 +71,8 @@ impl ShellTool {
             if lower.contains(pattern) {
                 return Some(format!(
                     "🔒 Blocked: command matches dangerous pattern '{}'. Command: '{}'",
-                    pattern, &command[..command.len().min(60)]
+                    pattern,
+                    &command[..command.len().min(60)]
                 ));
             }
         }
@@ -59,7 +82,8 @@ impl ShellTool {
             if lower.contains(path) {
                 return Some(format!(
                     "🔒 Blocked: command accesses forbidden path '{}'. Command: '{}'",
-                    path, &command[..command.len().min(60)]
+                    path,
+                    &command[..command.len().min(60)]
                 ));
             }
         }
@@ -151,7 +175,11 @@ impl Tool for ShellTool {
             cmd.current_dir(dir);
         }
 
-        tracing::info!("🖥️ ShellTool: executing (timeout={}s): {}", timeout_secs, &command[..command.len().min(100)]);
+        tracing::info!(
+            "🖥️ ShellTool: executing (timeout={}s): {}",
+            timeout_secs,
+            &command[..command.len().min(100)]
+        );
 
         let output = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_secs),
@@ -173,7 +201,9 @@ impl Tool for ShellTool {
         // Truncate large outputs (1MB max)
         let stdout = if stdout.len() > 1_048_576 {
             format!("{}...\n[truncated at 1MB]", &stdout[..1_048_576])
-        } else { stdout };
+        } else {
+            stdout
+        };
 
         let result = if output.status.success() {
             stdout

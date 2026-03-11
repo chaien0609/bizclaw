@@ -147,7 +147,9 @@ impl Hand {
         self.total_cost_usd += result.total_cost_usd;
         self.status = result.status.clone();
         if result.status == HandStatus::Failed {
-            self.last_error = result.phases.iter()
+            self.last_error = result
+                .phases
+                .iter()
                 .filter_map(|p| p.error.as_ref())
                 .next_back()
                 .cloned();

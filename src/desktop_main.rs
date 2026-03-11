@@ -11,7 +11,6 @@
 
 use bizclaw_core::config::{BizClawConfig, GatewayConfig};
 
-
 /// Find a free TCP port
 fn find_free_port() -> u16 {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("Cannot bind to port");
@@ -83,8 +82,7 @@ fn main() {
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .compact()
         .init();

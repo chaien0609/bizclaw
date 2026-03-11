@@ -100,7 +100,10 @@ impl EmbeddingClient {
         match self.config.provider.as_str() {
             "ollama" => self.embed_ollama(texts).await,
             "openai" | "gemini" | "deepseek" => self.embed_openai_compat(texts).await,
-            _ => Err(format!("Unknown embedding provider: {}", self.config.provider)),
+            _ => Err(format!(
+                "Unknown embedding provider: {}",
+                self.config.provider
+            )),
         }
     }
 
@@ -197,11 +200,7 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 
     let denom = norm_a.sqrt() * norm_b.sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        dot / denom
-    }
+    if denom == 0.0 { 0.0 } else { dot / denom }
 }
 
 /// Serialize a vector to bytes for SQLite BLOB storage.

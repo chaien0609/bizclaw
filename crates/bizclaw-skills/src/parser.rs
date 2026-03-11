@@ -73,8 +73,8 @@ impl SkillManifest {
 
     /// Load from a file path.
     pub fn load(path: &std::path::Path) -> Result<Self, String> {
-        let raw = std::fs::read_to_string(path)
-            .map_err(|e| format!("Read {}: {}", path.display(), e))?;
+        let raw =
+            std::fs::read_to_string(path).map_err(|e| format!("Read {}: {}", path.display(), e))?;
         let mut skill = Self::parse(&raw)?;
         skill.source_path = Some(path.to_string_lossy().to_string());
         skill.installed = true;

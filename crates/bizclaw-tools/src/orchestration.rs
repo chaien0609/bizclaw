@@ -73,7 +73,9 @@ impl Tool for DelegateTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "delegate".to_string(),
-            description: "Delegate a task to another agent. Use when the task is outside your expertise.".to_string(),
+            description:
+                "Delegate a task to another agent. Use when the task is outside your expertise."
+                    .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -104,7 +106,10 @@ impl Tool for DelegateTool {
         let mut state = self.state.lock().await;
 
         // Check agent exists
-        let agent_exists = state.agents.iter().any(|(name, _, _)| name == &args.to_agent);
+        let agent_exists = state
+            .agents
+            .iter()
+            .any(|(name, _, _)| name == &args.to_agent);
         if !agent_exists {
             let available: Vec<&str> = state.agents.iter().map(|(n, _, _)| n.as_str()).collect();
             return Ok(ToolResult {
@@ -249,7 +254,9 @@ impl Tool for ListAgentsTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "list_agents".to_string(),
-            description: "List all available agents in the system with their roles and descriptions.".to_string(),
+            description:
+                "List all available agents in the system with their roles and descriptions."
+                    .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {}
@@ -262,9 +269,7 @@ impl Tool for ListAgentsTool {
         let agents_info: Vec<String> = state
             .agents
             .iter()
-            .map(|(name, role, desc)| {
-                format!("- **{}** ({}): {}", name, role, desc)
-            })
+            .map(|(name, role, desc)| format!("- **{}** ({}): {}", name, role, desc))
             .collect();
         Ok(ToolResult {
             tool_call_id: String::new(),
@@ -304,7 +309,8 @@ impl Tool for TeamTasksTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "team_tasks".to_string(),
-            description: "Interact with the team task board: list, claim, or complete tasks.".to_string(),
+            description: "Interact with the team task board: list, claim, or complete tasks."
+                .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -350,9 +356,10 @@ impl Tool for TeamTasksTool {
         match args.action.as_str() {
             "list" => {
                 if let Some(team_id) = &args.team_id {
-                    let tasks = store.list_tasks(team_id).await.map_err(|e| {
-                        bizclaw_core::error::BizClawError::Tool(e.to_string())
-                    })?;
+                    let tasks = store
+                        .list_tasks(team_id)
+                        .await
+                        .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
                     let list: Vec<String> = tasks
                         .iter()
                         .map(|t| {
@@ -373,14 +380,13 @@ impl Tool for TeamTasksTool {
                     })
                 } else {
                     // List tasks assigned to this agent
-                    let tasks = store.list_agent_tasks(&state.agent_name).await.map_err(|e| {
-                        bizclaw_core::error::BizClawError::Tool(e.to_string())
-                    })?;
+                    let tasks = store
+                        .list_agent_tasks(&state.agent_name)
+                        .await
+                        .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
                     let list: Vec<String> = tasks
                         .iter()
-                        .map(|t| {
-                            format!("- [{}] {} ({:?})", t.id, t.title, t.status)
-                        })
+                        .map(|t| format!("- [{}] {} ({:?})", t.id, t.title, t.status))
                         .collect();
                     Ok(ToolResult {
                         tool_call_id: String::new(),
@@ -414,7 +420,9 @@ impl Tool for TeamTasksTool {
             }
             "complete" => {
                 let task_id = args.task_id.ok_or_else(|| {
-                    bizclaw_core::error::BizClawError::Tool("task_id required for 'complete'".into())
+                    bizclaw_core::error::BizClawError::Tool(
+                        "task_id required for 'complete'".into(),
+                    )
                 })?;
                 let result = args.result.unwrap_or_else(|| "Completed.".to_string());
                 store
@@ -434,7 +442,10 @@ impl Tool for TeamTasksTool {
             }
             _ => Ok(ToolResult {
                 tool_call_id: String::new(),
-                output: format!("Unknown action: '{}'. Use: list, claim, complete", args.action),
+                output: format!(
+                    "Unknown action: '{}'. Use: list, claim, complete",
+                    args.action
+                ),
                 success: false,
             }),
         }
@@ -531,9 +542,10 @@ impl Tool for TeamMessageTool {
                         &content,
                     )
                 };
-                store.send_team_message(&msg).await.map_err(|e| {
-                    bizclaw_core::error::BizClawError::Tool(e.to_string())
-                })?;
+                store
+                    .send_team_message(&msg)
+                    .await
+                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: "Message sent.".to_string(),

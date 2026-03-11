@@ -497,7 +497,8 @@ mod tests {
 
     #[test]
     fn test_evaluate_config() {
-        let config = EvaluateConfig::new("writer", "reviewer", "write blog", "must have 3 examples");
+        let config =
+            EvaluateConfig::new("writer", "reviewer", "write blog", "must have 3 examples");
         assert_eq!(config.max_rounds, 3);
     }
 

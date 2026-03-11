@@ -81,14 +81,33 @@ impl Tool for HttpRequestTool {
         }
         // Block private/internal destinations
         let blocked_patterns = [
-            "127.0.0.1", "localhost", "0.0.0.0", "[::1]", "[::0]",
-            "169.254.", "metadata.google", "metadata.aws",
-            "10.", "192.168.",
+            "127.0.0.1",
+            "localhost",
+            "0.0.0.0",
+            "[::1]",
+            "[::0]",
+            "169.254.",
+            "metadata.google",
+            "metadata.aws",
+            "10.",
+            "192.168.",
             // 172.16.0.0/12
-            "172.16.", "172.17.", "172.18.", "172.19.",
-            "172.20.", "172.21.", "172.22.", "172.23.",
-            "172.24.", "172.25.", "172.26.", "172.27.",
-            "172.28.", "172.29.", "172.30.", "172.31.",
+            "172.16.",
+            "172.17.",
+            "172.18.",
+            "172.19.",
+            "172.20.",
+            "172.21.",
+            "172.22.",
+            "172.23.",
+            "172.24.",
+            "172.25.",
+            "172.26.",
+            "172.27.",
+            "172.28.",
+            "172.29.",
+            "172.30.",
+            "172.31.",
         ];
         // Extract host portion (after ://)
         let host_part = lower_url.split("://").nth(1).unwrap_or("");
@@ -101,7 +120,6 @@ impl Tool for HttpRequestTool {
                 success: false,
             });
         }
-
 
         let client = reqwest::Client::builder()
             .user_agent("BizClaw/1.0")
@@ -128,9 +146,10 @@ impl Tool for HttpRequestTool {
             for (key, value) in headers {
                 if let Some(val_str) = value.as_str()
                     && let Ok(header_name) = reqwest::header::HeaderName::from_bytes(key.as_bytes())
-                        && let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str) {
-                            request = request.header(header_name, header_val);
-                        }
+                    && let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str)
+                {
+                    request = request.header(header_name, header_val);
+                }
             }
         }
 
@@ -142,9 +161,10 @@ impl Tool for HttpRequestTool {
                 .as_object()
                 .map(|h| !h.contains_key("content-type"))
                 .unwrap_or(true)
-                && (body.starts_with('{') || body.starts_with('[')) {
-                    request = request.header("Content-Type", "application/json");
-                }
+                && (body.starts_with('{') || body.starts_with('['))
+            {
+                request = request.header("Content-Type", "application/json");
+            }
         }
 
         let start = std::time::Instant::now();
@@ -204,19 +224,40 @@ pub fn is_url_blocked(url: &str) -> Option<String> {
         return Some("Only HTTP/HTTPS schemes allowed".into());
     }
     let blocked_patterns = [
-        "127.0.0.1", "localhost", "0.0.0.0", "[::1]", "[::0]",
-        "169.254.", "metadata.google", "metadata.aws",
-        "10.",  "192.168.",
-        "172.16.", "172.17.", "172.18.", "172.19.",
-        "172.20.", "172.21.", "172.22.", "172.23.",
-        "172.24.", "172.25.", "172.26.", "172.27.",
-        "172.28.", "172.29.", "172.30.", "172.31.",
+        "127.0.0.1",
+        "localhost",
+        "0.0.0.0",
+        "[::1]",
+        "[::0]",
+        "169.254.",
+        "metadata.google",
+        "metadata.aws",
+        "10.",
+        "192.168.",
+        "172.16.",
+        "172.17.",
+        "172.18.",
+        "172.19.",
+        "172.20.",
+        "172.21.",
+        "172.22.",
+        "172.23.",
+        "172.24.",
+        "172.25.",
+        "172.26.",
+        "172.27.",
+        "172.28.",
+        "172.29.",
+        "172.30.",
+        "172.31.",
     ];
     let host_part = lower_url.split("://").nth(1).unwrap_or("");
     let host = host_part.split('/').next().unwrap_or("");
     let host_no_port = host.split(':').next().unwrap_or("");
     if blocked_patterns.iter().any(|p| host_no_port.contains(p)) {
-        return Some(format!("Cannot access internal/private network ({host_no_port})"));
+        return Some(format!(
+            "Cannot access internal/private network ({host_no_port})"
+        ));
     }
     None
 }
@@ -350,7 +391,10 @@ mod tests {
     #[tokio::test]
     async fn test_execute_blocks_internal() {
         let tool = HttpRequestTool::new();
-        let result = tool.execute(r#"{"url":"http://127.0.0.1:8080/admin"}"#).await.unwrap();
+        let result = tool
+            .execute(r#"{"url":"http://127.0.0.1:8080/admin"}"#)
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.output.contains("Blocked"));
     }
@@ -358,7 +402,10 @@ mod tests {
     #[tokio::test]
     async fn test_execute_blocks_non_http() {
         let tool = HttpRequestTool::new();
-        let result = tool.execute(r#"{"url":"ftp://evil.com/file"}"#).await.unwrap();
+        let result = tool
+            .execute(r#"{"url":"ftp://evil.com/file"}"#)
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.output.contains("Blocked"));
     }

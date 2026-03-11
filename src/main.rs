@@ -200,10 +200,7 @@ async fn main() -> Result<()> {
                     "🦀 BizClaw v{} — Interactive Mode",
                     env!("CARGO_PKG_VERSION")
                 );
-                println!(
-                    "   Provider: {} | Model: default",
-                    agent.provider_name()
-                );
+                println!("   Provider: {} | Model: default", agent.provider_name());
                 println!("   Type /quit to exit, /clear to reset conversation\n");
 
                 let mut cli_channel = bizclaw_channels::cli::CliChannel::new();
@@ -259,7 +256,10 @@ async fn main() -> Result<()> {
                     // Start configured Zalo channels
                     for zalo_config in &config.channel.zalo {
                         if zalo_config.enabled {
-                            println!("  📱 Zalo '{}' ({}) channel starting...", zalo_config.name, zalo_config.mode);
+                            println!(
+                                "  📱 Zalo '{}' ({}) channel starting...",
+                                zalo_config.name, zalo_config.mode
+                            );
                             let mut zalo =
                                 bizclaw_channels::zalo::ZaloChannel::new(zalo_config.clone());
                             use bizclaw_core::traits::Channel;
@@ -645,7 +645,10 @@ async fn main() -> Result<()> {
             // Email channels (supports multiple accounts)
             for (i, email_cfg) in channel_config.email.iter().enumerate() {
                 if email_cfg.enabled && !email_cfg.email.is_empty() {
-                    println!("   📧 Email[{}]: starting listener ({})...", i, email_cfg.email);
+                    println!(
+                        "   📧 Email[{}]: starting listener ({})...",
+                        i, email_cfg.email
+                    );
                     let em = bizclaw_channels::email::EmailChannel::new(
                         bizclaw_channels::email::EmailConfig {
                             imap_host: email_cfg.imap_host.clone(),
@@ -679,14 +682,20 @@ async fn main() -> Result<()> {
                     };
 
                     if expanded_path.exists() {
-                        println!("   💬 Zalo[{}]: starting '{}' ({} mode)...", i, zalo_cfg.name, zalo_cfg.mode);
+                        println!(
+                            "   💬 Zalo[{}]: starting '{}' ({} mode)...",
+                            i, zalo_cfg.name, zalo_cfg.mode
+                        );
                         tracing::info!(
                             "Zalo channel '{}' starting with cookie from: {}",
                             zalo_cfg.name,
                             expanded_path.display()
                         );
                     } else {
-                        println!("   💬 Zalo[{}]: '{}' skipped (no cookie at {})", i, zalo_cfg.name, cookie_path);
+                        println!(
+                            "   💬 Zalo[{}]: '{}' skipped (no cookie at {})",
+                            i, zalo_cfg.name, cookie_path
+                        );
                     }
                 }
             }
@@ -694,7 +703,10 @@ async fn main() -> Result<()> {
             // WhatsApp channels (webhook-based — no background task needed)
             for (i, wa_cfg) in channel_config.whatsapp.iter().enumerate() {
                 if wa_cfg.enabled && !wa_cfg.access_token.is_empty() {
-                    println!("   📱 WhatsApp[{}]: enabled (webhook at /api/v1/webhook/whatsapp)", i);
+                    println!(
+                        "   📱 WhatsApp[{}]: enabled (webhook at /api/v1/webhook/whatsapp)",
+                        i
+                    );
                 }
             }
 
@@ -931,15 +943,16 @@ where
             let arg = parts.get(2).copied().unwrap_or("");
 
             match cmd.as_str() {
-                "/help" => {
-                    Some("🦀 *BizClaw Commands*\n\n\
+                "/help" => Some(
+                    "🦀 *BizClaw Commands*\n\n\
                         📋 `/hand list` — Xem danh sách Hands\n\
                         ▶️ `/hand run <name>` — Chạy Hand ngay\n\
                         🔄 `/run <workflow>` — Chạy Workflow\n\
                         📊 `/status` — Trạng thái hệ thống\n\
                         ℹ️ `/help` — Hiện menu này\n\n\
-                        _Gửi tin nhắn bình thường để chat với AI agent._".to_string())
-                }
+                        _Gửi tin nhắn bình thường để chat với AI agent._"
+                        .to_string(),
+                ),
                 "/status" => {
                     let provider = agent.provider_name().to_string();
                     let conv_len = agent.conversation().len();
@@ -975,9 +988,11 @@ where
                                             }
                                             for t in tasks {
                                                 let name = t["name"].as_str().unwrap_or("?");
-                                                let enabled = t["enabled"].as_bool().unwrap_or(false);
+                                                let enabled =
+                                                    t["enabled"].as_bool().unwrap_or(false);
                                                 let runs = t["run_count"].as_u64().unwrap_or(0);
-                                                let status_icon = if enabled { "🟢" } else { "🔴" };
+                                                let status_icon =
+                                                    if enabled { "🟢" } else { "🔴" };
                                                 msg.push_str(&format!(
                                                     "{} *{}* — {} runs\n",
                                                     status_icon, name, runs
@@ -997,7 +1012,9 @@ where
                         }
                         "run" | "trigger" => {
                             if arg.is_empty() {
-                                Some("⚠️ Cần tên Hand. Ví dụ: `/hand run Research Hand`".to_string())
+                                Some(
+                                    "⚠️ Cần tên Hand. Ví dụ: `/hand run Research Hand`".to_string(),
+                                )
                             } else {
                                 // Find and execute Hand by name
                                 let search_name = arg.to_lowercase();
@@ -1009,24 +1026,38 @@ where
                                 {
                                     Ok(resp) => {
                                         if let Ok(data) = resp.json::<serde_json::Value>().await {
-                                            let tasks = data["tasks"].as_array().cloned().unwrap_or_default();
+                                            let tasks = data["tasks"]
+                                                .as_array()
+                                                .cloned()
+                                                .unwrap_or_default();
                                             let found = tasks.iter().find(|t| {
-                                                t["name"].as_str().unwrap_or("").to_lowercase().contains(&search_name)
+                                                t["name"]
+                                                    .as_str()
+                                                    .unwrap_or("")
+                                                    .to_lowercase()
+                                                    .contains(&search_name)
                                             });
                                             if let Some(task) = found {
-                                                let task_name = task["name"].as_str().unwrap_or("Hand");
+                                                let task_name =
+                                                    task["name"].as_str().unwrap_or("Hand");
                                                 let prompt = task["action"]["AgentPrompt"]
                                                     .as_str()
-                                                    .or_else(|| task["action"]["AgentPrompt"]["prompt"].as_str())
+                                                    .or_else(|| {
+                                                        task["action"]["AgentPrompt"]["prompt"]
+                                                            .as_str()
+                                                    })
                                                     .unwrap_or("Execute this task")
                                                     .to_string();
 
                                                 // Execute the prompt through the Agent
-                                                let indicator = format!("⏳ Đang chạy *{}*...", task_name);
+                                                let indicator =
+                                                    format!("⏳ Đang chạy *{}*...", task_name);
                                                 // Send typing indicator
                                                 match channel_name {
                                                     n if n.starts_with("telegram") => {
-                                                        if let Some(tg_cfg) = config.channel.telegram.first() {
+                                                        if let Some(tg_cfg) =
+                                                            config.channel.telegram.first()
+                                                        {
                                                             let url = format!(
                                                                 "https://api.telegram.org/bot{}/sendMessage",
                                                                 tg_cfg.bot_token
@@ -1046,19 +1077,20 @@ where
                                                 }
 
                                                 match agent.process(&prompt).await {
-                                                    Ok(result) => {
-                                                        Some(format!(
-                                                            "🤚 *{}* — Hoàn thành!\n\n{}\n\n_⏱ Executed at {}_",
-                                                            task_name,
-                                                            if result.len() > 3500 {
-                                                                format!("{}...", &result[..3500])
-                                                            } else {
-                                                                result
-                                                            },
-                                                            chrono::Utc::now().format("%H:%M:%S UTC")
-                                                        ))
-                                                    }
-                                                    Err(e) => Some(format!("❌ Lỗi chạy {}: {}", task_name, e)),
+                                                    Ok(result) => Some(format!(
+                                                        "🤚 *{}* — Hoàn thành!\n\n{}\n\n_⏱ Executed at {}_",
+                                                        task_name,
+                                                        if result.len() > 3500 {
+                                                            format!("{}...", &result[..3500])
+                                                        } else {
+                                                            result
+                                                        },
+                                                        chrono::Utc::now().format("%H:%M:%S UTC")
+                                                    )),
+                                                    Err(e) => Some(format!(
+                                                        "❌ Lỗi chạy {}: {}",
+                                                        task_name, e
+                                                    )),
                                                 }
                                             } else {
                                                 Some(format!(
@@ -1153,14 +1185,14 @@ where
         if channel_name.starts_with("telegram") {
             // Find the right telegram config by matching the name suffix
             let bot_name = channel_name.strip_prefix("telegram:").unwrap_or("");
-            let tg_cfg = config.channel.telegram.iter()
+            let tg_cfg = config
+                .channel
+                .telegram
+                .iter()
                 .find(|t| t.name == bot_name)
                 .or_else(|| config.channel.telegram.first());
             if let Some(tg) = tg_cfg {
-                let url = format!(
-                    "https://api.telegram.org/bot{}/sendMessage",
-                    tg.bot_token
-                );
+                let url = format!("https://api.telegram.org/bot{}/sendMessage", tg.bot_token);
                 let body = serde_json::json!({
                     "chat_id": incoming.thread_id,
                     "text": &final_response,
@@ -1172,7 +1204,10 @@ where
             }
         } else if channel_name.starts_with("discord") {
             let bot_name = channel_name.strip_prefix("discord:").unwrap_or("");
-            let dc_cfg = config.channel.discord.iter()
+            let dc_cfg = config
+                .channel
+                .discord
+                .iter()
                 .find(|d| d.name == bot_name)
                 .or_else(|| config.channel.discord.first());
             if let Some(dc) = dc_cfg {

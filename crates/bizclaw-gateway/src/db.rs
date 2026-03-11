@@ -22,14 +22,14 @@ pub struct Provider {
     pub name: String,
     pub label: String,
     pub icon: String,
-    pub provider_type: String,  // cloud, local, proxy
+    pub provider_type: String, // cloud, local, proxy
     pub api_key: String,
     pub base_url: String,
     pub chat_path: String,
     pub models_path: String,
-    pub auth_style: String,     // bearer, none
-    pub env_keys: Vec<String>,  // env var names for API key lookup
-    pub models: Vec<String>,    // cached/default model IDs
+    pub auth_style: String,    // bearer, none
+    pub env_keys: Vec<String>, // env var names for API key lookup
+    pub models: Vec<String>,   // cached/default model IDs
     pub is_active: bool,
     pub enabled: bool,
     pub created_at: String,
@@ -61,13 +61,14 @@ pub struct AgentChannelBinding {
 impl GatewayDb {
     /// Open or create the gateway database.
     pub fn open(path: &Path) -> Result<Self, String> {
-        let conn = Connection::open(path)
-            .map_err(|e| format!("Gateway DB open error: {e}"))?;
-        
+        let conn = Connection::open(path).map_err(|e| format!("Gateway DB open error: {e}"))?;
+
         // Enable WAL mode for better concurrent read performance
         conn.execute_batch("PRAGMA journal_mode=WAL;").ok();
-        
-        let db = Self { conn: Mutex::new(conn) };
+
+        let db = Self {
+            conn: Mutex::new(conn),
+        };
         db.migrate()?;
         db.seed_default_providers()?;
         Ok(db)
@@ -76,9 +77,10 @@ impl GatewayDb {
     /// Run schema migrations.
     fn migrate(&self) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
-        
+
         // Main tables
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS providers (
                 name TEXT PRIMARY KEY,
                 label TEXT DEFAULT '',
@@ -150,26 +152,35 @@ impl GatewayDb {
                 value INTEGER DEFAULT 0,
                 updated_at TEXT DEFAULT (datetime('now'))
             );
-        ").map_err(|e| format!("Migration error: {e}"))?;
-        
+        ",
+        )
+        .map_err(|e| format!("Migration error: {e}"))?;
+
         // Migration: add new columns to existing providers table
         // SQLite doesn't have IF NOT EXISTS for ALTER TABLE, so we check first
-        let has_label: bool = conn.query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('providers') WHERE name='label'",
-            [], |r| r.get::<_, i64>(0),
-        ).unwrap_or(0) > 0;
-        
+        let has_label: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('providers') WHERE name='label'",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0)
+            > 0;
+
         if !has_label {
-            conn.execute_batch("
+            conn.execute_batch(
+                "
                 ALTER TABLE providers ADD COLUMN label TEXT DEFAULT '';
                 ALTER TABLE providers ADD COLUMN icon TEXT DEFAULT '🤖';
                 ALTER TABLE providers ADD COLUMN chat_path TEXT DEFAULT '/chat/completions';
                 ALTER TABLE providers ADD COLUMN models_path TEXT DEFAULT '/models';
                 ALTER TABLE providers ADD COLUMN auth_style TEXT DEFAULT 'bearer';
                 ALTER TABLE providers ADD COLUMN env_keys_json TEXT DEFAULT '[]';
-            ").map_err(|e| format!("Migration add columns: {e}"))?;
+            ",
+            )
+            .map_err(|e| format!("Migration add columns: {e}"))?;
         }
-        
+
         Ok(())
     }
 
@@ -183,120 +194,212 @@ impl GatewayDb {
         #[allow(clippy::type_complexity)]
         let defaults: Vec<(&str, &str, &str, &str, &str, &str, &str, &str, &str, &str)> = vec![
             (
-                "openai", "OpenAI", "🤖", "cloud",
+                "openai",
+                "OpenAI",
+                "🤖",
+                "cloud",
                 "https://api.openai.com/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["OPENAI_API_KEY"]"#,
                 r#"["gpt-4.1","gpt-4.1-mini","gpt-4.1-nano","gpt-4o","gpt-4o-mini","o3","o3-mini","o4-mini"]"#,
             ),
             (
-                "anthropic", "Anthropic", "🧠", "cloud",
+                "anthropic",
+                "Anthropic",
+                "🧠",
+                "cloud",
                 "https://api.anthropic.com/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["ANTHROPIC_API_KEY"]"#,
                 r#"["claude-sonnet-4-20250514","claude-opus-4-20250514","claude-3.5-haiku-20241022"]"#,
             ),
             (
-                "gemini", "Google Gemini", "💎", "cloud",
+                "gemini",
+                "Google Gemini",
+                "💎",
+                "cloud",
                 "https://generativelanguage.googleapis.com/v1beta/openai",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["GEMINI_API_KEY","GOOGLE_API_KEY"]"#,
                 r#"["gemini-2.5-pro-preview-06-05","gemini-2.5-flash-preview-05-20","gemini-2.0-flash","gemini-2.0-flash-lite"]"#,
             ),
             (
-                "deepseek", "DeepSeek", "🌊", "cloud",
+                "deepseek",
+                "DeepSeek",
+                "🌊",
+                "cloud",
                 "https://api.deepseek.com",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["DEEPSEEK_API_KEY"]"#,
                 r#"["deepseek-chat","deepseek-reasoner"]"#,
             ),
             (
-                "groq", "Groq", "⚡", "cloud",
+                "groq",
+                "Groq",
+                "⚡",
+                "cloud",
                 "https://api.groq.com/openai/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["GROQ_API_KEY"]"#,
                 r#"["llama-3.3-70b-versatile","llama-3.1-8b-instant","gemma2-9b-it","mixtral-8x7b-32768"]"#,
             ),
             (
-                "openrouter", "OpenRouter", "🌐", "cloud",
+                "openrouter",
+                "OpenRouter",
+                "🌐",
+                "cloud",
                 "https://openrouter.ai/api/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["OPENROUTER_API_KEY","OPENAI_API_KEY"]"#,
                 r#"["openai/gpt-4.1","anthropic/claude-sonnet-4","google/gemini-2.5-flash-preview","deepseek/deepseek-r1"]"#,
             ),
             (
-                "together", "Together AI", "🤝", "cloud",
+                "together",
+                "Together AI",
+                "🤝",
+                "cloud",
                 "https://api.together.xyz/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["TOGETHER_API_KEY"]"#,
                 r#"["meta-llama/Llama-3.3-70B-Instruct-Turbo","Qwen/Qwen2.5-72B-Instruct-Turbo","deepseek-ai/DeepSeek-R1"]"#,
             ),
             (
-                "minimax", "MiniMax", "🔮", "cloud",
+                "minimax",
+                "MiniMax",
+                "🔮",
+                "cloud",
                 "https://api.minimaxi.chat/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["MINIMAX_API_KEY"]"#,
                 r#"["MiniMax-Text-01","MiniMax-M1","abab6.5s-chat","abab6.5-chat","abab5.5-chat"]"#,
             ),
             (
-                "xai", "xAI (Grok)", "🚀", "cloud",
+                "xai",
+                "xAI (Grok)",
+                "🚀",
+                "cloud",
                 "https://api.x.ai/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["XAI_API_KEY"]"#,
                 r#"["grok-3","grok-3-mini","grok-3-fast","grok-2"]"#,
             ),
             (
-                "mistral", "Mistral AI", "🌪️", "cloud",
+                "mistral",
+                "Mistral AI",
+                "🌪️",
+                "cloud",
                 "https://api.mistral.ai/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["MISTRAL_API_KEY"]"#,
                 r#"["mistral-large-latest","mistral-medium-latest","mistral-small-latest","codestral-latest","open-mistral-nemo"]"#,
             ),
             (
-                "ollama", "Ollama (Local)", "🦙", "local",
+                "ollama",
+                "Ollama (Local)",
+                "🦙",
+                "local",
                 "http://localhost:11434/v1",
-                "/chat/completions", "/models", "none",
+                "/chat/completions",
+                "/models",
+                "none",
                 r#"[]"#,
                 r#"["llama3.2","qwen3","phi-4","gemma2","deepseek-r1"]"#,
             ),
             (
-                "llamacpp", "llama.cpp", "🔧", "local",
+                "llamacpp",
+                "llama.cpp",
+                "🔧",
+                "local",
                 "http://localhost:8080/v1",
-                "/chat/completions", "/models", "none",
+                "/chat/completions",
+                "/models",
+                "none",
                 r#"[]"#,
                 r#"["local-model"]"#,
             ),
             (
-                "brain", "Brain Engine", "🧲", "local",
+                "brain",
+                "Brain Engine",
+                "🧲",
+                "local",
                 "",
-                "", "", "none",
+                "",
+                "",
+                "none",
                 r#"[]"#,
                 r#"["tinyllama-1.1b","phi-2","llama-3.2-1b"]"#,
             ),
             (
-                "cliproxy", "CLIProxyAPI", "🔌", "proxy",
+                "cliproxy",
+                "CLIProxyAPI",
+                "🔌",
+                "proxy",
                 "http://localhost:8888/v1",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["CLIPROXY_API_KEY"]"#,
                 r#"["default"]"#,
             ),
             (
-                "vllm", "vLLM", "🚀", "local",
+                "vllm",
+                "vLLM",
+                "🚀",
+                "local",
                 "http://localhost:8000/v1",
-                "/chat/completions", "/models", "none",
+                "/chat/completions",
+                "/models",
+                "none",
                 r#"["VLLM_API_KEY"]"#,
                 r#"["default"]"#,
             ),
             (
-                "modelark", "BytePlus ModelArk", "🔥", "cloud",
+                "modelark",
+                "BytePlus ModelArk",
+                "🔥",
+                "cloud",
                 "https://ark.ap-southeast.bytepluses.com/api/v3",
-                "/chat/completions", "/models", "bearer",
+                "/chat/completions",
+                "/models",
+                "bearer",
                 r#"["ARK_API_KEY","VOLC_ACCESSKEY"]"#,
                 r#"["seed-2-0-mini-260215","seed-1-8-251228","deepseek-v3-2-251201","doubao-1-5-pro-256k-250115","doubao-1-5-pro-32k-250115","glm-4-7-251222"]"#,
             ),
         ];
 
-        for (name, label, icon, ptype, base_url, chat_path, models_path, auth_style, env_keys, models) in defaults {
+        for (
+            name,
+            label,
+            icon,
+            ptype,
+            base_url,
+            chat_path,
+            models_path,
+            auth_style,
+            env_keys,
+            models,
+        ) in defaults
+        {
             conn.execute(
                 "INSERT OR IGNORE INTO providers (name, label, icon, provider_type, base_url, chat_path, models_path, auth_style, env_keys_json, models_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![name, label, icon, ptype, base_url, chat_path, models_path, auth_style, env_keys, models],
@@ -314,32 +417,35 @@ impl GatewayDb {
             "SELECT name, label, icon, provider_type, api_key, base_url, chat_path, models_path, auth_style, env_keys_json, models_json, is_active, enabled, created_at, updated_at FROM providers ORDER BY name"
         ).map_err(|e| format!("Prepare: {e}"))?;
 
-        let providers = stmt.query_map([], |row| {
-            let name: String = row.get(0)?;
-            let models_json: String = row.get(10)?;
-            let models: Vec<String> = serde_json::from_str(&models_json).unwrap_or_default();
-            let env_keys_json: String = row.get(9)?;
-            let env_keys: Vec<String> = serde_json::from_str(&env_keys_json).unwrap_or_default();
-            Ok(Provider {
-                name: name.clone(),
-                label: row.get(1)?,
-                icon: row.get(2)?,
-                provider_type: row.get(3)?,
-                api_key: row.get(4)?,
-                base_url: row.get(5)?,
-                chat_path: row.get(6)?,
-                models_path: row.get(7)?,
-                auth_style: row.get(8)?,
-                env_keys,
-                models,
-                is_active: name == active_provider, // derive from runtime config
-                enabled: row.get::<_, i32>(12)? != 0,
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+        let providers = stmt
+            .query_map([], |row| {
+                let name: String = row.get(0)?;
+                let models_json: String = row.get(10)?;
+                let models: Vec<String> = serde_json::from_str(&models_json).unwrap_or_default();
+                let env_keys_json: String = row.get(9)?;
+                let env_keys: Vec<String> =
+                    serde_json::from_str(&env_keys_json).unwrap_or_default();
+                Ok(Provider {
+                    name: name.clone(),
+                    label: row.get(1)?,
+                    icon: row.get(2)?,
+                    provider_type: row.get(3)?,
+                    api_key: row.get(4)?,
+                    base_url: row.get(5)?,
+                    chat_path: row.get(6)?,
+                    models_path: row.get(7)?,
+                    auth_style: row.get(8)?,
+                    env_keys,
+                    models,
+                    is_active: name == active_provider, // derive from runtime config
+                    enabled: row.get::<_, i32>(12)? != 0,
+                    created_at: row.get(13)?,
+                    updated_at: row.get(14)?,
+                })
             })
-        }).map_err(|e| format!("Query: {e}"))?
-        .filter_map(|r| r.ok())
-        .collect();
+            .map_err(|e| format!("Query: {e}"))?
+            .filter_map(|r| r.ok())
+            .collect();
 
         Ok(providers)
     }
@@ -363,7 +469,7 @@ impl GatewayDb {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         let models_json = serde_json::to_string(models).unwrap_or_else(|_| "[]".to_string());
         let env_keys_json = serde_json::to_string(env_keys).unwrap_or_else(|_| "[]".to_string());
-        
+
         conn.execute(
             "INSERT INTO providers (name, label, icon, provider_type, api_key, base_url, chat_path, models_path, auth_style, env_keys_json, models_json, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))
@@ -455,13 +561,15 @@ impl GatewayDb {
             conn.execute(
                 "UPDATE providers SET api_key=?1, updated_at=datetime('now') WHERE name=?2",
                 params![key, name],
-            ).map_err(|e| format!("Update api_key: {e}"))?;
+            )
+            .map_err(|e| format!("Update api_key: {e}"))?;
         }
         if let Some(url) = base_url {
             conn.execute(
                 "UPDATE providers SET base_url=?1, updated_at=datetime('now') WHERE name=?2",
                 params![url, name],
-            ).map_err(|e| format!("Update base_url: {e}"))?;
+            )
+            .map_err(|e| format!("Update base_url: {e}"))?;
         }
         Ok(())
     }
@@ -473,7 +581,8 @@ impl GatewayDb {
         conn.execute(
             "UPDATE providers SET models_json=?1, updated_at=datetime('now') WHERE name=?2",
             params![models_json, name],
-        ).map_err(|e| format!("Update models: {e}"))?;
+        )
+        .map_err(|e| format!("Update models: {e}"))?;
         Ok(())
     }
 
@@ -533,16 +642,23 @@ impl GatewayDb {
             "SELECT name, role, description, provider, model, system_prompt, enabled, created_at, updated_at FROM agents ORDER BY name"
         ).map_err(|e| format!("Prepare: {e}"))?;
 
-        let agents = stmt.query_map([], |row| {
-            Ok(AgentRecord {
-                name: row.get(0)?, role: row.get(1)?, description: row.get(2)?,
-                provider: row.get(3)?, model: row.get(4)?, system_prompt: row.get(5)?,
-                enabled: row.get::<_, i32>(6)? != 0,
-                created_at: row.get(7)?, updated_at: row.get(8)?,
+        let agents = stmt
+            .query_map([], |row| {
+                Ok(AgentRecord {
+                    name: row.get(0)?,
+                    role: row.get(1)?,
+                    description: row.get(2)?,
+                    provider: row.get(3)?,
+                    model: row.get(4)?,
+                    system_prompt: row.get(5)?,
+                    enabled: row.get::<_, i32>(6)? != 0,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                })
             })
-        }).map_err(|e| format!("Query: {e}"))?
-        .filter_map(|r| r.ok())
-        .collect();
+            .map_err(|e| format!("Query: {e}"))?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(agents)
     }
 
@@ -552,8 +668,11 @@ impl GatewayDb {
         conn.execute("DELETE FROM agents WHERE name=?1", params![name])
             .map_err(|e| format!("Delete agent: {e}"))?;
         // Also remove channel bindings
-        conn.execute("DELETE FROM agent_channels WHERE agent_name=?1", params![name])
-            .map_err(|e| format!("Delete agent channels: {e}"))?;
+        conn.execute(
+            "DELETE FROM agent_channels WHERE agent_name=?1",
+            params![name],
+        )
+        .map_err(|e| format!("Delete agent channels: {e}"))?;
         Ok(())
     }
 
@@ -563,14 +682,18 @@ impl GatewayDb {
     pub fn set_agent_channels(&self, agent_name: &str, channels: &[String]) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         // Delete existing bindings
-        conn.execute("DELETE FROM agent_channels WHERE agent_name=?1", params![agent_name])
-            .map_err(|e| format!("Clear channels: {e}"))?;
+        conn.execute(
+            "DELETE FROM agent_channels WHERE agent_name=?1",
+            params![agent_name],
+        )
+        .map_err(|e| format!("Clear channels: {e}"))?;
         // Insert new bindings
         for ch in channels {
             conn.execute(
                 "INSERT INTO agent_channels (agent_name, channel_type) VALUES (?1, ?2)",
                 params![agent_name, ch],
-            ).map_err(|e| format!("Insert channel: {e}"))?;
+            )
+            .map_err(|e| format!("Insert channel: {e}"))?;
         }
         Ok(())
     }
@@ -578,11 +701,14 @@ impl GatewayDb {
     /// Get channels for an agent.
     pub fn get_agent_channels(&self, agent_name: &str) -> Result<Vec<String>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
-        let mut stmt = conn.prepare(
-            "SELECT channel_type FROM agent_channels WHERE agent_name=?1 ORDER BY channel_type"
-        ).map_err(|e| format!("Prepare: {e}"))?;
-        
-        let channels = stmt.query_map(params![agent_name], |row| row.get::<_, String>(0))
+        let mut stmt = conn
+            .prepare(
+                "SELECT channel_type FROM agent_channels WHERE agent_name=?1 ORDER BY channel_type",
+            )
+            .map_err(|e| format!("Prepare: {e}"))?;
+
+        let channels = stmt
+            .query_map(params![agent_name], |row| row.get::<_, String>(0))
             .map_err(|e| format!("Query: {e}"))?
             .filter_map(|r| r.ok())
             .collect();
@@ -590,16 +716,20 @@ impl GatewayDb {
     }
 
     /// Get all agent-channel bindings.
-    pub fn all_agent_channels(&self) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    pub fn all_agent_channels(
+        &self,
+    ) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
-        let mut stmt = conn.prepare(
-            "SELECT agent_name, channel_type FROM agent_channels ORDER BY agent_name"
-        ).map_err(|e| format!("Prepare: {e}"))?;
+        let mut stmt = conn
+            .prepare("SELECT agent_name, channel_type FROM agent_channels ORDER BY agent_name")
+            .map_err(|e| format!("Prepare: {e}"))?;
 
         let mut map = std::collections::HashMap::new();
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        }).map_err(|e| format!("Query: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| format!("Query: {e}"))?;
 
         for r in rows.flatten() {
             map.entry(r.0).or_insert_with(Vec::new).push(r.1);
@@ -613,7 +743,8 @@ impl GatewayDb {
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         match conn.query_row(
-            "SELECT value FROM settings WHERE key=?1", params![key],
+            "SELECT value FROM settings WHERE key=?1",
+            params![key],
             |row| row.get::<_, String>(0),
         ) {
             Ok(v) => Ok(Some(v)),
@@ -629,7 +760,8 @@ impl GatewayDb {
             "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
              ON CONFLICT(key) DO UPDATE SET value=?2, updated_at=datetime('now')",
             params![key, value],
-        ).map_err(|e| format!("Set setting: {e}"))?;
+        )
+        .map_err(|e| format!("Set setting: {e}"))?;
         Ok(())
     }
 
@@ -638,7 +770,9 @@ impl GatewayDb {
         let mut count = 0;
         for meta in agents {
             let name = meta["name"].as_str().unwrap_or_default();
-            if name.is_empty() { continue; }
+            if name.is_empty() {
+                continue;
+            }
             let role = meta["role"].as_str().unwrap_or("assistant");
             let description = meta["description"].as_str().unwrap_or("");
             let provider = meta["provider"].as_str().unwrap_or("");
@@ -652,7 +786,11 @@ impl GatewayDb {
 
     /// Seed demo agents — 5 agents across 2 departments for first-time setup.
     /// Only runs when agents table is empty. Uses INSERT OR IGNORE for safety.
-    pub fn seed_demo_agents(&self, default_provider: &str, default_model: &str) -> Result<usize, String> {
+    pub fn seed_demo_agents(
+        &self,
+        default_provider: &str,
+        default_model: &str,
+    ) -> Result<usize, String> {
         // Check if agents already exist — never overwrite user data
         let existing = self.list_agents().unwrap_or_default();
         if !existing.is_empty() {
@@ -665,9 +803,11 @@ impl GatewayDb {
 
         // 1. Sales Bot — tư vấn bán hàng, báo giá, chốt đơn
         self.upsert_agent(
-            "sales-bot", "sales",
+            "sales-bot",
+            "sales",
             "🏢 Phòng KD — Tư vấn sản phẩm, báo giá, chốt đơn hàng, chăm sóc lead",
-            default_provider, default_model,
+            default_provider,
+            default_model,
             "Bạn là nhân viên kinh doanh chuyên nghiệp của công ty. Nhiệm vụ:\n\
              - Tư vấn sản phẩm/dịch vụ cho khách hàng tiềm năng\n\
              - Báo giá, thương lượng và chốt đơn hàng\n\
@@ -681,9 +821,11 @@ impl GatewayDb {
 
         // 2. Marketing Bot — content, quảng cáo, social
         self.upsert_agent(
-            "marketing-bot", "marketing",
+            "marketing-bot",
+            "marketing",
             "🏢 Phòng KD — Viết content, quảng cáo, quản lý social media, chiến dịch",
-            default_provider, default_model,
+            default_provider,
+            default_model,
             "Bạn là chuyên gia marketing sáng tạo. Nhiệm vụ:\n\
              - Viết content quảng cáo, bài đăng social media (Facebook, TikTok, LinkedIn)\n\
              - Lên ý tưởng chiến dịch marketing, khuyến mãi\n\
@@ -718,9 +860,11 @@ impl GatewayDb {
 
         // 4. Support Bot — hỗ trợ khách hàng, FAQ, ticket
         self.upsert_agent(
-            "support-bot", "support",
+            "support-bot",
+            "support",
             "💻 Phòng KT — Hỗ trợ khách hàng, xử lý ticket, FAQ, hướng dẫn sử dụng",
-            default_provider, default_model,
+            default_provider,
+            default_model,
             "Bạn là nhân viên hỗ trợ kỹ thuật cấp 1-2. Nhiệm vụ:\n\
              - Trả lời câu hỏi thường gặp (FAQ) nhanh chóng\n\
              - Hướng dẫn cài đặt, cấu hình sản phẩm\n\
@@ -731,13 +875,22 @@ impl GatewayDb {
              Phong cách: Kiên nhẫn, dễ hiểu, step-by-step. Ưu tiên giải quyết nhanh.\n\
              Ngôn ngữ: Tiếng Việt. Luôn xưng 'em' và gọi khách 'anh/chị'.",
         )?;
-        self.set_agent_channels("support-bot", &["web".to_string(), "telegram".to_string(), "zalo".to_string()])?;
+        self.set_agent_channels(
+            "support-bot",
+            &[
+                "web".to_string(),
+                "telegram".to_string(),
+                "zalo".to_string(),
+            ],
+        )?;
 
         // 5. Analyst Bot — phân tích dữ liệu, báo cáo
         self.upsert_agent(
-            "analyst-bot", "analyst",
+            "analyst-bot",
+            "analyst",
             "💻 Phòng KT — Phân tích dữ liệu, tạo báo cáo, dashboard, KPI tracking",
-            default_provider, default_model,
+            default_provider,
+            default_model,
             "Bạn là chuyên gia phân tích dữ liệu (Data Analyst). Nhiệm vụ:\n\
              - Phân tích dữ liệu kinh doanh, đưa ra insights\n\
              - Tạo báo cáo tổng hợp: doanh thu, chi phí, lợi nhuận\n\
@@ -767,8 +920,12 @@ mod tests {
     fn test_default_providers_seeded() {
         let db = temp_db();
         let providers = db.list_providers("").unwrap();
-        assert!(providers.len() >= 15, "Should have at least 15 default providers, got {}", providers.len());
-        
+        assert!(
+            providers.len() >= 15,
+            "Should have at least 15 default providers, got {}",
+            providers.len()
+        );
+
         let openai = providers.iter().find(|p| p.name == "openai").unwrap();
         assert_eq!(openai.provider_type, "cloud");
         assert_eq!(openai.label, "OpenAI");
@@ -781,23 +938,33 @@ mod tests {
     #[test]
     fn test_provider_crud() {
         let db = temp_db();
-        
+
         // Create custom provider
-        let p = db.upsert_provider(
-            "my-local", "My Local LLM", "🏠", "local",
-            "", "http://localhost:11434/v1",
-            "/chat/completions", "/models", "none",
-            &[], &["my-model".to_string()],
-        ).unwrap();
+        let p = db
+            .upsert_provider(
+                "my-local",
+                "My Local LLM",
+                "🏠",
+                "local",
+                "",
+                "http://localhost:11434/v1",
+                "/chat/completions",
+                "/models",
+                "none",
+                &[],
+                &["my-model".to_string()],
+            )
+            .unwrap();
         assert_eq!(p.name, "my-local");
         assert_eq!(p.label, "My Local LLM");
         assert_eq!(p.provider_type, "local");
-        
+
         // Update
-        db.update_provider_config("my-local", Some("sk-1234"), None).unwrap();
+        db.update_provider_config("my-local", Some("sk-1234"), None)
+            .unwrap();
         let updated = db.get_provider("my-local").unwrap();
         assert_eq!(updated.api_key, "sk-1234");
-        
+
         // Delete
         db.delete_provider("my-local").unwrap();
         assert!(db.get_provider("my-local").is_err());
@@ -816,11 +983,15 @@ mod tests {
     #[test]
     fn test_update_models_cache() {
         let db = temp_db();
-        db.update_provider_models("openai", &[
-            "gpt-4o".to_string(),
-            "gpt-4o-mini".to_string(),
-            "o1-preview".to_string(),
-        ]).unwrap();
+        db.update_provider_models(
+            "openai",
+            &[
+                "gpt-4o".to_string(),
+                "gpt-4o-mini".to_string(),
+                "o1-preview".to_string(),
+            ],
+        )
+        .unwrap();
         let p = db.get_provider("openai").unwrap();
         assert_eq!(p.models.len(), 3);
         assert!(p.models.contains(&"o1-preview".to_string()));
@@ -839,21 +1010,39 @@ mod tests {
     #[test]
     fn test_agent_crud() {
         let db = temp_db();
-        
+
         // Create
-        let a = db.upsert_agent("hr-bot", "assistant", "HR support", "ollama", "llama3.2", "You are HR").unwrap();
+        let a = db
+            .upsert_agent(
+                "hr-bot",
+                "assistant",
+                "HR support",
+                "ollama",
+                "llama3.2",
+                "You are HR",
+            )
+            .unwrap();
         assert_eq!(a.name, "hr-bot");
         assert_eq!(a.provider, "ollama");
-        
+
         // Update
-        let a2 = db.upsert_agent("hr-bot", "assistant", "HR support v2", "deepseek", "deepseek-chat", "You are HR v2").unwrap();
+        let a2 = db
+            .upsert_agent(
+                "hr-bot",
+                "assistant",
+                "HR support v2",
+                "deepseek",
+                "deepseek-chat",
+                "You are HR v2",
+            )
+            .unwrap();
         assert_eq!(a2.description, "HR support v2");
         assert_eq!(a2.provider, "deepseek");
-        
+
         // List
         let agents = db.list_agents().unwrap();
         assert_eq!(agents.len(), 1);
-        
+
         // Delete
         db.delete_agent("hr-bot").unwrap();
         assert!(db.get_agent("hr-bot").is_err());
@@ -862,19 +1051,22 @@ mod tests {
     #[test]
     fn test_agent_channels() {
         let db = temp_db();
-        db.upsert_agent("test", "assistant", "", "", "", "").unwrap();
-        
+        db.upsert_agent("test", "assistant", "", "", "", "")
+            .unwrap();
+
         // Set channels
-        db.set_agent_channels("test", &["telegram".to_string(), "zalo".to_string()]).unwrap();
+        db.set_agent_channels("test", &["telegram".to_string(), "zalo".to_string()])
+            .unwrap();
         let ch = db.get_agent_channels("test").unwrap();
         assert_eq!(ch.len(), 2);
         assert!(ch.contains(&"telegram".to_string()));
-        
+
         // Replace channels
-        db.set_agent_channels("test", &["discord".to_string()]).unwrap();
+        db.set_agent_channels("test", &["discord".to_string()])
+            .unwrap();
         let ch2 = db.get_agent_channels("test").unwrap();
         assert_eq!(ch2, vec!["discord"]);
-        
+
         // Delete agent cascades
         db.delete_agent("test").unwrap();
         let ch3 = db.get_agent_channels("test").unwrap();
@@ -884,12 +1076,12 @@ mod tests {
     #[test]
     fn test_settings() {
         let db = temp_db();
-        
+
         assert!(db.get_setting("theme").unwrap().is_none());
-        
+
         db.set_setting("theme", "dark").unwrap();
         assert_eq!(db.get_setting("theme").unwrap(), Some("dark".to_string()));
-        
+
         db.set_setting("theme", "light").unwrap();
         assert_eq!(db.get_setting("theme").unwrap(), Some("light".to_string()));
     }
@@ -903,7 +1095,7 @@ mod tests {
         ];
         let count = db.migrate_from_agents_json(&json_data).unwrap();
         assert_eq!(count, 2);
-        
+
         let agents = db.list_agents().unwrap();
         assert_eq!(agents.len(), 2);
     }
@@ -913,10 +1105,12 @@ mod tests {
         let db = temp_db();
         db.upsert_agent("a1", "assistant", "", "", "", "").unwrap();
         db.upsert_agent("a2", "assistant", "", "", "", "").unwrap();
-        
-        db.set_agent_channels("a1", &["telegram".to_string(), "zalo".to_string()]).unwrap();
-        db.set_agent_channels("a2", &["discord".to_string()]).unwrap();
-        
+
+        db.set_agent_channels("a1", &["telegram".to_string(), "zalo".to_string()])
+            .unwrap();
+        db.set_agent_channels("a2", &["discord".to_string()])
+            .unwrap();
+
         let all = db.all_agent_channels().unwrap();
         assert_eq!(all.len(), 2);
         assert_eq!(all["a1"].len(), 2);
@@ -927,7 +1121,12 @@ mod tests {
 // ═══ PaaS: API Key Management ═══
 impl GatewayDb {
     /// Create a new API key. Returns the raw key (only shown once).
-    pub fn create_api_key(&self, name: &str, scopes: &str, expires_days: Option<i64>) -> Result<(String, String), String> {
+    pub fn create_api_key(
+        &self,
+        name: &str,
+        scopes: &str,
+        expires_days: Option<i64>,
+    ) -> Result<(String, String), String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         let id = uuid::Uuid::new_v4().to_string();
         // Generate a secure random key with bz_ prefix
@@ -942,7 +1141,9 @@ impl GatewayDb {
         };
         let expires_at = expires_days.map(|d| {
             let now = chrono::Utc::now();
-            (now + chrono::Duration::days(d)).format("%Y-%m-%dT%H:%M:%SZ").to_string()
+            (now + chrono::Duration::days(d))
+                .format("%Y-%m-%dT%H:%M:%SZ")
+                .to_string()
         });
         conn.execute(
             "INSERT INTO api_keys (id, name, key_hash, key_prefix, scopes, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -957,27 +1158,32 @@ impl GatewayDb {
         let mut stmt = conn.prepare(
             "SELECT id, name, key_prefix, scopes, active, last_used_at, expires_at, created_at FROM api_keys ORDER BY created_at DESC"
         ).map_err(|e| format!("Prepare: {e}"))?;
-        let rows = stmt.query_map([], |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "key_prefix": row.get::<_, String>(2)?,
-                "scopes": row.get::<_, String>(3)?,
-                "active": row.get::<_, bool>(4)?,
-                "last_used_at": row.get::<_, Option<String>>(5)?.unwrap_or_default(),
-                "expires_at": row.get::<_, Option<String>>(6)?.unwrap_or_default(),
-                "created_at": row.get::<_, String>(7)?,
-            }))
-        }).map_err(|e| format!("Query: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "name": row.get::<_, String>(1)?,
+                    "key_prefix": row.get::<_, String>(2)?,
+                    "scopes": row.get::<_, String>(3)?,
+                    "active": row.get::<_, bool>(4)?,
+                    "last_used_at": row.get::<_, Option<String>>(5)?.unwrap_or_default(),
+                    "expires_at": row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                    "created_at": row.get::<_, String>(7)?,
+                }))
+            })
+            .map_err(|e| format!("Query: {e}"))?;
         let mut keys = Vec::new();
-        for row in rows { keys.push(row.map_err(|e| format!("Row: {e}"))?); }
+        for row in rows {
+            keys.push(row.map_err(|e| format!("Row: {e}"))?);
+        }
         Ok(keys)
     }
 
     /// Revoke (delete) an API key.
     pub fn revoke_api_key(&self, id: &str) -> Result<bool, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
-        let count = conn.execute("DELETE FROM api_keys WHERE id = ?1", params![id])
+        let count = conn
+            .execute("DELETE FROM api_keys WHERE id = ?1", params![id])
             .map_err(|e| format!("Delete: {e}"))?;
         Ok(count > 0)
     }
@@ -1041,7 +1247,8 @@ impl GatewayDb {
             "INSERT INTO usage_daily (date, metric, value) VALUES (?1, ?2, ?3) \
              ON CONFLICT(date, metric) DO UPDATE SET value = value + ?3",
             params![today, metric, value],
-        ).map_err(|e| format!("Track usage: {e}"))?;
+        )
+        .map_err(|e| format!("Track usage: {e}"))?;
         Ok(())
     }
 
@@ -1049,12 +1256,14 @@ impl GatewayDb {
     pub fn get_monthly_usage(&self) -> Result<serde_json::Value, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         let month_start = chrono::Utc::now().format("%Y-%m-01").to_string();
-        let mut stmt = conn.prepare(
-            "SELECT metric, SUM(value) FROM usage_daily WHERE date >= ?1 GROUP BY metric"
-        ).map_err(|e| format!("Prepare: {e}"))?;
-        let rows = stmt.query_map(params![month_start], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
-        }).map_err(|e| format!("Query: {e}"))?;
+        let mut stmt = conn
+            .prepare("SELECT metric, SUM(value) FROM usage_daily WHERE date >= ?1 GROUP BY metric")
+            .map_err(|e| format!("Prepare: {e}"))?;
+        let rows = stmt
+            .query_map(params![month_start], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            })
+            .map_err(|e| format!("Query: {e}"))?;
         let mut usage = serde_json::Map::new();
         for row in rows {
             if let Ok((metric, value)) = row {
@@ -1068,19 +1277,28 @@ impl GatewayDb {
     pub fn get_daily_usage(&self, days: i64) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         let since = (chrono::Utc::now() - chrono::Duration::days(days))
-            .format("%Y-%m-%d").to_string();
-        let mut stmt = conn.prepare(
-            "SELECT date, metric, value FROM usage_daily WHERE date >= ?1 ORDER BY date ASC"
-        ).map_err(|e| format!("Prepare: {e}"))?;
-        let rows = stmt.query_map(params![since], |row| {
-            Ok(serde_json::json!({
-                "date": row.get::<_, String>(0)?,
-                "metric": row.get::<_, String>(1)?,
-                "value": row.get::<_, f64>(2)?,
-            }))
-        }).map_err(|e| format!("Query: {e}"))?;
+            .format("%Y-%m-%d")
+            .to_string();
+        let mut stmt = conn
+            .prepare(
+                "SELECT date, metric, value FROM usage_daily WHERE date >= ?1 ORDER BY date ASC",
+            )
+            .map_err(|e| format!("Prepare: {e}"))?;
+        let rows = stmt
+            .query_map(params![since], |row| {
+                Ok(serde_json::json!({
+                    "date": row.get::<_, String>(0)?,
+                    "metric": row.get::<_, String>(1)?,
+                    "value": row.get::<_, f64>(2)?,
+                }))
+            })
+            .map_err(|e| format!("Query: {e}"))?;
         let mut items = Vec::new();
-        for row in rows { if let Ok(v) = row { items.push(v); } }
+        for row in rows {
+            if let Ok(v) = row {
+                items.push(v);
+            }
+        }
         Ok(items)
     }
 
@@ -1088,19 +1306,25 @@ impl GatewayDb {
     pub fn get_plan_limits(&self) -> Result<serde_json::Value, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         // Seed defaults if empty
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_agents', 10);
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_channels', 5);
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_tokens_month', 1000000);
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_storage_mb', 1024);
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_api_keys', 10);
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_mcp_servers', 5);
-        ").ok();
-        let mut stmt = conn.prepare("SELECT key, value FROM plan_limits")
+        ",
+        )
+        .ok();
+        let mut stmt = conn
+            .prepare("SELECT key, value FROM plan_limits")
             .map_err(|e| format!("Prepare: {e}"))?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-        }).map_err(|e| format!("Query: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(|e| format!("Query: {e}"))?;
         let mut limits = serde_json::Map::new();
         for row in rows {
             if let Ok((key, value)) = row {
@@ -1117,7 +1341,8 @@ impl GatewayDb {
             "INSERT INTO plan_limits (key, value, updated_at) VALUES (?1, ?2, datetime('now')) \
              ON CONFLICT(key) DO UPDATE SET value = ?2, updated_at = datetime('now')",
             params![key, value],
-        ).map_err(|e| format!("Set limit: {e}"))?;
+        )
+        .map_err(|e| format!("Set limit: {e}"))?;
         Ok(())
     }
 }

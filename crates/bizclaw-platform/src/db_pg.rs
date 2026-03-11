@@ -5,7 +5,7 @@ use bizclaw_core::error::{BizClawError, Result};
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
 // Re-export shared types from the SQLite module
-pub use crate::db::{Tenant, User, AuditEntry, TenantChannel, TenantConfig, TenantAgent};
+pub use crate::db::{AuditEntry, Tenant, TenantAgent, TenantChannel, TenantConfig, User};
 
 /// Memory types matching ReMe's 4-type system.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -209,9 +209,6 @@ impl PgDb {
         Ok(())
     }
 
-
-
-
     /// Get the underlying pool (for direct queries).
     pub fn pool(&self) -> &PgPool {
         &self.pool
@@ -223,8 +220,14 @@ impl PgDb {
 
     #[allow(clippy::too_many_arguments)]
     pub async fn create_tenant(
-        &self, name: &str, slug: &str, port: u16,
-        provider: &str, model: &str, plan: &str, owner_id: Option<&str>,
+        &self,
+        name: &str,
+        slug: &str,
+        port: u16,
+        provider: &str,
+        model: &str,
+        plan: &str,
+        owner_id: Option<&str>,
     ) -> Result<Tenant> {
         let id = uuid::Uuid::new_v4().to_string();
         let pairing_code = format!("{:06}", rand_code());
@@ -277,17 +280,27 @@ impl PgDb {
         Ok(rows.iter().map(pg_row_to_tenant).collect())
     }
 
-    pub async fn update_tenant_status(&self, id: &str, status: &str, pid: Option<u32>) -> Result<()> {
+    pub async fn update_tenant_status(
+        &self,
+        id: &str,
+        status: &str,
+        pid: Option<u32>,
+    ) -> Result<()> {
         sqlx::query("UPDATE tenants SET status=$1, pid=$2, updated_at=NOW() WHERE id=$3")
-            .bind(status).bind(pid.map(|p| p as i32)).bind(id)
-            .execute(&self.pool).await
+            .bind(status)
+            .bind(pid.map(|p| p as i32))
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update status: {e}")))?;
         Ok(())
     }
 
     pub async fn delete_tenant(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM tenants WHERE id=$1")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete tenant: {e}")))?;
         Ok(())
     }
@@ -297,12 +310,14 @@ impl PgDb {
             .bind(slug)
             .fetch_one(&self.pool)
             .await
-            .unwrap_or(0) > 0
+            .unwrap_or(0)
+            > 0
     }
 
     pub async fn get_max_port(&self) -> Result<Option<u16>> {
         let port: Option<i32> = sqlx::query_scalar("SELECT max(port) FROM tenants")
-            .fetch_one(&self.pool).await
+            .fetch_one(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Get max port: {e}")))?;
         Ok(port.map(|p| p as u16))
     }
@@ -310,51 +325,80 @@ impl PgDb {
     pub async fn reset_pairing_code(&self, id: &str) -> Result<String> {
         let code = format!("{:06}", rand_code());
         sqlx::query("UPDATE tenants SET pairing_code=$1 WHERE id=$2")
-            .bind(&code).bind(id).execute(&self.pool).await
+            .bind(&code)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Reset pairing: {e}")))?;
         Ok(code)
     }
 
     pub async fn validate_pairing(&self, slug: &str, code: &str) -> Result<Option<Tenant>> {
         let result = sqlx::query_scalar::<_, String>(
-            "SELECT id FROM tenants WHERE slug=$1 AND pairing_code=$2"
-        ).bind(slug).bind(code).fetch_optional(&self.pool).await
+            "SELECT id FROM tenants WHERE slug=$1 AND pairing_code=$2",
+        )
+        .bind(slug)
+        .bind(code)
+        .fetch_optional(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Validate pairing: {e}")))?;
 
         match result {
             Some(id) => {
                 sqlx::query("UPDATE tenants SET pairing_code=NULL WHERE id=$1")
-                    .bind(&id).execute(&self.pool).await.ok();
+                    .bind(&id)
+                    .execute(&self.pool)
+                    .await
+                    .ok();
                 self.get_tenant(&id).await.map(Some)
             }
             None => Ok(None),
         }
     }
 
-    pub async fn update_tenant_provider(&self, id: &str, provider: &str, model: &str) -> Result<()> {
+    pub async fn update_tenant_provider(
+        &self,
+        id: &str,
+        provider: &str,
+        model: &str,
+    ) -> Result<()> {
         sqlx::query("UPDATE tenants SET provider=$1, model=$2, updated_at=NOW() WHERE id=$3")
-            .bind(provider).bind(model).bind(id)
-            .execute(&self.pool).await
+            .bind(provider)
+            .bind(model)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update provider: {e}")))?;
         Ok(())
     }
 
     pub async fn used_ports(&self) -> Result<Vec<u16>> {
         let ports: Vec<i32> = sqlx::query_scalar("SELECT port FROM tenants WHERE port IS NOT NULL")
-            .fetch_all(&self.pool).await
+            .fetch_all(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Used ports: {e}")))?;
         Ok(ports.into_iter().map(|p| p as u16).collect())
     }
 
     pub async fn tenant_stats(&self) -> Result<(u32, u32, u32, u32)> {
         let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tenants")
-            .fetch_one(&self.pool).await.unwrap_or(0);
-        let running: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tenants WHERE status='running'")
-            .fetch_one(&self.pool).await.unwrap_or(0);
-        let stopped: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tenants WHERE status='stopped'")
-            .fetch_one(&self.pool).await.unwrap_or(0);
+            .fetch_one(&self.pool)
+            .await
+            .unwrap_or(0);
+        let running: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM tenants WHERE status='running'")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
+        let stopped: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM tenants WHERE status='stopped'")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
         let error: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tenants WHERE status='error'")
-            .fetch_one(&self.pool).await.unwrap_or(0);
+            .fetch_one(&self.pool)
+            .await
+            .unwrap_or(0);
         Ok((total as u32, running as u32, stopped as u32, error as u32))
     }
 
@@ -362,19 +406,33 @@ impl PgDb {
     // USERS
     // ════════════════════════════════════════════════════════
 
-    pub async fn create_user(&self, email: &str, password_hash: &str, role: &str, tenant_id: Option<&str>) -> Result<String> {
+    pub async fn create_user(
+        &self,
+        email: &str,
+        password_hash: &str,
+        role: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
-        sqlx::query("INSERT INTO users (id, email, password_hash, role, tenant_id) VALUES ($1,$2,$3,$4,$5)")
-            .bind(&id).bind(email).bind(password_hash).bind(role).bind(tenant_id)
-            .execute(&self.pool).await
-            .map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
+        sqlx::query(
+            "INSERT INTO users (id, email, password_hash, role, tenant_id) VALUES ($1,$2,$3,$4,$5)",
+        )
+        .bind(&id)
+        .bind(email)
+        .bind(password_hash)
+        .bind(role)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
         Ok(id)
     }
 
     pub async fn get_user_by_email(&self, email: &str) -> Result<Option<(String, String, String)>> {
         let row = sqlx::query("SELECT id, password_hash, role FROM users WHERE email=$1")
             .bind(email)
-            .fetch_optional(&self.pool).await
+            .fetch_optional(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Get user: {e}")))?;
 
         Ok(row.map(|r| (r.get("id"), r.get("password_hash"), r.get("role"))))
@@ -387,7 +445,9 @@ impl PgDb {
         .map_err(|e| BizClawError::Memory(format!("Get user by id: {e}")))?;
 
         Ok(row.map(|r| User {
-            id: r.get(0), email: r.get(1), role: r.get(2),
+            id: r.get(0),
+            email: r.get(1),
+            role: r.get(2),
             tenant_id: r.try_get(3).ok().flatten(),
             status: r.try_get::<String, _>(4).unwrap_or("active".into()),
             last_login: r.try_get(5).ok().flatten(),
@@ -401,54 +461,79 @@ impl PgDb {
         ).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List users: {e}")))?;
 
-        Ok(rows.iter().map(|r| User {
-            id: r.get(0), email: r.get(1), role: r.get(2),
-            tenant_id: r.try_get(3).ok().flatten(),
-            status: r.try_get::<String, _>(4).unwrap_or("active".into()),
-            last_login: r.try_get(5).ok().flatten(),
-            created_at: r.get(6),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| User {
+                id: r.get(0),
+                email: r.get(1),
+                role: r.get(2),
+                tenant_id: r.try_get(3).ok().flatten(),
+                status: r.try_get::<String, _>(4).unwrap_or("active".into()),
+                last_login: r.try_get(5).ok().flatten(),
+                created_at: r.get(6),
+            })
+            .collect())
     }
 
     pub async fn update_user_tenant(&self, id: &str, tenant_id: Option<&str>) -> Result<()> {
         sqlx::query("UPDATE users SET tenant_id=$1 WHERE id=$2")
-            .bind(tenant_id).bind(id).execute(&self.pool).await
+            .bind(tenant_id)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update user tenant: {e}")))?;
         Ok(())
     }
 
     pub async fn update_user_status(&self, id: &str, status: &str) -> Result<()> {
         sqlx::query("UPDATE users SET status=$1 WHERE id=$2")
-            .bind(status).bind(id).execute(&self.pool).await
+            .bind(status)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update user status: {e}")))?;
         Ok(())
     }
 
     pub async fn update_user_role(&self, id: &str, role: &str) -> Result<()> {
         sqlx::query("UPDATE users SET role=$1 WHERE id=$2")
-            .bind(role).bind(id).execute(&self.pool).await
+            .bind(role)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update user role: {e}")))?;
         Ok(())
     }
 
     pub async fn update_user_password(&self, id: &str, password_hash: &str) -> Result<()> {
         sqlx::query("UPDATE users SET password_hash=$1 WHERE id=$2")
-            .bind(password_hash).bind(id).execute(&self.pool).await
+            .bind(password_hash)
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Update password: {e}")))?;
         Ok(())
     }
 
     pub async fn delete_user_cascade(&self, id: &str) -> Result<Vec<String>> {
-        let tenant_ids: Vec<String> = sqlx::query_scalar("SELECT id FROM tenants WHERE owner_id=$1")
-            .bind(id).fetch_all(&self.pool).await
-            .map_err(|e| BizClawError::Memory(format!("Get user tenants: {e}")))?;
+        let tenant_ids: Vec<String> =
+            sqlx::query_scalar("SELECT id FROM tenants WHERE owner_id=$1")
+                .bind(id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| BizClawError::Memory(format!("Get user tenants: {e}")))?;
 
         for tid in &tenant_ids {
             sqlx::query("DELETE FROM tenants WHERE id=$1")
-                .bind(tid).execute(&self.pool).await.ok();
+                .bind(tid)
+                .execute(&self.pool)
+                .await
+                .ok();
         }
         sqlx::query("DELETE FROM users WHERE id=$1")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete user: {e}")))?;
         Ok(tenant_ids)
     }
@@ -457,12 +542,21 @@ impl PgDb {
     // PASSWORD RESETS
     // ════════════════════════════════════════════════════════
 
-    pub async fn save_password_reset_token(&self, email: &str, token: &str, expires_at: i64) -> Result<()> {
+    pub async fn save_password_reset_token(
+        &self,
+        email: &str,
+        token: &str,
+        expires_at: i64,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO password_resets (email, token, expires_at) VALUES ($1,$2,$3)
-             ON CONFLICT(email) DO UPDATE SET token=$2, expires_at=$3"
-        ).bind(email).bind(token).bind(expires_at)
-        .execute(&self.pool).await
+             ON CONFLICT(email) DO UPDATE SET token=$2, expires_at=$3",
+        )
+        .bind(email)
+        .bind(token)
+        .bind(expires_at)
+        .execute(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Save reset token: {e}")))?;
         Ok(())
     }
@@ -476,7 +570,9 @@ impl PgDb {
 
     pub async fn delete_password_reset_token(&self, email: &str) -> Result<()> {
         sqlx::query("DELETE FROM password_resets WHERE email=$1")
-            .bind(email).execute(&self.pool).await
+            .bind(email)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete reset token: {e}")))?;
         Ok(())
     }
@@ -485,7 +581,13 @@ impl PgDb {
     // AUDIT LOG
     // ════════════════════════════════════════════════════════
 
-    pub async fn log_event(&self, event_type: &str, actor_type: &str, actor_id: &str, details: Option<&str>) -> Result<()> {
+    pub async fn log_event(
+        &self,
+        event_type: &str,
+        actor_type: &str,
+        actor_id: &str,
+        details: Option<&str>,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO audit_log (event_type, actor_type, actor_id, details) VALUES ($1,$2,$3,$4)"
         ).bind(event_type).bind(actor_type).bind(actor_id).bind(details)
@@ -500,27 +602,44 @@ impl PgDb {
         ).bind(limit as i64).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("Recent events: {e}")))?;
 
-        Ok(rows.iter().map(|r| AuditEntry {
-            id: r.get::<i32, _>(0) as i64,
-            event_type: r.get(1), actor_type: r.get(2),
-            actor_id: r.get(3), details: r.try_get(4).ok().flatten(),
-            created_at: r.get(5),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| AuditEntry {
+                id: r.get::<i32, _>(0) as i64,
+                event_type: r.get(1),
+                actor_type: r.get(2),
+                actor_id: r.get(3),
+                details: r.try_get(4).ok().flatten(),
+                created_at: r.get(5),
+            })
+            .collect())
     }
 
     // ════════════════════════════════════════════════════════
     // TENANT CHANNELS
     // ════════════════════════════════════════════════════════
 
-    pub async fn upsert_channel(&self, tenant_id: &str, channel_type: &str, enabled: bool, config_json: &str) -> Result<TenantChannel> {
+    pub async fn upsert_channel(
+        &self,
+        tenant_id: &str,
+        channel_type: &str,
+        enabled: bool,
+        config_json: &str,
+    ) -> Result<TenantChannel> {
         let id = format!("{}-{}", tenant_id, channel_type);
         sqlx::query(
             "INSERT INTO tenant_channels (id, tenant_id, channel_type, enabled, config_json)
              VALUES ($1, $2, $3, $4, $5::jsonb)
              ON CONFLICT(tenant_id, channel_type, instance_id) DO UPDATE SET
-               enabled=$4, config_json=$5::jsonb, updated_at=NOW()"
-        ).bind(&id).bind(tenant_id).bind(channel_type).bind(enabled).bind(config_json)
-        .execute(&self.pool).await
+               enabled=$4, config_json=$5::jsonb, updated_at=NOW()",
+        )
+        .bind(&id)
+        .bind(tenant_id)
+        .bind(channel_type)
+        .bind(enabled)
+        .bind(config_json)
+        .execute(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Upsert channel: {e}")))?;
         self.get_channel(&id).await
     }
@@ -532,10 +651,15 @@ impl PgDb {
         .map_err(|e| BizClawError::Memory(format!("Get channel: {e}")))?;
 
         Ok(TenantChannel {
-            id: r.get(0), tenant_id: r.get(1), channel_type: r.get(2),
-            enabled: r.get(3), config_json: r.get(4), status: r.get(5),
+            id: r.get(0),
+            tenant_id: r.get(1),
+            channel_type: r.get(2),
+            enabled: r.get(3),
+            config_json: r.get(4),
+            status: r.get(5),
             status_message: r.try_get(6).ok().flatten(),
-            created_at: r.get(7), updated_at: r.get(8),
+            created_at: r.get(7),
+            updated_at: r.get(8),
         })
     }
 
@@ -545,17 +669,27 @@ impl PgDb {
         ).bind(tenant_id).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List channels: {e}")))?;
 
-        Ok(rows.iter().map(|r| TenantChannel {
-            id: r.get(0), tenant_id: r.get(1), channel_type: r.get(2),
-            enabled: r.get(3), config_json: r.get(4), status: r.get(5),
-            status_message: r.try_get(6).ok().flatten(),
-            created_at: r.get(7), updated_at: r.get(8),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| TenantChannel {
+                id: r.get(0),
+                tenant_id: r.get(1),
+                channel_type: r.get(2),
+                enabled: r.get(3),
+                config_json: r.get(4),
+                status: r.get(5),
+                status_message: r.try_get(6).ok().flatten(),
+                created_at: r.get(7),
+                updated_at: r.get(8),
+            })
+            .collect())
     }
 
     pub async fn delete_channel(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM tenant_channels WHERE id=$1")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete channel: {e}")))?;
         Ok(())
     }
@@ -567,18 +701,26 @@ impl PgDb {
     pub async fn set_config(&self, tenant_id: &str, key: &str, value: &str) -> Result<()> {
         sqlx::query(
             "INSERT INTO tenant_configs (tenant_id, key, value) VALUES ($1,$2,$3)
-             ON CONFLICT(tenant_id, key) DO UPDATE SET value=$3, updated_at=NOW()"
-        ).bind(tenant_id).bind(key).bind(value)
-        .execute(&self.pool).await
+             ON CONFLICT(tenant_id, key) DO UPDATE SET value=$3, updated_at=NOW()",
+        )
+        .bind(tenant_id)
+        .bind(key)
+        .bind(value)
+        .execute(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Set config: {e}")))?;
         Ok(())
     }
 
     pub async fn get_config(&self, tenant_id: &str, key: &str) -> Result<Option<String>> {
-        sqlx::query_scalar::<_, String>("SELECT value FROM tenant_configs WHERE tenant_id=$1 AND key=$2")
-            .bind(tenant_id).bind(key)
-            .fetch_optional(&self.pool).await
-            .map_err(|e| BizClawError::Memory(format!("Get config: {e}")))
+        sqlx::query_scalar::<_, String>(
+            "SELECT value FROM tenant_configs WHERE tenant_id=$1 AND key=$2",
+        )
+        .bind(tenant_id)
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| BizClawError::Memory(format!("Get config: {e}")))
     }
 
     pub async fn list_configs(&self, tenant_id: &str) -> Result<Vec<TenantConfig>> {
@@ -587,9 +729,15 @@ impl PgDb {
         ).bind(tenant_id).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List configs: {e}")))?;
 
-        Ok(rows.iter().map(|r| TenantConfig {
-            tenant_id: r.get(0), key: r.get(1), value: r.get(2), updated_at: r.get(3),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| TenantConfig {
+                tenant_id: r.get(0),
+                key: r.get(1),
+                value: r.get(2),
+                updated_at: r.get(3),
+            })
+            .collect())
     }
 
     pub async fn set_configs(&self, tenant_id: &str, configs: &[(String, String)]) -> Result<()> {
@@ -601,7 +749,10 @@ impl PgDb {
 
     pub async fn delete_config(&self, tenant_id: &str, key: &str) -> Result<()> {
         sqlx::query("DELETE FROM tenant_configs WHERE tenant_id=$1 AND key=$2")
-            .bind(tenant_id).bind(key).execute(&self.pool).await
+            .bind(tenant_id)
+            .bind(key)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete config: {e}")))?;
         Ok(())
     }
@@ -612,8 +763,14 @@ impl PgDb {
 
     #[allow(clippy::too_many_arguments)]
     pub async fn upsert_agent(
-        &self, tenant_id: &str, name: &str, role: &str,
-        description: &str, provider: &str, model: &str, system_prompt: &str,
+        &self,
+        tenant_id: &str,
+        name: &str,
+        role: &str,
+        description: &str,
+        provider: &str,
+        model: &str,
+        system_prompt: &str,
     ) -> Result<TenantAgent> {
         let id = format!("{}-{}", tenant_id, name);
         sqlx::query(
@@ -635,10 +792,17 @@ impl PgDb {
         .map_err(|e| BizClawError::Memory(format!("Get agent: {e}")))?;
 
         Ok(TenantAgent {
-            id: r.get(0), tenant_id: r.get(1), name: r.get(2),
-            role: r.get(3), description: r.get(4), provider: r.get(5),
-            model: r.get(6), system_prompt: r.get(7), enabled: r.get(8),
-            created_at: r.get(9), updated_at: r.get(10),
+            id: r.get(0),
+            tenant_id: r.get(1),
+            name: r.get(2),
+            role: r.get(3),
+            description: r.get(4),
+            provider: r.get(5),
+            model: r.get(6),
+            system_prompt: r.get(7),
+            enabled: r.get(8),
+            created_at: r.get(9),
+            updated_at: r.get(10),
         })
     }
 
@@ -648,24 +812,39 @@ impl PgDb {
         ).bind(tenant_id).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List agents: {e}")))?;
 
-        Ok(rows.iter().map(|r| TenantAgent {
-            id: r.get(0), tenant_id: r.get(1), name: r.get(2),
-            role: r.get(3), description: r.get(4), provider: r.get(5),
-            model: r.get(6), system_prompt: r.get(7), enabled: r.get(8),
-            created_at: r.get(9), updated_at: r.get(10),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| TenantAgent {
+                id: r.get(0),
+                tenant_id: r.get(1),
+                name: r.get(2),
+                role: r.get(3),
+                description: r.get(4),
+                provider: r.get(5),
+                model: r.get(6),
+                system_prompt: r.get(7),
+                enabled: r.get(8),
+                created_at: r.get(9),
+                updated_at: r.get(10),
+            })
+            .collect())
     }
 
     pub async fn delete_agent(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM tenant_agents WHERE id=$1")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete agent: {e}")))?;
         Ok(())
     }
 
     pub async fn delete_agent_by_name(&self, tenant_id: &str, name: &str) -> Result<()> {
         sqlx::query("DELETE FROM tenant_agents WHERE tenant_id=$1 AND name=$2")
-            .bind(tenant_id).bind(name).execute(&self.pool).await
+            .bind(tenant_id)
+            .bind(name)
+            .execute(&self.pool)
+            .await
             .map_err(|e| BizClawError::Memory(format!("Delete agent: {e}")))?;
         Ok(())
     }
@@ -676,14 +855,22 @@ impl PgDb {
 
     pub async fn get_platform_config(&self, key: &str) -> Option<String> {
         sqlx::query_scalar::<_, String>("SELECT value FROM platform_configs WHERE key=$1")
-            .bind(key).fetch_optional(&self.pool).await.ok().flatten()
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await
+            .ok()
+            .flatten()
     }
 
     pub async fn set_platform_config(&self, key: &str, value: &str) -> Result<()> {
         sqlx::query(
             "INSERT INTO platform_configs (key, value) VALUES ($1,$2)
-             ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=NOW()"
-        ).bind(key).bind(value).execute(&self.pool).await
+             ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=NOW()",
+        )
+        .bind(key)
+        .bind(value)
+        .execute(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Set platform config: {e}")))?;
         Ok(())
     }
@@ -695,9 +882,14 @@ impl PgDb {
     /// Store personal memory (user preferences, learned facts).
     #[allow(clippy::too_many_arguments)]
     pub async fn store_personal_memory(
-        &self, tenant_id: &str, user_id: Option<&str>,
-        category: &str, key: &str, value: &str,
-        confidence: f32, source: &str,
+        &self,
+        tenant_id: &str,
+        user_id: Option<&str>,
+        category: &str,
+        key: &str,
+        value: &str,
+        confidence: f32,
+        source: &str,
     ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
@@ -712,7 +904,11 @@ impl PgDb {
     }
 
     /// Get all personal memories for a user in a tenant.
-    pub async fn get_personal_memories(&self, tenant_id: &str, user_id: Option<&str>) -> Result<Vec<PersonalMemory>> {
+    pub async fn get_personal_memories(
+        &self,
+        tenant_id: &str,
+        user_id: Option<&str>,
+    ) -> Result<Vec<PersonalMemory>> {
         let rows = sqlx::query(
             "SELECT id, tenant_id, user_id, category, key, value, confidence, source, created_at::text, updated_at::text
              FROM memory_personal WHERE tenant_id=$1 AND ($2::text IS NULL OR user_id=$2)
@@ -721,20 +917,35 @@ impl PgDb {
         .fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("Get personal memories: {e}")))?;
 
-        Ok(rows.iter().map(|r| PersonalMemory {
-            id: r.get(0), tenant_id: r.get(1), user_id: r.try_get(2).ok().flatten(),
-            category: r.get(3), key: r.get(4), value: r.get(5),
-            confidence: r.get(6), source: r.try_get(7).ok().flatten(),
-            created_at: r.get(8), updated_at: r.get(9),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| PersonalMemory {
+                id: r.get(0),
+                tenant_id: r.get(1),
+                user_id: r.try_get(2).ok().flatten(),
+                category: r.get(3),
+                key: r.get(4),
+                value: r.get(5),
+                confidence: r.get(6),
+                source: r.try_get(7).ok().flatten(),
+                created_at: r.get(8),
+                updated_at: r.get(9),
+            })
+            .collect())
     }
 
     /// Store task memory (learned from past tasks).
     #[allow(clippy::too_many_arguments)]
     pub async fn store_task_memory(
-        &self, tenant_id: &str, task_type: &str, description: &str,
-        approach: &str, outcome: &str, lessons: &str,
-        duration: Option<i32>, tokens: Option<i32>,
+        &self,
+        tenant_id: &str,
+        task_type: &str,
+        description: &str,
+        approach: &str,
+        outcome: &str,
+        lessons: &str,
+        duration: Option<i32>,
+        tokens: Option<i32>,
     ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
@@ -750,8 +961,12 @@ impl PgDb {
 
     /// Record tool usage (success/failure tracking).
     pub async fn record_tool_usage(
-        &self, tenant_id: &str, tool_name: &str,
-        success: bool, duration_ms: i32, error: Option<&str>,
+        &self,
+        tenant_id: &str,
+        tool_name: &str,
+        success: bool,
+        duration_ms: i32,
+        error: Option<&str>,
     ) -> Result<()> {
         let success_inc = if success { 1 } else { 0 };
         let failure_inc = if success { 0 } else { 1 };
@@ -776,10 +991,15 @@ impl PgDb {
     /// Store or update working memory (conversation summary).
     #[allow(clippy::too_many_arguments)]
     pub async fn upsert_working_memory(
-        &self, tenant_id: &str, session_id: &str,
-        channel: Option<&str>, user_id: Option<&str>,
-        summary: &str, key_facts: &serde_json::Value,
-        message_count: i32, token_count: i32,
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+        channel: Option<&str>,
+        user_id: Option<&str>,
+        summary: &str,
+        key_facts: &serde_json::Value,
+        message_count: i32,
+        token_count: i32,
     ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
@@ -795,30 +1015,55 @@ impl PgDb {
     }
 
     /// Search memories using keyword (BM25-style trigram search).
-    pub async fn search_memories(&self, tenant_id: &str, query: &str, limit: i32) -> Result<Vec<serde_json::Value>> {
+    pub async fn search_memories(
+        &self,
+        tenant_id: &str,
+        query: &str,
+        limit: i32,
+    ) -> Result<Vec<serde_json::Value>> {
         let rows = sqlx::query(
             "SELECT memory_type, content_text, similarity(content_text, $2) as score
              FROM memory_embeddings
              WHERE tenant_id=$1 AND content_text % $2
-             ORDER BY score DESC LIMIT $3"
-        ).bind(tenant_id).bind(query).bind(limit)
-        .fetch_all(&self.pool).await
+             ORDER BY score DESC LIMIT $3",
+        )
+        .bind(tenant_id)
+        .bind(query)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Search memories: {e}")))?;
 
-        Ok(rows.iter().map(|r| serde_json::json!({
-            "memory_type": r.get::<String, _>(0),
-            "content": r.get::<String, _>(1),
-            "score": r.get::<f32, _>(2),
-        })).collect())
+        Ok(rows
+            .iter()
+            .map(|r| {
+                serde_json::json!({
+                    "memory_type": r.get::<String, _>(0),
+                    "content": r.get::<String, _>(1),
+                    "score": r.get::<f32, _>(2),
+                })
+            })
+            .collect())
     }
 
     /// Index content for memory search.
-    pub async fn index_memory(&self, tenant_id: &str, memory_type: &str, memory_id: &str, content: &str) -> Result<()> {
+    pub async fn index_memory(
+        &self,
+        tenant_id: &str,
+        memory_type: &str,
+        memory_id: &str,
+        content: &str,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO memory_embeddings (id, tenant_id, memory_type, memory_id, content_text)
-             VALUES (uuid_generate_v4(), $1, $2, $3::uuid, $4)"
-        ).bind(tenant_id).bind(memory_type).bind(memory_id).bind(content)
-        .execute(&self.pool).await
+             VALUES (uuid_generate_v4(), $1, $2, $3::uuid, $4)",
+        )
+        .bind(tenant_id)
+        .bind(memory_type)
+        .bind(memory_id)
+        .bind(content)
+        .execute(&self.pool)
+        .await
         .map_err(|e| BizClawError::Memory(format!("Index memory: {e}")))?;
         Ok(())
     }
@@ -837,7 +1082,9 @@ impl PgDb {
         .map_err(|e| BizClawError::Memory(format!("Get heartbeat config: {e}")))?;
 
         Ok(HeartbeatConfig {
-            id: row.get(0), tenant_id: row.get(1), enabled: row.get(2),
+            id: row.get(0),
+            tenant_id: row.get(1),
+            enabled: row.get(2),
             interval_seconds: row.get(3),
             notify_channel: row.try_get(4).ok().flatten(),
             notify_target: row.try_get(5).ok().flatten(),
@@ -848,8 +1095,12 @@ impl PgDb {
 
     /// Update heartbeat config.
     pub async fn update_heartbeat_config(
-        &self, tenant_id: &str, enabled: bool, interval: i32,
-        channel: Option<&str>, target: Option<&str>,
+        &self,
+        tenant_id: &str,
+        enabled: bool,
+        interval: i32,
+        channel: Option<&str>,
+        target: Option<&str>,
     ) -> Result<()> {
         sqlx::query(
             "UPDATE heartbeat_configs SET enabled=$2, interval_seconds=$3, notify_channel=$4, notify_target=$5, updated_at=NOW()
@@ -862,8 +1113,13 @@ impl PgDb {
 
     /// Create a heartbeat task.
     pub async fn create_heartbeat_task(
-        &self, tenant_id: &str, task_name: &str, task_type: &str,
-        cron_expr: Option<&str>, handler: &str, config: &serde_json::Value,
+        &self,
+        tenant_id: &str,
+        task_name: &str,
+        task_type: &str,
+        cron_expr: Option<&str>,
+        handler: &str,
+        config: &serde_json::Value,
     ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
@@ -884,13 +1140,22 @@ impl PgDb {
         ).bind(tenant_id).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List heartbeat tasks: {e}")))?;
 
-        Ok(rows.iter().map(|r| HeartbeatTask {
-            id: r.get(0), tenant_id: r.get(1), task_name: r.get(2),
-            task_type: r.get(3), cron_expression: r.try_get(4).ok().flatten(),
-            handler: r.get(5), config: r.get(6), enabled: r.get(7),
-            last_run: r.try_get(8).ok().flatten(),
-            last_result: r.try_get(9).ok().flatten(), run_count: r.get(10),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| HeartbeatTask {
+                id: r.get(0),
+                tenant_id: r.get(1),
+                task_name: r.get(2),
+                task_type: r.get(3),
+                cron_expression: r.try_get(4).ok().flatten(),
+                handler: r.get(5),
+                config: r.get(6),
+                enabled: r.get(7),
+                last_run: r.try_get(8).ok().flatten(),
+                last_result: r.try_get(9).ok().flatten(),
+                run_count: r.get(10),
+            })
+            .collect())
     }
 
     // ════════════════════════════════════════════════════════
@@ -905,22 +1170,38 @@ impl PgDb {
         ).bind(tenant_id).fetch_all(&self.pool).await
         .map_err(|e| BizClawError::Memory(format!("List skills: {e}")))?;
 
-        Ok(rows.iter().map(|r| Skill {
-            id: r.get(0), tenant_id: r.try_get(1).ok().flatten(),
-            name: r.get(2), slug: r.get(3), description: r.get(4),
-            version: r.get(5), language: r.get(6),
-            category: r.try_get(7).ok().flatten(), entry_point: r.get(8),
-            enabled: r.get(9), is_builtin: r.get(10),
-            usage_count: r.get(11), created_at: r.get(12),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| Skill {
+                id: r.get(0),
+                tenant_id: r.try_get(1).ok().flatten(),
+                name: r.get(2),
+                slug: r.get(3),
+                description: r.get(4),
+                version: r.get(5),
+                language: r.get(6),
+                category: r.try_get(7).ok().flatten(),
+                entry_point: r.get(8),
+                enabled: r.get(9),
+                is_builtin: r.get(10),
+                usage_count: r.get(11),
+                created_at: r.get(12),
+            })
+            .collect())
     }
 
     /// Create or update a skill.
     #[allow(clippy::too_many_arguments)]
     pub async fn upsert_skill(
-        &self, tenant_id: Option<&str>, name: &str, slug: &str,
-        description: &str, language: &str, category: &str,
-        source_code: Option<&str>, entry_point: &str,
+        &self,
+        tenant_id: Option<&str>,
+        name: &str,
+        slug: &str,
+        description: &str,
+        language: &str,
+        category: &str,
+        source_code: Option<&str>,
+        entry_point: &str,
     ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
@@ -952,7 +1233,11 @@ fn pg_row_to_tenant(row: &sqlx::postgres::PgRow) -> Tenant {
         max_channels: row.get::<i32, _>(9) as u32,
         max_members: row.get::<i32, _>(10) as u32,
         pairing_code: row.try_get(11).ok().flatten(),
-        pid: row.try_get::<Option<i32>, _>(12).ok().flatten().map(|p| p as u32),
+        pid: row
+            .try_get::<Option<i32>, _>(12)
+            .ok()
+            .flatten()
+            .map(|p| p as u32),
         cpu_percent: row.get::<f64, _>(13),
         memory_bytes: row.get::<i64, _>(14) as u64,
         disk_bytes: row.get::<i64, _>(15) as u64,

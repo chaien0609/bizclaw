@@ -263,10 +263,7 @@ impl ModelRouter {
         if has_complex_keyword || (deep_history && multi_tool_types) || has_planning {
             debug!(
                 has_complex_keyword,
-                deep_history,
-                multi_tool_types,
-                has_planning,
-                "Classified as Complex"
+                deep_history, multi_tool_types, has_planning, "Classified as Complex"
             );
             return TaskComplexity::Complex;
         }
@@ -285,9 +282,7 @@ impl ModelRouter {
         if short_description && single_tool && all_read_only && !deep_history {
             debug!(
                 short_description,
-                single_tool,
-                all_read_only,
-                "Classified as Simple"
+                single_tool, all_read_only, "Classified as Simple"
             );
             return TaskComplexity::Simple;
         }
@@ -454,7 +449,11 @@ mod tests {
             ..test_config()
         };
         let router = ModelRouter::new(config);
-        let decision = router.route(20, &["shell", "file", "browser"], "complex architecture redesign");
+        let decision = router.route(
+            20,
+            &["shell", "file", "browser"],
+            "complex architecture redesign",
+        );
         assert_eq!(decision.tier, ModelTier::Primary);
         assert_eq!(decision.model, "gemini-2.5-flash");
     }
@@ -502,8 +501,17 @@ mod tests {
 
     #[test]
     fn test_select_tier_mapping() {
-        assert_eq!(ModelRouter::select_tier(TaskComplexity::Simple), ModelTier::Fast);
-        assert_eq!(ModelRouter::select_tier(TaskComplexity::Standard), ModelTier::Primary);
-        assert_eq!(ModelRouter::select_tier(TaskComplexity::Complex), ModelTier::Premium);
+        assert_eq!(
+            ModelRouter::select_tier(TaskComplexity::Simple),
+            ModelTier::Fast
+        );
+        assert_eq!(
+            ModelRouter::select_tier(TaskComplexity::Standard),
+            ModelTier::Primary
+        );
+        assert_eq!(
+            ModelRouter::select_tier(TaskComplexity::Complex),
+            ModelTier::Premium
+        );
     }
 }

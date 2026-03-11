@@ -100,12 +100,24 @@ const TENANT_SELECT: &str = "SELECT id,name,slug,status,port,plan,provider,model
 /// Map a database row to a Tenant struct (eliminates 3x copy-paste).
 fn row_to_tenant(row: &rusqlite::Row) -> rusqlite::Result<Tenant> {
     Ok(Tenant {
-        id: row.get(0)?, name: row.get(1)?, slug: row.get(2)?, status: row.get(3)?,
-        port: row.get(4)?, plan: row.get(5)?, provider: row.get(6)?, model: row.get(7)?,
-        max_messages_day: row.get(8)?, max_channels: row.get(9)?, max_members: row.get(10)?,
-        pairing_code: row.get(11)?, pid: row.get(12)?, cpu_percent: row.get(13)?,
-        memory_bytes: row.get(14)?, disk_bytes: row.get(15)?,
-        owner_id: row.get(16)?, created_at: row.get(17)?,
+        id: row.get(0)?,
+        name: row.get(1)?,
+        slug: row.get(2)?,
+        status: row.get(3)?,
+        port: row.get(4)?,
+        plan: row.get(5)?,
+        provider: row.get(6)?,
+        model: row.get(7)?,
+        max_messages_day: row.get(8)?,
+        max_channels: row.get(9)?,
+        max_members: row.get(10)?,
+        pairing_code: row.get(11)?,
+        pid: row.get(12)?,
+        cpu_percent: row.get(13)?,
+        memory_bytes: row.get(14)?,
+        disk_bytes: row.get(15)?,
+        owner_id: row.get(16)?,
+        created_at: row.get(17)?,
     })
 }
 
@@ -114,13 +126,14 @@ impl PlatformDb {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
             .map_err(|e| BizClawError::Memory(format!("DB open error: {e}")))?;
-            
+
         // Enable WAL mode to allow concurrent readers/writers and prevent "database is locked" errors
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA busy_timeout = 5000;"
-        ).map_err(|e| BizClawError::Memory(format!("DB pragma error: {e}")))?;
+             PRAGMA busy_timeout = 5000;",
+        )
+        .map_err(|e| BizClawError::Memory(format!("DB pragma error: {e}")))?;
 
         let db = Self { conn };
         db.migrate()?;
@@ -241,20 +254,22 @@ impl PlatformDb {
         for stmt in &alter_stmts {
             let _ = self.conn.execute(stmt, []);
         }
-        
+
         Ok(())
     }
 
     // ── Platform Configs ────────────────────────────────────
-    
+
     pub fn get_platform_config(&self, key: &str) -> Option<String> {
-        self.conn.query_row(
-            "SELECT value FROM platform_configs WHERE key=?1",
-            params![key],
-            |row| row.get::<_, String>(0)
-        ).ok()
+        self.conn
+            .query_row(
+                "SELECT value FROM platform_configs WHERE key=?1",
+                params![key],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
     }
-    
+
     pub fn set_platform_config(&self, key: &str, value: &str) -> Result<()> {
         self.conn.execute(
             "INSERT INTO platform_configs (key, value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')",
@@ -290,37 +305,43 @@ impl PlatformDb {
 
     /// Check if a slug is already taken (to enforce uniqueness during auto-provision).
     pub fn is_slug_taken(&self, slug: &str) -> bool {
-        let count: i32 = self.conn.query_row(
-            "SELECT count(*) FROM tenants WHERE slug=?1",
-            params![slug],
-            |row| row.get(0)
-        ).unwrap_or(0);
+        let count: i32 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM tenants WHERE slug=?1",
+                params![slug],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
         count > 0
     }
 
     /// Get the next available port by looking at the maximum allocated port.
     pub fn get_max_port(&self) -> Result<Option<u16>> {
-        self.conn.query_row(
-            "SELECT max(port) FROM tenants",
-            [],
-            |row| row.get::<_, Option<u16>>(0)
-        ).map_err(|e| BizClawError::Memory(format!("Get max port: {e}")))
+        self.conn
+            .query_row("SELECT max(port) FROM tenants", [], |row| {
+                row.get::<_, Option<u16>>(0)
+            })
+            .map_err(|e| BizClawError::Memory(format!("Get max port: {e}")))
     }
 
     /// Get a tenant by ID.
     pub fn get_tenant(&self, id: &str) -> Result<Tenant> {
-        self.conn.query_row(
-            &format!("{} WHERE id=?1", TENANT_SELECT),
-            params![id],
-            row_to_tenant,
-        ).map_err(|e| BizClawError::Memory(format!("Get tenant: {e}")))
+        self.conn
+            .query_row(
+                &format!("{} WHERE id=?1", TENANT_SELECT),
+                params![id],
+                row_to_tenant,
+            )
+            .map_err(|e| BizClawError::Memory(format!("Get tenant: {e}")))
     }
 
     /// List all tenants.
     pub fn list_tenants(&self) -> Result<Vec<Tenant>> {
-        let mut stmt = self.conn.prepare(
-            &format!("{} ORDER BY created_at DESC", TENANT_SELECT),
-        ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
+        let mut stmt = self
+            .conn
+            .prepare(&format!("{} ORDER BY created_at DESC", TENANT_SELECT))
+            .map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
         let tenants = stmt
             .query_map([], row_to_tenant)
@@ -332,9 +353,13 @@ impl PlatformDb {
 
     /// List tenants owned by a specific user.
     pub fn list_tenants_by_owner(&self, owner_id: &str) -> Result<Vec<Tenant>> {
-        let mut stmt = self.conn.prepare(
-            &format!("{} WHERE owner_id=?1 ORDER BY created_at DESC", TENANT_SELECT),
-        ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
+        let mut stmt = self
+            .conn
+            .prepare(&format!(
+                "{} WHERE owner_id=?1 ORDER BY created_at DESC",
+                TENANT_SELECT
+            ))
+            .map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
         let tenants = stmt
             .query_map(params![owner_id], row_to_tenant)
@@ -401,7 +426,13 @@ impl PlatformDb {
     // ── Users ────────────────────────────────────
 
     /// Create user with optional tenant affiliation.
-    pub fn create_user(&self, email: &str, password_hash: &str, role: &str, tenant_id: Option<&str>) -> Result<String> {
+    pub fn create_user(
+        &self,
+        email: &str,
+        password_hash: &str,
+        role: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         self.conn
             .execute(
@@ -493,9 +524,10 @@ impl PlatformDb {
     pub fn delete_user_cascade(&self, id: &str) -> Result<Vec<String>> {
         // Find all tenants owned by this user
         let tenant_ids: Vec<String> = {
-            let mut stmt = self.conn.prepare(
-                "SELECT id FROM tenants WHERE owner_id=?1"
-            ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id FROM tenants WHERE owner_id=?1")
+                .map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
             stmt.query_map(params![id], |row| row.get::<_, String>(0))
                 .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
                 .filter_map(|r| r.ok())
@@ -504,51 +536,72 @@ impl PlatformDb {
 
         // Delete tenant-related data
         for tid in &tenant_ids {
-            let _ = self.conn.execute("DELETE FROM tenant_channels WHERE tenant_id=?1", params![tid]);
-            let _ = self.conn.execute("DELETE FROM tenant_configs WHERE tenant_id=?1", params![tid]);
-            let _ = self.conn.execute("DELETE FROM tenant_agents WHERE tenant_id=?1", params![tid]);
-            let _ = self.conn.execute("DELETE FROM tenant_members WHERE tenant_id=?1", params![tid]);
-            let _ = self.conn.execute("DELETE FROM tenants WHERE id=?1", params![tid]);
+            let _ = self.conn.execute(
+                "DELETE FROM tenant_channels WHERE tenant_id=?1",
+                params![tid],
+            );
+            let _ = self.conn.execute(
+                "DELETE FROM tenant_configs WHERE tenant_id=?1",
+                params![tid],
+            );
+            let _ = self
+                .conn
+                .execute("DELETE FROM tenant_agents WHERE tenant_id=?1", params![tid]);
+            let _ = self.conn.execute(
+                "DELETE FROM tenant_members WHERE tenant_id=?1",
+                params![tid],
+            );
+            let _ = self
+                .conn
+                .execute("DELETE FROM tenants WHERE id=?1", params![tid]);
         }
-        
+
         // Delete the user
         self.conn
             .execute("DELETE FROM users WHERE id=?1", params![id])
             .map_err(|e| BizClawError::Memory(format!("Delete user: {e}")))?;
-        
+
         Ok(tenant_ids)
     }
 
     /// Update user status (pending/active/suspended).
     pub fn update_user_status(&self, id: &str, status: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE users SET status=?1 WHERE id=?2",
-            params![status, id],
-        ).map_err(|e| BizClawError::Memory(format!("Update user status: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE users SET status=?1 WHERE id=?2",
+                params![status, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Update user status: {e}")))?;
         Ok(())
     }
 
     /// Update user role (superadmin/admin/viewer).
     pub fn update_user_role(&self, id: &str, role: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE users SET role=?1 WHERE id=?2",
-            params![role, id],
-        ).map_err(|e| BizClawError::Memory(format!("Update user role: {e}")))?;
+        self.conn
+            .execute("UPDATE users SET role=?1 WHERE id=?2", params![role, id])
+            .map_err(|e| BizClawError::Memory(format!("Update user role: {e}")))?;
         Ok(())
     }
 
     /// Update user password.
     pub fn update_user_password(&self, id: &str, password_hash: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE users SET password_hash=?1 WHERE id=?2",
-            params![password_hash, id],
-        ).map_err(|e| BizClawError::Memory(format!("Update password: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE users SET password_hash=?1 WHERE id=?2",
+                params![password_hash, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Update password: {e}")))?;
         Ok(())
     }
 
     // ── Password Resets ────────────────────────────────────
 
-    pub fn save_password_reset_token(&self, email: &str, token: &str, expires_at: i64) -> Result<()> {
+    pub fn save_password_reset_token(
+        &self,
+        email: &str,
+        token: &str,
+        expires_at: i64,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO password_resets (email, token, expires_at) VALUES (?1,?2,?3) ON CONFLICT(email) DO UPDATE SET token=excluded.token, expires_at=excluded.expires_at",
             params![email, token, expires_at],
@@ -566,7 +619,8 @@ impl PlatformDb {
     }
 
     pub fn delete_password_reset_token(&self, email: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM password_resets WHERE email=?1", params![email])
+        self.conn
+            .execute("DELETE FROM password_resets WHERE email=?1", params![email])
             .map_err(|e| BizClawError::Memory(format!("Delete reset token: {e}")))?;
         Ok(())
     }
@@ -745,13 +799,15 @@ impl PlatformDb {
 
     /// Set a config value for a tenant.
     pub fn set_config(&self, tenant_id: &str, key: &str, value: &str) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO tenant_configs (tenant_id, key, value, updated_at)
+        self.conn
+            .execute(
+                "INSERT INTO tenant_configs (tenant_id, key, value, updated_at)
              VALUES (?1, ?2, ?3, datetime('now'))
              ON CONFLICT(tenant_id, key) DO UPDATE SET
                value = ?3, updated_at = datetime('now')",
-            params![tenant_id, key, value],
-        ).map_err(|e| BizClawError::Memory(format!("Set config: {e}")))?;
+                params![tenant_id, key, value],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Set config: {e}")))?;
         Ok(())
     }
 
@@ -799,19 +855,23 @@ impl PlatformDb {
 
     /// Delete a config key.
     pub fn delete_config(&self, tenant_id: &str, key: &str) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM tenant_configs WHERE tenant_id=?1 AND key=?2",
-            params![tenant_id, key],
-        ).map_err(|e| BizClawError::Memory(format!("Delete config: {e}")))?;
+        self.conn
+            .execute(
+                "DELETE FROM tenant_configs WHERE tenant_id=?1 AND key=?2",
+                params![tenant_id, key],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Delete config: {e}")))?;
         Ok(())
     }
 
     /// Update tenant provider/model in the tenants table.
     pub fn update_tenant_provider(&self, id: &str, provider: &str, model: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE tenants SET provider=?1, model=?2, updated_at=datetime('now') WHERE id=?3",
-            params![provider, model, id],
-        ).map_err(|e| BizClawError::Memory(format!("Update provider: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE tenants SET provider=?1, model=?2, updated_at=datetime('now') WHERE id=?3",
+                params![provider, model, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Update provider: {e}")))?;
         Ok(())
     }
 
@@ -864,11 +924,17 @@ impl PlatformDb {
         let agents = stmt
             .query_map(params![tenant_id], |row| {
                 Ok(TenantAgent {
-                    id: row.get(0)?, tenant_id: row.get(1)?, name: row.get(2)?,
-                    role: row.get(3)?, description: row.get(4)?, provider: row.get(5)?,
-                    model: row.get(6)?, system_prompt: row.get(7)?,
+                    id: row.get(0)?,
+                    tenant_id: row.get(1)?,
+                    name: row.get(2)?,
+                    role: row.get(3)?,
+                    description: row.get(4)?,
+                    provider: row.get(5)?,
+                    model: row.get(6)?,
+                    system_prompt: row.get(7)?,
                     enabled: row.get::<_, i32>(8)? != 0,
-                    created_at: row.get(9)?, updated_at: row.get(10)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
             })
             .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
@@ -918,7 +984,15 @@ mod tests {
     fn test_create_and_list_tenants() {
         let db = temp_db();
         let t = db
-            .create_tenant("TestBot", "testbot", 10001, "openai", "gpt-4o-mini", "free", None)
+            .create_tenant(
+                "TestBot",
+                "testbot",
+                10001,
+                "openai",
+                "gpt-4o-mini",
+                "free",
+                None,
+            )
             .unwrap();
         assert_eq!(t.name, "TestBot");
         assert_eq!(t.slug, "testbot");
@@ -976,7 +1050,9 @@ mod tests {
     fn test_user_crud() {
         let db = temp_db();
         let hash = "$2b$12$fake_hash_for_testing";
-        let id = db.create_user("admin@bizclaw.vn", hash, "admin", None).unwrap();
+        let id = db
+            .create_user("admin@bizclaw.vn", hash, "admin", None)
+            .unwrap();
 
         let user = db.get_user_by_email("admin@bizclaw.vn").unwrap();
         assert!(user.is_some());
@@ -1051,8 +1127,13 @@ mod tests {
         // Create agent
         let agent = db
             .upsert_agent(
-                &t.id, "sales-bot", "assistant", "Sales helper",
-                "ollama", "llama3.2", "You are a sales bot.",
+                &t.id,
+                "sales-bot",
+                "assistant",
+                "Sales helper",
+                "ollama",
+                "llama3.2",
+                "You are a sales bot.",
             )
             .unwrap();
         assert_eq!(agent.name, "sales-bot");
@@ -1061,9 +1142,15 @@ mod tests {
 
         // Create another agent
         db.upsert_agent(
-            &t.id, "hr-bot", "analyst", "HR helper",
-            "openai", "gpt-4o", "You help with HR.",
-        ).unwrap();
+            &t.id,
+            "hr-bot",
+            "analyst",
+            "HR helper",
+            "openai",
+            "gpt-4o",
+            "You help with HR.",
+        )
+        .unwrap();
 
         // List agents
         let agents = db.list_agents(&t.id).unwrap();
@@ -1072,8 +1159,13 @@ mod tests {
         // Update agent (upsert existing)
         let updated = db
             .upsert_agent(
-                &t.id, "sales-bot", "assistant", "Updated sales helper",
-                "gemini", "gemini-2.0-flash", "Updated prompt.",
+                &t.id,
+                "sales-bot",
+                "assistant",
+                "Updated sales helper",
+                "gemini",
+                "gemini-2.0-flash",
+                "Updated prompt.",
             )
             .unwrap();
         assert_eq!(updated.provider, "gemini");
@@ -1098,7 +1190,8 @@ mod tests {
             .unwrap();
         assert_eq!(t.provider, "openai");
 
-        db.update_tenant_provider(&t.id, "ollama", "llama3.2").unwrap();
+        db.update_tenant_provider(&t.id, "ollama", "llama3.2")
+            .unwrap();
         let updated = db.get_tenant(&t.id).unwrap();
         assert_eq!(updated.provider, "ollama");
         assert_eq!(updated.model, "llama3.2");

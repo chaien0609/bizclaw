@@ -104,15 +104,36 @@ impl SchedulerDb {
             .map_err(|e| format!("Migration: {e}"))?;
 
         // Add new columns for existing DBs (safe to fail if already exist)
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN agent_name TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN deliver_to TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE scheduler_tasks ADD COLUMN agent_name TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE scheduler_tasks ADD COLUMN deliver_to TEXT", []);
         // Retry mechanism columns (v2)
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN last_error TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN retry_max INTEGER NOT NULL DEFAULT 3", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN retry_base_delay INTEGER NOT NULL DEFAULT 30", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN retry_backoff REAL NOT NULL DEFAULT 2.0", []);
-        let _ = self.conn.execute("ALTER TABLE scheduler_tasks ADD COLUMN retry_max_delay INTEGER NOT NULL DEFAULT 300", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE scheduler_tasks ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = self
+            .conn
+            .execute("ALTER TABLE scheduler_tasks ADD COLUMN last_error TEXT", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE scheduler_tasks ADD COLUMN retry_max INTEGER NOT NULL DEFAULT 3",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE scheduler_tasks ADD COLUMN retry_base_delay INTEGER NOT NULL DEFAULT 30",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE scheduler_tasks ADD COLUMN retry_backoff REAL NOT NULL DEFAULT 2.0",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE scheduler_tasks ADD COLUMN retry_max_delay INTEGER NOT NULL DEFAULT 300",
+            [],
+        );
 
         Ok(())
     }
@@ -124,7 +145,12 @@ impl SchedulerDb {
         let (action_type, action_data) = match &task.action {
             TaskAction::AgentPrompt(p) => ("agent_prompt", serde_json::json!({"prompt": p})),
             TaskAction::Notify(m) => ("notify", serde_json::json!({"message": m})),
-            TaskAction::Webhook { url, method, body, headers } => (
+            TaskAction::Webhook {
+                url,
+                method,
+                body,
+                headers,
+            } => (
                 "webhook",
                 serde_json::json!({"url": url, "method": method, "body": body, "headers": headers}),
             ),
@@ -223,13 +249,12 @@ impl SchedulerDb {
                         url: action_data["url"].as_str().unwrap_or("").to_string(),
                         method: action_data["method"].as_str().unwrap_or("POST").to_string(),
                         body: action_data["body"].as_str().map(|s| s.to_string()),
-                        headers: serde_json::from_value(
-                            action_data["headers"].clone()
-                        ).unwrap_or_default(),
+                        headers: serde_json::from_value(action_data["headers"].clone())
+                            .unwrap_or_default(),
                     },
-                    _ => {
-                        TaskAction::Notify(action_data["message"].as_str().unwrap_or("").to_string())
-                    }
+                    _ => TaskAction::Notify(
+                        action_data["message"].as_str().unwrap_or("").to_string(),
+                    ),
                 };
 
                 let task_type = match task_type_name.as_str() {
@@ -263,15 +288,21 @@ impl SchedulerDb {
                 let status = match status_str.as_str() {
                     "running" => TaskStatus::Running,
                     "completed" => TaskStatus::Completed,
-                    "failed" => TaskStatus::Failed(last_error.clone().unwrap_or_else(|| "unknown".into())),
+                    "failed" => {
+                        TaskStatus::Failed(last_error.clone().unwrap_or_else(|| "unknown".into()))
+                    }
                     "disabled" => TaskStatus::Disabled,
                     "retry_pending" => {
                         // Reconstruct retry_at from next_run
-                        let retry_at = next_run_str.as_ref()
+                        let retry_at = next_run_str
+                            .as_ref()
                             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
                             .map(|d| d.with_timezone(&Utc))
                             .unwrap_or_else(Utc::now);
-                        TaskStatus::RetryPending { retry_at, attempt: fail_count }
+                        TaskStatus::RetryPending {
+                            retry_at,
+                            attempt: fail_count,
+                        }
                     }
                     _ => TaskStatus::Pending,
                 };
@@ -448,7 +479,14 @@ impl SchedulerDb {
             .execute(
                 "INSERT INTO notifications (title, body, priority, source, channel, created_at) 
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                rusqlite::params![title, body, priority, source, channel, Utc::now().to_rfc3339()],
+                rusqlite::params![
+                    title,
+                    body,
+                    priority,
+                    source,
+                    channel,
+                    Utc::now().to_rfc3339()
+                ],
             )
             .map_err(|e| format!("Save notification: {e}"))?;
         Ok(self.conn.last_insert_rowid())
@@ -560,10 +598,13 @@ impl WorkflowRule {
         action_config: serde_json::Value,
     ) -> Self {
         Self {
-            id: format!("wf-{:x}", std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis()),
+            id: format!(
+                "wf-{:x}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+            ),
             name: name.to_string(),
             description: String::new(),
             trigger_type: trigger_type.to_string(),

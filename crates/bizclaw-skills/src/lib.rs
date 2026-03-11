@@ -13,11 +13,11 @@
 //! - Local directories
 //! - Remote URL (BizClaw Hub)
 
+pub mod builtin;
+pub mod marketplace;
 pub mod parser;
 pub mod registry;
-pub mod marketplace;
-pub mod builtin;
 
+pub use marketplace::SkillMarketplace;
 pub use parser::{SkillManifest, SkillMetadata};
 pub use registry::SkillRegistry;
-pub use marketplace::SkillMarketplace;

@@ -11,8 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Global usage tracker — singleton pattern.
 static TRACKER: std::sync::OnceLock<UsageTracker> = std::sync::OnceLock::new();
@@ -94,12 +94,12 @@ impl UsageTracker {
 
         // Update provider stats
         if let Ok(mut providers) = self.providers.lock() {
-            let entry = providers.entry(provider.to_string()).or_insert_with(|| {
-                ProviderUsage {
+            let entry = providers
+                .entry(provider.to_string())
+                .or_insert_with(|| ProviderUsage {
                     provider_name: provider.to_string(),
                     ..Default::default()
-                }
-            });
+                });
             entry.total_requests += 1;
             entry.prompt_tokens += prompt_tokens;
             entry.completion_tokens += completion_tokens;
@@ -110,12 +110,12 @@ impl UsageTracker {
 
         // Update agent stats
         if let Ok(mut agents) = self.agents.lock() {
-            let entry = agents.entry(agent.to_string()).or_insert_with(|| {
-                AgentUsage {
+            let entry = agents
+                .entry(agent.to_string())
+                .or_insert_with(|| AgentUsage {
                     agent_name: agent.to_string(),
                     ..Default::default()
-                }
-            });
+                });
             entry.total_messages += 1;
             entry.total_tokens += total;
             entry.estimated_cost_usd += cost;
@@ -127,12 +127,12 @@ impl UsageTracker {
         self.total_errors.fetch_add(1, Ordering::Relaxed);
 
         if let Ok(mut providers) = self.providers.lock() {
-            let entry = providers.entry(provider.to_string()).or_insert_with(|| {
-                ProviderUsage {
+            let entry = providers
+                .entry(provider.to_string())
+                .or_insert_with(|| ProviderUsage {
                     provider_name: provider.to_string(),
                     ..Default::default()
-                }
-            });
+                });
             entry.total_errors += 1;
         }
     }
@@ -181,7 +181,8 @@ fn estimate_cost(model: &str, prompt_tokens: u64, completion_tokens: u64) -> f64
         (30.00, 60.00)
     } else if model_lower.contains("gpt-3.5") {
         (0.50, 1.50)
-    } else if model_lower.contains("claude-3-5-sonnet") || model_lower.contains("claude-3.5-sonnet") {
+    } else if model_lower.contains("claude-3-5-sonnet") || model_lower.contains("claude-3.5-sonnet")
+    {
         (3.00, 15.00)
     } else if model_lower.contains("claude-3-5-haiku") || model_lower.contains("claude-3.5-haiku") {
         (0.80, 4.00)
@@ -236,7 +237,11 @@ mod tests {
         let summary = tracker.summary();
         assert_eq!(summary.total_errors, 3);
 
-        let openai = summary.providers.iter().find(|p| p.provider_name == "openai").unwrap();
+        let openai = summary
+            .providers
+            .iter()
+            .find(|p| p.provider_name == "openai")
+            .unwrap();
         assert_eq!(openai.total_errors, 2);
     }
 

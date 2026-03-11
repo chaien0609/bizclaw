@@ -152,8 +152,12 @@ async fn main() -> Result<()> {
                     .take(64)
                     .map(char::from)
                     .collect();
-                tracing::warn!("⚠️  JWT_SECRET not set! Auto-generated 256-bit random secret for this session.");
-                tracing::warn!("⚠️  Tokens will be INVALIDATED on restart. Set JWT_SECRET env var for persistence.");
+                tracing::warn!(
+                    "⚠️  JWT_SECRET not set! Auto-generated 256-bit random secret for this session."
+                );
+                tracing::warn!(
+                    "⚠️  Tokens will be INVALIDATED on restart. Set JWT_SECRET env var for persistence."
+                );
                 secret
             } else {
                 cli.jwt_secret.clone()
@@ -163,20 +167,20 @@ async fn main() -> Result<()> {
 
     // Connect PostgreSQL for enterprise features (optional — falls back gracefully)
     let pg_db = match std::env::var("DATABASE_URL").or_else(|_| std::env::var("BIZCLAW_PG_URL")) {
-        Ok(url) if !url.is_empty() => {
-            match bizclaw_platform::PgDb::connect_with_url(&url).await {
-                Ok(pg) => {
-                    tracing::info!("🐘 PostgreSQL connected — enterprise features enabled");
-                    Some(pg)
-                }
-                Err(e) => {
-                    tracing::warn!("⚠️  PostgreSQL connect failed: {e} — enterprise features disabled");
-                    None
-                }
+        Ok(url) if !url.is_empty() => match bizclaw_platform::PgDb::connect_with_url(&url).await {
+            Ok(pg) => {
+                tracing::info!("🐘 PostgreSQL connected — enterprise features enabled");
+                Some(pg)
             }
-        }
+            Err(e) => {
+                tracing::warn!("⚠️  PostgreSQL connect failed: {e} — enterprise features disabled");
+                None
+            }
+        },
         _ => {
-            tracing::info!("ℹ️  DATABASE_URL not set — enterprise features disabled (SQLite only mode)");
+            tracing::info!(
+                "ℹ️  DATABASE_URL not set — enterprise features disabled (SQLite only mode)"
+            );
             None
         }
     };
@@ -193,7 +197,6 @@ async fn main() -> Result<()> {
         register_attempts: std::sync::Mutex::new(std::collections::HashMap::new()),
         pg_db,
     });
-
 
     // Start server
     println!("🏢 BizClaw Platform v{}", env!("CARGO_PKG_VERSION"));
@@ -220,7 +223,11 @@ async fn main() -> Result<()> {
         let db_lock = state.db.lock().await;
         match db_lock.list_tenants() {
             Ok(tenants) => {
-                let running: Vec<_> = tenants.iter().filter(|t| t.status == "running").cloned().collect();
+                let running: Vec<_> = tenants
+                    .iter()
+                    .filter(|t| t.status == "running")
+                    .cloned()
+                    .collect();
                 if !running.is_empty() {
                     println!("🔄 Auto-restarting {} tenant(s)...", running.len());
                     drop(db_lock); // Release lock before starting tenants

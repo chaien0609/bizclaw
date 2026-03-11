@@ -48,7 +48,11 @@ impl ByteRoverQueryTool {
     pub fn for_tenant(slug: &str) -> Self {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/root"));
         Self {
-            workspace_dir: home.join(".bizclaw").join("tenants").join(slug).join("brain"),
+            workspace_dir: home
+                .join(".bizclaw")
+                .join("tenants")
+                .join(slug)
+                .join("brain"),
         }
     }
 }
@@ -129,10 +133,7 @@ impl Tool for ByteRoverQueryTool {
             if !results.is_empty() {
                 return Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!(
-                        "## ByteRover Context (Local Fallback)\n\n{}",
-                        results
-                    ),
+                    output: format!("## ByteRover Context (Local Fallback)\n\n{}", results),
                     success: true,
                 });
             }
@@ -169,7 +170,11 @@ impl ByteRoverCurateTool {
     pub fn for_tenant(slug: &str) -> Self {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/root"));
         Self {
-            workspace_dir: home.join(".bizclaw").join("tenants").join(slug).join("brain"),
+            workspace_dir: home
+                .join(".bizclaw")
+                .join("tenants")
+                .join(slug)
+                .join("brain"),
         }
     }
 }

@@ -238,8 +238,12 @@ mod tests {
 
     #[test]
     fn test_result_type_alias() {
-        fn returns_ok() -> Result<i32> { Ok(42) }
-        fn returns_err() -> Result<i32> { Err(BizClawError::Other("fail".into())) }
+        fn returns_ok() -> Result<i32> {
+            Ok(42)
+        }
+        fn returns_err() -> Result<i32> {
+            Err(BizClawError::Other("fail".into()))
+        }
         assert_eq!(returns_ok().unwrap(), 42);
         assert!(returns_err().is_err());
     }

@@ -82,10 +82,7 @@ pub enum BudgetStatus {
         usage_percent: f32,
     },
     /// Alert threshold reached but still allowed
-    Alert {
-        usage_percent: f32,
-        message: String,
-    },
+    Alert { usage_percent: f32, message: String },
     /// Budget exceeded — action required
     Exceeded {
         action: BudgetExceedAction,
@@ -166,10 +163,12 @@ impl BudgetManager {
 
         let usage = match usage_map.get(agent_id) {
             Some(u) => u,
-            None => return BudgetStatus::Ok {
-                tokens_remaining: budget.monthly_token_limit,
-                usage_percent: 0.0,
-            },
+            None => {
+                return BudgetStatus::Ok {
+                    tokens_remaining: budget.monthly_token_limit,
+                    usage_percent: 0.0,
+                };
+            }
         };
 
         // Check token limit
@@ -246,13 +245,7 @@ impl BudgetManager {
 
         usage_map
             .iter()
-            .map(|(id, usage)| {
-                (
-                    id.clone(),
-                    usage.clone(),
-                    budgets.get(id).cloned(),
-                )
-            })
+            .map(|(id, usage)| (id.clone(), usage.clone(), budgets.get(id).cloned()))
             .collect()
     }
 

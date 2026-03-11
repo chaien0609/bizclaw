@@ -89,10 +89,7 @@ pub struct MessageResponse {
 /// # Safety
 /// Wraps in catch_unwind to prevent panics from crossing FFI boundary.
 pub fn start_daemon(config: DaemonConfig) -> Result<(), String> {
-    std::panic::catch_unwind(|| {
-        start_daemon_inner(config)
-    })
-    .unwrap_or_else(|e| {
+    std::panic::catch_unwind(|| start_daemon_inner(config)).unwrap_or_else(|e| {
         let msg = if let Some(s) = e.downcast_ref::<&str>() {
             s.to_string()
         } else {
@@ -237,8 +234,8 @@ pub fn get_version() -> String {
 pub fn register_device_tools(device_json: &str) -> Result<(), String> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Validate JSON
-        let parsed: serde_json::Value = serde_json::from_str(device_json)
-            .map_err(|e| format!("Invalid device JSON: {e}"))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(device_json).map_err(|e| format!("Invalid device JSON: {e}"))?;
 
         // Store for agent tool dispatch
         // Store device capabilities for agent tool dispatch
@@ -278,7 +275,8 @@ pub fn execute_device_action(action_json: &str) -> String {
                 return serde_json::json!({
                     "success": false,
                     "error": format!("Invalid action JSON: {e}")
-                }).to_string();
+                })
+                .to_string();
             }
         };
 
@@ -293,7 +291,8 @@ pub fn execute_device_action(action_json: &str) -> String {
             "success": true,
             "action": action_type,
             "status": "forwarded_to_device",
-        }).to_string()
+        })
+        .to_string()
     }))
     .unwrap_or_else(|_| r#"{"success":false,"error":"panic"}"#.into())
 }

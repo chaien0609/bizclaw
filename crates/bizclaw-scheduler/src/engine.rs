@@ -518,7 +518,11 @@ mod tests {
 
         // Re-enable should reset retry state
         engine.set_enabled(&task_id, true);
-        let t = engine.list_tasks().iter().find(|t| t.id == task_id).unwrap();
+        let t = engine
+            .list_tasks()
+            .iter()
+            .find(|t| t.id == task_id)
+            .unwrap();
         assert_eq!(t.fail_count, 0);
         assert_eq!(t.last_error, None);
         assert_eq!(t.status, TaskStatus::Pending);

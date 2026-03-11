@@ -111,7 +111,8 @@ pub struct HeartbeatMonitor {
     entries: Arc<RwLock<HashMap<String, HeartbeatEntry>>>,
     config: HeartbeatConfig,
     /// Callback for status changes (agent_id, old_status, new_status)
-    on_status_change: Arc<RwLock<Option<Box<dyn Fn(&str, HealthStatus, HealthStatus) + Send + Sync>>>>,
+    on_status_change:
+        Arc<RwLock<Option<Box<dyn Fn(&str, HealthStatus, HealthStatus) + Send + Sync>>>>,
 }
 
 impl HeartbeatMonitor {
@@ -227,10 +228,9 @@ impl HeartbeatMonitor {
     /// Start the background monitoring loop.
     pub fn start_monitoring(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
         let interval = self.config.check_interval_seconds;
-        
+
         tokio::spawn(async move {
-            let mut tick =
-                tokio::time::interval(std::time::Duration::from_secs(interval));
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(interval));
 
             loop {
                 tick.tick().await;
@@ -332,22 +332,15 @@ mod tests {
     #[tokio::test]
     async fn test_heartbeat_registration() {
         let monitor = HeartbeatMonitor::default();
-        monitor
-            .register("agent-1", vec!["zalo".into()], 30)
-            .await;
+        monitor.register("agent-1", vec!["zalo".into()], 30).await;
 
-        assert_eq!(
-            monitor.status("agent-1").await,
-            Some(HealthStatus::Healthy)
-        );
+        assert_eq!(monitor.status("agent-1").await, Some(HealthStatus::Healthy));
     }
 
     #[tokio::test]
     async fn test_heartbeat_update() {
         let monitor = HeartbeatMonitor::default();
-        monitor
-            .register("agent-1", vec!["zalo".into()], 30)
-            .await;
+        monitor.register("agent-1", vec!["zalo".into()], 30).await;
 
         monitor
             .heartbeat(
@@ -365,14 +358,9 @@ mod tests {
     #[tokio::test]
     async fn test_offline_marking() {
         let monitor = HeartbeatMonitor::default();
-        monitor
-            .register("agent-1", vec!["zalo".into()], 30)
-            .await;
+        monitor.register("agent-1", vec!["zalo".into()], 30).await;
 
         monitor.mark_offline("agent-1").await;
-        assert_eq!(
-            monitor.status("agent-1").await,
-            Some(HealthStatus::Offline)
-        );
+        assert_eq!(monitor.status("agent-1").await, Some(HealthStatus::Offline));
     }
 }

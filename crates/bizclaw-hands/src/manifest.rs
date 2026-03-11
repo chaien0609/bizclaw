@@ -114,8 +114,8 @@ impl HandManifest {
 
     /// Load manifest from a HAND.toml file path.
     pub fn load(path: &std::path::Path) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Read {}: {e}", path.display()))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Read {}: {e}", path.display()))?;
         Self::from_toml(&content)
     }
 }

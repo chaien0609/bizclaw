@@ -12,8 +12,7 @@ use crate::step::{CollectStrategy, StepResultStatus, StepType, Workflow, Workflo
 
 /// Callback type for agent execution.
 /// Takes (agent_name, prompt) and returns (output, tokens_used).
-pub type AgentCallback =
-    Box<dyn Fn(&str, &str) -> Result<(String, u64), String> + Send + Sync>;
+pub type AgentCallback = Box<dyn Fn(&str, &str) -> Result<(String, u64), String> + Send + Sync>;
 
 /// Workflow execution engine.
 pub struct WorkflowEngine {
@@ -34,9 +33,12 @@ impl WorkflowEngine {
 
     /// Register a workflow.
     pub fn register(&mut self, workflow: Workflow) {
-        info!("📋 Registered workflow: {} ({} steps)", workflow.name, workflow.step_count());
-        self.workflows
-            .insert(workflow.name.clone(), workflow);
+        info!(
+            "📋 Registered workflow: {} ({} steps)",
+            workflow.name,
+            workflow.step_count()
+        );
+        self.workflows.insert(workflow.name.clone(), workflow);
     }
 
     /// Get a workflow by name.
@@ -82,22 +84,31 @@ impl WorkflowEngine {
         );
 
         for (idx, step) in workflow.steps.iter().enumerate() {
-            debug!("→ Step {}/{}: '{}' (agent: {})", idx + 1, workflow.step_count(), step.name, step.agent);
+            debug!(
+                "→ Step {}/{}: '{}' (agent: {})",
+                idx + 1,
+                workflow.step_count(),
+                step.name,
+                step.agent
+            );
 
             let step_start = Utc::now();
             let current_input = state.last_output().to_string();
 
             let result = match &step.step_type {
-                StepType::Sequential => {
-                    self.execute_sequential(step, &current_input, agent_fn)
-                }
+                StepType::Sequential => self.execute_sequential(step, &current_input, agent_fn),
                 StepType::FanOut { parallel_steps } => {
                     self.execute_fanout(step, &current_input, parallel_steps, &workflow, agent_fn)
                 }
-                StepType::Collect { strategy, evaluator } => {
-                    self.execute_collect(step, &state, strategy, evaluator.as_deref(), agent_fn)
-                }
-                StepType::Conditional { condition, if_true, if_false } => {
+                StepType::Collect {
+                    strategy,
+                    evaluator,
+                } => self.execute_collect(step, &state, strategy, evaluator.as_deref(), agent_fn),
+                StepType::Conditional {
+                    condition,
+                    if_true,
+                    if_false,
+                } => {
                     let target = if condition.evaluate(&current_input) {
                         if_true
                     } else {
@@ -220,9 +231,7 @@ impl WorkflowEngine {
 
         Err(format!(
             "Step '{}' failed after {} retries: {}",
-            step.name,
-            step.max_retries,
-            last_err
+            step.name, step.max_retries, last_err
         ))
     }
 
@@ -380,7 +389,10 @@ impl WorkflowEngine {
             iterations += 1;
 
             if config.stop_condition.evaluate(&result.output) {
-                debug!("  🛑 Loop '{}' stop condition met at iteration {}", parent_step.name, iterations);
+                debug!(
+                    "  🛑 Loop '{}' stop condition met at iteration {}",
+                    parent_step.name, iterations
+                );
                 current_input = result.output;
                 break;
             }
@@ -464,7 +476,9 @@ mod tests {
         ));
 
         engine.register(wf);
-        let state = engine.execute("test_transform", "hello world", &mock_agent_fn()).unwrap();
+        let state = engine
+            .execute("test_transform", "hello world", &mock_agent_fn())
+            .unwrap();
         assert_eq!(state.status, WorkflowStatus::Completed);
         assert_eq!(state.last_output(), "<article>hello world</article>");
         assert_eq!(state.total_tokens, 0);
@@ -474,8 +488,16 @@ mod tests {
     fn test_engine_fanout() {
         let mut engine = WorkflowEngine::new();
         let wf = Workflow::new("test_fanout", "Fan-out test")
-            .add_step(WorkflowStep::new("expert1", "analyst", StepType::Sequential))
-            .add_step(WorkflowStep::new("expert2", "researcher", StepType::Sequential))
+            .add_step(WorkflowStep::new(
+                "expert1",
+                "analyst",
+                StepType::Sequential,
+            ))
+            .add_step(WorkflowStep::new(
+                "expert2",
+                "researcher",
+                StepType::Sequential,
+            ))
             .add_step(WorkflowStep::new(
                 "parallel",
                 "coordinator",
@@ -485,7 +507,9 @@ mod tests {
             ));
 
         engine.register(wf);
-        let state = engine.execute("test_fanout", "analyze market", &mock_agent_fn()).unwrap();
+        let state = engine
+            .execute("test_fanout", "analyze market", &mock_agent_fn())
+            .unwrap();
         assert_eq!(state.status, WorkflowStatus::Completed);
     }
 
@@ -501,12 +525,22 @@ mod tests {
         });
 
         let wf = Workflow::new("test_optional", "Optional test")
-            .add_step(WorkflowStep::new("good", "good_agent", StepType::Sequential))
+            .add_step(WorkflowStep::new(
+                "good",
+                "good_agent",
+                StepType::Sequential,
+            ))
             .add_step(WorkflowStep::new("bad", "failing", StepType::Sequential).optional())
-            .add_step(WorkflowStep::new("final", "good_agent", StepType::Sequential));
+            .add_step(WorkflowStep::new(
+                "final",
+                "good_agent",
+                StepType::Sequential,
+            ));
 
         engine.register(wf);
-        let state = engine.execute("test_optional", "input", &failing_agent).unwrap();
+        let state = engine
+            .execute("test_optional", "input", &failing_agent)
+            .unwrap();
         assert_eq!(state.status, WorkflowStatus::Completed);
         assert_eq!(state.step_results.len(), 3);
         assert_eq!(state.step_results[1].status, StepResultStatus::Skipped);
@@ -522,8 +556,11 @@ mod tests {
     #[test]
     fn test_engine_history() {
         let mut engine = WorkflowEngine::new();
-        let wf = Workflow::new("htest", "History test")
-            .add_step(WorkflowStep::new("s1", "a", StepType::Sequential));
+        let wf = Workflow::new("htest", "History test").add_step(WorkflowStep::new(
+            "s1",
+            "a",
+            StepType::Sequential,
+        ));
         engine.register(wf);
         engine.execute("htest", "x", &mock_agent_fn()).unwrap();
         engine.execute("htest", "y", &mock_agent_fn()).unwrap();

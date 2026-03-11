@@ -27,7 +27,10 @@ pub fn dashboard_static_files() -> HashMap<&'static str, (&'static str, &'static
     // CSS
     files.insert(
         "/static/dashboard/styles.css",
-        (include_str!("dashboard/styles.css"), "text/css; charset=utf-8"),
+        (
+            include_str!("dashboard/styles.css"),
+            "text/css; charset=utf-8",
+        ),
     );
 
     // Main app

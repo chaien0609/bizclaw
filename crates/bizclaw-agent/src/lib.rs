@@ -174,9 +174,10 @@ impl Agent {
         // CRITICAL: create_provider is sync and can block (e.g., brain GGUF loading).
         // Run it on a blocking thread so it doesn't stall the tokio runtime.
         let config_clone = config.clone();
-        let provider = tokio::task::spawn_blocking(move || {
-            bizclaw_providers::create_provider(&config_clone)
-        }).await.map_err(|e| bizclaw_core::error::BizClawError::Other(format!("spawn: {e}")))??;
+        let provider =
+            tokio::task::spawn_blocking(move || bizclaw_providers::create_provider(&config_clone))
+                .await
+                .map_err(|e| bizclaw_core::error::BizClawError::Other(format!("spawn: {e}")))??;
         let memory = bizclaw_memory::create_memory(&config.memory)?;
         let mut tools = bizclaw_tools::ToolRegistry::with_defaults();
         let security = bizclaw_security::DefaultSecurityPolicy::new(config.autonomy.clone());
@@ -202,7 +203,8 @@ impl Agent {
             let results = tokio::time::timeout(
                 std::time::Duration::from_secs(10),
                 bizclaw_mcp::bridge::connect_mcp_servers(&mcp_configs),
-            ).await;
+            )
+            .await;
             let mut total_mcp_tools = 0;
             match results {
                 Ok(connections) => {
@@ -289,10 +291,17 @@ impl Agent {
         let mut compacted = false;
         let estimated_tokens = self.estimate_tokens();
         let max_context = self.config.brain.context_length as usize;
-        let utilization = if max_context > 0 { estimated_tokens as f32 / max_context as f32 } else { 0.0 };
+        let utilization = if max_context > 0 {
+            estimated_tokens as f32 / max_context as f32
+        } else {
+            0.0
+        };
 
         if utilization > 0.70 && self.conversation.len() > 10 {
-            tracing::info!("📦 Auto-compaction triggered ({}% used)", (utilization * 100.0) as u32);
+            tracing::info!(
+                "📦 Auto-compaction triggered ({}% used)",
+                (utilization * 100.0) as u32
+            );
             self.compact_conversation().await;
             compacted = true;
         }
@@ -366,7 +375,11 @@ impl Agent {
         let mut tool_rounds = 0;
 
         for round in 0..=MAX_ROUNDS {
-            let tools = if round < MAX_ROUNDS { &tool_defs } else { &vec![] };
+            let tools = if round < MAX_ROUNDS {
+                &tool_defs
+            } else {
+                &vec![]
+            };
             tracing::debug!("🧠 Think round {}/{}", round + 1, MAX_ROUNDS);
 
             // Circuit Breaker: check if provider is available
@@ -389,26 +402,39 @@ impl Agent {
                 }
                 Err(e) => {
                     self.circuit_breaker.record_failure();
-                    tracing::error!("Provider error: {} (CB: {})", e, self.circuit_breaker.summary());
+                    tracing::error!(
+                        "Provider error: {} (CB: {})",
+                        e,
+                        self.circuit_breaker.summary()
+                    );
                     return Err(e);
                 }
             };
 
             if resp.tool_calls.is_empty() {
-                final_content = resp.content.unwrap_or_else(|| "I'm not sure how to respond.".into());
+                final_content = resp
+                    .content
+                    .unwrap_or_else(|| "I'm not sure how to respond.".into());
                 self.conversation.push(Message::assistant(&final_content));
                 break;
             }
 
             // ACT
             tool_rounds = round + 1;
-            tracing::info!("⚡ Act round {}: {} tool(s)", tool_rounds, resp.tool_calls.len());
+            tracing::info!(
+                "⚡ Act round {}: {} tool(s)",
+                tool_rounds,
+                resp.tool_calls.len()
+            );
 
             let mut results = Vec::new();
             for tc in &resp.tool_calls {
                 tracing::info!("  → {}", tc.function.name);
                 // Tool loop detection — block repeated calls to save tokens
-                if self.loop_detector.check(&tc.function.name, &tc.function.arguments) {
+                if self
+                    .loop_detector
+                    .check(&tc.function.name, &tc.function.arguments)
+                {
                     results.push(Message::tool(
                         format!("⚠️ Loop detected: '{}' called repeatedly with same args — blocked to save tokens", tc.function.name),
                         &tc.id,
@@ -418,22 +444,35 @@ impl Agent {
                 // Security check for shell, execute_code, and file tools
                 let is_tool_blocked = match tc.function.name.as_str() {
                     "shell" => {
-                        if let Ok(args) = serde_json::from_str::<serde_json::Value>(&tc.function.arguments) {
+                        if let Ok(args) =
+                            serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
+                        {
                             if let Some(cmd) = args["command"].as_str() {
                                 !self.security.check_command(cmd).await.unwrap_or(false)
-                            } else { false }
-                        } else { false }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
                     }
                     "file" => {
-                        if let Ok(args) = serde_json::from_str::<serde_json::Value>(&tc.function.arguments) {
+                        if let Ok(args) =
+                            serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
+                        {
                             let path = args["path"].as_str().unwrap_or("");
                             !self.security.check_path(path).await.unwrap_or(false)
-                        } else { false }
+                        } else {
+                            false
+                        }
                     }
                     _ => false,
                 };
                 if is_tool_blocked {
-                    results.push(Message::tool(format!("Permission denied: '{}'", tc.function.name), &tc.id));
+                    results.push(Message::tool(
+                        format!("Permission denied: '{}'", tc.function.name),
+                        &tc.id,
+                    ));
                     continue;
                 }
                 if let Some(tool) = self.tools.get(&tc.function.name) {
@@ -441,13 +480,18 @@ impl Agent {
                         Ok(r) => {
                             let out = if r.output.len() > 4000 {
                                 format!("{}...[truncated]", &r.output[..4000])
-                            } else { r.output };
+                            } else {
+                                r.output
+                            };
                             results.push(Message::tool(&out, &tc.id));
                         }
                         Err(e) => results.push(Message::tool(format!("Error: {e}"), &tc.id)),
                     }
                 } else {
-                    results.push(Message::tool(format!("Not found: {}", tc.function.name), &tc.id));
+                    results.push(Message::tool(
+                        format!("Not found: {}", tc.function.name),
+                        &tc.id,
+                    ));
                 }
             }
 
@@ -455,10 +499,13 @@ impl Agent {
             self.conversation.push(Message {
                 role: bizclaw_core::types::Role::Assistant,
                 content: resp.content.clone().unwrap_or_default(),
-                name: None, tool_call_id: None,
+                name: None,
+                tool_call_id: None,
                 tool_calls: Some(resp.tool_calls.clone()),
             });
-            for r in results { self.conversation.push(r); }
+            for r in results {
+                self.conversation.push(r);
+            }
             tracing::debug!("🔍 Observe — looping to Think");
         }
 
@@ -469,37 +516,59 @@ impl Agent {
 
         // Quality Gate
         if let Some(ref gate) = self.config.quality_gate
-            && !gate.evaluator_prompt.is_empty() {
-                let max_rev = gate.max_revisions.unwrap_or(2) as usize;
-                for rev in 0..max_rev {
-                    let ep = format!("{}\n\nUSER: {}\nRESPONSE: {}\n\nReply APPROVED or REVISION_NEEDED: <feedback>",
-                        gate.evaluator_prompt, user_message, final_content);
-                    let em = vec![Message::system("Quality evaluator."), Message::user(&ep)];
-                    let epar = GenerateParams {
-                        model: gate.evaluator_model.clone().unwrap_or(self.config.default_model.clone()),
-                        temperature: 0.3, max_tokens: 500, top_p: 0.9, stop: vec![],
-                        extended_thinking: false, thinking_budget_tokens: 0,
-                        reasoning_effort: String::new(),
-                    };
-                    match self.provider.chat(&em, &[], &epar).await {
-                        Ok(er) => {
-                            let e = er.content.unwrap_or_default();
-                            if e.contains("APPROVED") { tracing::info!("✅ QG passed"); break; }
-                            if e.contains("REVISION_NEEDED") {
-                                tracing::info!("🔄 Revision {}/{}", rev+1, max_rev);
-                                let fb = e.split_once(':').map(|x| x.1).unwrap_or("Improve.");
-                                self.conversation.push(Message::system(format!("[QG rev {}/{}] {}", rev+1, max_rev, fb.trim())));
-                                if let Ok(rv) = self.provider.chat(&self.conversation, &[], &params).await
-                                    && let Some(nc) = rv.content {
-                                        final_content = nc;
-                                        self.conversation.push(Message::assistant(&final_content));
-                                    }
-                            } else { break; }
+            && !gate.evaluator_prompt.is_empty()
+        {
+            let max_rev = gate.max_revisions.unwrap_or(2) as usize;
+            for rev in 0..max_rev {
+                let ep = format!(
+                    "{}\n\nUSER: {}\nRESPONSE: {}\n\nReply APPROVED or REVISION_NEEDED: <feedback>",
+                    gate.evaluator_prompt, user_message, final_content
+                );
+                let em = vec![Message::system("Quality evaluator."), Message::user(&ep)];
+                let epar = GenerateParams {
+                    model: gate
+                        .evaluator_model
+                        .clone()
+                        .unwrap_or(self.config.default_model.clone()),
+                    temperature: 0.3,
+                    max_tokens: 500,
+                    top_p: 0.9,
+                    stop: vec![],
+                    extended_thinking: false,
+                    thinking_budget_tokens: 0,
+                    reasoning_effort: String::new(),
+                };
+                match self.provider.chat(&em, &[], &epar).await {
+                    Ok(er) => {
+                        let e = er.content.unwrap_or_default();
+                        if e.contains("APPROVED") {
+                            tracing::info!("✅ QG passed");
+                            break;
                         }
-                        Err(_) => break,
+                        if e.contains("REVISION_NEEDED") {
+                            tracing::info!("🔄 Revision {}/{}", rev + 1, max_rev);
+                            let fb = e.split_once(':').map(|x| x.1).unwrap_or("Improve.");
+                            self.conversation.push(Message::system(format!(
+                                "[QG rev {}/{}] {}",
+                                rev + 1,
+                                max_rev,
+                                fb.trim()
+                            )));
+                            if let Ok(rv) =
+                                self.provider.chat(&self.conversation, &[], &params).await
+                                && let Some(nc) = rv.content
+                            {
+                                final_content = nc;
+                                self.conversation.push(Message::assistant(&final_content));
+                            }
+                        } else {
+                            break;
+                        }
                     }
+                    Err(_) => break,
                 }
             }
+        }
 
         // Save memory + update stats
         self.save_memory(user_message, &final_content).await;
@@ -508,13 +577,14 @@ impl Agent {
             message_count: self.conversation.len(),
             estimated_tokens: new_tokens,
             utilization_pct: new_tokens as f32 / max_context as f32 * 100.0,
-            max_context, last_tool_rounds: tool_rounds, compacted,
+            max_context,
+            last_tool_rounds: tool_rounds,
+            compacted,
             session_id: self.session_id.clone(),
         };
 
         Ok(final_content)
     }
-
 
     /// Search the knowledge base for relevant context.
     /// Uses hybrid search (keyword + vector) when embeddings are available.
@@ -575,8 +645,8 @@ impl Agent {
             .build()
             .ok()?;
 
-        let endpoint = std::env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let endpoint =
+            std::env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
 
         let body = serde_json::json!({
             "model": "nomic-embed-text",
@@ -602,11 +672,7 @@ impl Agent {
             .filter_map(|v: &serde_json::Value| v.as_f64().map(|f| f as f32))
             .collect();
 
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+        if vec.is_empty() { None } else { Some(vec) }
     }
 
     /// Retrieve relevant past conversations from memory (FTS5-powered).

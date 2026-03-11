@@ -6,8 +6,8 @@ use super::models::ZaloMessage;
 use bizclaw_core::error::{BizClawError, Result};
 use bizclaw_core::types::IncomingMessage;
 use futures::StreamExt;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
@@ -97,10 +97,7 @@ impl ZaloListener {
     /// Start listening and sending IncomingMessage to the provided sender.
     /// This spawns a background task that auto-reconnects.
     /// Returns the receiver end for consuming messages.
-    pub fn start_listening(
-        &self,
-        cookie: String,
-    ) -> mpsc::Receiver<IncomingMessage> {
+    pub fn start_listening(&self, cookie: String) -> mpsc::Receiver<IncomingMessage> {
         let (tx, rx) = mpsc::channel::<IncomingMessage>(256);
 
         let ws_url = self.ws_url.clone();
@@ -213,8 +210,7 @@ impl ZaloListener {
                                         sender_id: zalo_msg.sender_id.clone(),
                                         sender_name: None,
                                         content,
-                                        thread_type:
-                                            bizclaw_core::types::ThreadType::Direct,
+                                        thread_type: bizclaw_core::types::ThreadType::Direct,
                                         timestamp: chrono::DateTime::from_timestamp(
                                             zalo_msg.timestamp as i64,
                                             0,
@@ -310,10 +306,7 @@ impl ZaloListener {
             501 => {
                 // New message
                 Ok(ZaloEvent::Message(ZaloMessage {
-                    msg_id: json["data"]["msgId"]
-                        .as_str()
-                        .unwrap_or("")
-                        .into(),
+                    msg_id: json["data"]["msgId"].as_str().unwrap_or("").into(),
                     thread_id: json["data"]["toid"]
                         .as_str()
                         .or_else(|| json["data"]["idTo"].as_str())

@@ -32,7 +32,11 @@ pub struct LineChannel {
 
 impl LineChannel {
     pub fn new(config: LineConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 
     /// Parse LINE webhook event.
@@ -65,22 +69,35 @@ impl LineChannel {
 
 #[async_trait]
 impl Channel for LineChannel {
-    fn name(&self) -> &str { "line" }
+    fn name(&self) -> &str {
+        "line"
+    }
     async fn connect(&mut self) -> Result<()> {
         self.connected = true;
         tracing::info!("📱 LINE channel connected");
         Ok(())
     }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let body = serde_json::json!({
             "to": message.thread_id,
             "messages": [{"type": "text", "text": message.content}]
         });
-        self.client.post("https://api.line.me/v2/bot/message/push")
-            .header("Authorization", format!("Bearer {}", self.config.channel_access_token))
-            .json(&body).send().await
+        self.client
+            .post("https://api.line.me/v2/bot/message/push")
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.channel_access_token),
+            )
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("LINE: {e}")))?;
         Ok(())
     }
@@ -112,7 +129,11 @@ pub struct TeamsChannel {
 
 impl TeamsChannel {
     pub fn new(config: TeamsConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 
     pub fn parse_activity(&self, payload: &serde_json::Value) -> Option<IncomingMessage> {
@@ -125,7 +146,8 @@ impl TeamsChannel {
             sender_id: payload["from"]["id"].as_str().unwrap_or("").into(),
             sender_name: payload["from"]["name"].as_str().map(String::from),
             content: payload["text"].as_str().unwrap_or("").into(),
-            thread_type: if payload["conversation"]["conversationType"].as_str() == Some("personal") {
+            thread_type: if payload["conversation"]["conversationType"].as_str() == Some("personal")
+            {
                 ThreadType::Direct
             } else {
                 ThreadType::Group
@@ -138,10 +160,20 @@ impl TeamsChannel {
 
 #[async_trait]
 impl Channel for TeamsChannel {
-    fn name(&self) -> &str { "teams" }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        "teams"
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, _message: OutgoingMessage) -> Result<()> {
         // Teams requires Bot Framework REST API with OAuth token
         tracing::warn!("Teams send: not yet implemented — requires Bot Framework auth");
@@ -173,24 +205,41 @@ pub struct SignalChannel {
 
 impl SignalChannel {
     pub fn new(config: SignalConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 }
 
 #[async_trait]
 impl Channel for SignalChannel {
-    fn name(&self) -> &str { "signal" }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        "signal"
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let body = serde_json::json!({
             "message": message.content,
             "number": self.config.phone_number,
             "recipients": [message.thread_id],
         });
-        self.client.post(format!("{}/v2/send", self.config.api_url))
-            .json(&body).send().await
+        self.client
+            .post(format!("{}/v2/send", self.config.api_url))
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Signal: {e}")))?;
         Ok(())
     }
@@ -220,24 +269,46 @@ pub struct MatrixChannel {
 
 impl MatrixChannel {
     pub fn new(config: MatrixConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 }
 
 #[async_trait]
 impl Channel for MatrixChannel {
-    fn name(&self) -> &str { "matrix" }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        "matrix"
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let txn_id = uuid::Uuid::new_v4().to_string();
-        let url = format!("{}/_matrix/client/v3/rooms/{}/send/m.room.message/{}",
-            self.config.homeserver_url, message.thread_id, txn_id);
+        let url = format!(
+            "{}/_matrix/client/v3/rooms/{}/send/m.room.message/{}",
+            self.config.homeserver_url, message.thread_id, txn_id
+        );
         let body = serde_json::json!({"msgtype": "m.text", "body": message.content});
-        self.client.put(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
-            .json(&body).send().await
+        self.client
+            .put(&url)
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Matrix: {e}")))?;
         Ok(())
     }
@@ -266,16 +337,30 @@ pub struct ViberChannel {
 
 impl ViberChannel {
     pub fn new(config: ViberConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 }
 
 #[async_trait]
 impl Channel for ViberChannel {
-    fn name(&self) -> &str { "viber" }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        "viber"
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let body = serde_json::json!({
             "receiver": message.thread_id,
@@ -283,9 +368,12 @@ impl Channel for ViberChannel {
             "text": message.content,
             "sender": {"name": self.config.bot_name},
         });
-        self.client.post("https://chatapi.viber.com/pa/send_message")
+        self.client
+            .post("https://chatapi.viber.com/pa/send_message")
             .header("X-Viber-Auth-Token", &self.config.auth_token)
-            .json(&body).send().await
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Viber: {e}")))?;
         Ok(())
     }
@@ -314,7 +402,11 @@ pub struct MessengerChannel {
 
 impl MessengerChannel {
     pub fn new(config: MessengerConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 
     pub fn parse_webhook(&self, payload: &serde_json::Value) -> Vec<IncomingMessage> {
@@ -345,18 +437,31 @@ impl MessengerChannel {
 
 #[async_trait]
 impl Channel for MessengerChannel {
-    fn name(&self) -> &str { "messenger" }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        "messenger"
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let body = serde_json::json!({
             "recipient": {"id": message.thread_id},
             "message": {"text": message.content},
         });
-        self.client.post("https://graph.facebook.com/v18.0/me/messages")
+        self.client
+            .post("https://graph.facebook.com/v18.0/me/messages")
             .query(&[("access_token", &self.config.page_access_token)])
-            .json(&body).send().await
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Messenger: {e}")))?;
         Ok(())
     }
@@ -392,21 +497,38 @@ pub struct GenericWebhookChannel {
 
 impl GenericWebhookChannel {
     pub fn new(config: GenericWebhookConfig) -> Self {
-        Self { config, client: reqwest::Client::new(), connected: false }
+        Self {
+            config,
+            client: reqwest::Client::new(),
+            connected: false,
+        }
     }
 }
 
 #[async_trait]
 impl Channel for GenericWebhookChannel {
-    fn name(&self) -> &str { &self.config.name }
-    async fn connect(&mut self) -> Result<()> { self.connected = true; Ok(()) }
-    async fn disconnect(&mut self) -> Result<()> { self.connected = false; Ok(()) }
-    fn is_connected(&self) -> bool { self.connected }
+    fn name(&self) -> &str {
+        &self.config.name
+    }
+    async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let body = serde_json::json!({"text": message.content});
-        self.client.post(&self.config.outgoing_url)
+        self.client
+            .post(&self.config.outgoing_url)
             .header(&self.config.auth_header, &self.config.auth_value)
-            .json(&body).send().await
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("{}: {e}", self.config.name)))?;
         Ok(())
     }
@@ -415,7 +537,9 @@ impl Channel for GenericWebhookChannel {
     }
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 // ═══════════════════════════════════════════════════════
 // Supported channel names for registry
@@ -523,7 +647,9 @@ mod tests {
     #[test]
     fn test_teams_parse_personal_message() {
         let ch = TeamsChannel::new(TeamsConfig {
-            app_id: "test".into(), app_password: "test".into(), enabled: true,
+            app_id: "test".into(),
+            app_password: "test".into(),
+            enabled: true,
         });
         let payload = serde_json::json!({
             "type": "message",
@@ -540,7 +666,9 @@ mod tests {
     #[test]
     fn test_teams_parse_group_message() {
         let ch = TeamsChannel::new(TeamsConfig {
-            app_id: "test".into(), app_password: "test".into(), enabled: true,
+            app_id: "test".into(),
+            app_password: "test".into(),
+            enabled: true,
         });
         let payload = serde_json::json!({
             "type": "message",
@@ -555,7 +683,9 @@ mod tests {
     #[test]
     fn test_teams_ignore_non_message() {
         let ch = TeamsChannel::new(TeamsConfig {
-            app_id: "test".into(), app_password: "test".into(), enabled: true,
+            app_id: "test".into(),
+            app_password: "test".into(),
+            enabled: true,
         });
         let payload = serde_json::json!({"type": "typing"});
         assert!(ch.parse_activity(&payload).is_none());
@@ -614,7 +744,11 @@ mod tests {
     // ── Channel registry tests ──
     #[test]
     fn test_all_channels_count() {
-        assert!(ALL_CHANNEL_NAMES.len() >= 25, "Should have 25+ channels, got {}", ALL_CHANNEL_NAMES.len());
+        assert!(
+            ALL_CHANNEL_NAMES.len() >= 25,
+            "Should have 25+ channels, got {}",
+            ALL_CHANNEL_NAMES.len()
+        );
     }
 
     #[test]

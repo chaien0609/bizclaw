@@ -62,8 +62,7 @@ pub struct GuardrailConfig {
 impl GuardrailConfig {
     /// Load guardrails from a TOML file.
     pub fn load(path: &std::path::Path) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Read guardrails: {e}"))?;
+        let content = std::fs::read_to_string(path).map_err(|e| format!("Read guardrails: {e}"))?;
         toml::from_str(&content).map_err(|e| format!("Parse guardrails: {e}"))
     }
 
@@ -88,7 +87,8 @@ impl GuardrailConfig {
     /// Check cost threshold guardrails.
     pub fn check_cost(&self, current_cost: f64) -> Option<&Guardrail> {
         self.rules.iter().find(|g| {
-            g.enabled && matches!(&g.trigger, GuardrailTrigger::CostThreshold(max) if current_cost > *max)
+            g.enabled
+                && matches!(&g.trigger, GuardrailTrigger::CostThreshold(max) if current_cost > *max)
         })
     }
 }

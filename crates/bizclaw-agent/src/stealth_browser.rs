@@ -146,10 +146,7 @@ pub fn user_agent_flag() -> String {
 
 /// Build complete stealth arguments list for Chrome launch.
 pub fn stealth_args() -> Vec<String> {
-    let mut args: Vec<String> = STEALTH_CHROME_FLAGS
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let mut args: Vec<String> = STEALTH_CHROME_FLAGS.iter().map(|s| s.to_string()).collect();
     args.push(user_agent_flag());
     args.push(format!(
         "--window-size={},{}",
@@ -196,10 +193,7 @@ impl StealthConfig {
 
     /// Build Chrome arguments from this config.
     pub fn chrome_args(&self) -> Vec<String> {
-        let mut args: Vec<String> = STEALTH_CHROME_FLAGS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let mut args: Vec<String> = STEALTH_CHROME_FLAGS.iter().map(|s| s.to_string()).collect();
         args.push(format!("--user-agent={}", self.effective_user_agent()));
         args.push(format!("--window-size={},{}", self.width, self.height));
         args

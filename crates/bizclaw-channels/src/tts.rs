@@ -27,10 +27,18 @@ pub struct TtsConfig {
     pub enabled: bool,
 }
 
-fn default_provider() -> String { "edge".to_string() }
-fn default_voice() -> String { "vi-VN-HoaiMyNeural".to_string() }
-fn default_speed() -> f32 { 1.0 }
-fn default_format() -> String { "mp3".to_string() }
+fn default_provider() -> String {
+    "edge".to_string()
+}
+fn default_voice() -> String {
+    "vi-VN-HoaiMyNeural".to_string()
+}
+fn default_speed() -> f32 {
+    1.0
+}
+fn default_format() -> String {
+    "mp3".to_string()
+}
 
 impl Default for TtsConfig {
     fn default() -> Self {
@@ -90,7 +98,8 @@ impl TtsEngine {
             "response_format": self.config.format,
         });
 
-        let response: reqwest::Response = self.client
+        let response: reqwest::Response = self
+            .client
             .post("https://api.openai.com/v1/audio/speech")
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&body)
@@ -101,10 +110,17 @@ impl TtsEngine {
         if !response.status().is_success() {
             let status = response.status();
             let err: String = response.text().await.unwrap_or_default();
-            return Err(format!("OpenAI TTS {status}: {}", &err[..err.len().min(200)]));
+            return Err(format!(
+                "OpenAI TTS {status}: {}",
+                &err[..err.len().min(200)]
+            ));
         }
 
-        let audio: Vec<u8> = response.bytes().await.map_err(|e| format!("Read error: {e}"))?.to_vec();
+        let audio: Vec<u8> = response
+            .bytes()
+            .await
+            .map_err(|e| format!("Read error: {e}"))?
+            .to_vec();
         let duration_secs = text.len() as f32 / 15.0; // Rough estimate
 
         Ok(TtsResult {
@@ -128,7 +144,8 @@ impl TtsEngine {
             }
         });
 
-        let response: reqwest::Response = self.client
+        let response: reqwest::Response = self
+            .client
             .post(&url)
             .header("xi-api-key", &self.config.api_key)
             .header("Content-Type", "application/json")
@@ -140,10 +157,17 @@ impl TtsEngine {
         if !response.status().is_success() {
             let status = response.status();
             let err: String = response.text().await.unwrap_or_default();
-            return Err(format!("ElevenLabs TTS {status}: {}", &err[..err.len().min(200)]));
+            return Err(format!(
+                "ElevenLabs TTS {status}: {}",
+                &err[..err.len().min(200)]
+            ));
         }
 
-        let audio: Vec<u8> = response.bytes().await.map_err(|e| format!("Read error: {e}"))?.to_vec();
+        let audio: Vec<u8> = response
+            .bytes()
+            .await
+            .map_err(|e| format!("Read error: {e}"))?
+            .to_vec();
         let duration_secs = text.len() as f32 / 15.0;
 
         Ok(TtsResult {
@@ -162,17 +186,22 @@ impl TtsEngine {
 
         let result = tokio::process::Command::new("edge-tts")
             .args([
-                "--voice", &self.config.voice,
-                "--rate", &format!("{:+}%", ((self.config.speed - 1.0) * 100.0) as i32),
-                "--text", &safe_text,
-                "--write-media", &output_path,
+                "--voice",
+                &self.config.voice,
+                "--rate",
+                &format!("{:+}%", ((self.config.speed - 1.0) * 100.0) as i32),
+                "--text",
+                &safe_text,
+                "--write-media",
+                &output_path,
             ])
             .output()
             .await;
 
         match result {
             Ok(output) if output.status.success() => {
-                let audio = tokio::fs::read(&output_path).await
+                let audio = tokio::fs::read(&output_path)
+                    .await
                     .map_err(|e| format!("Read TTS output error: {e}"))?;
                 let _ = tokio::fs::remove_file(&output_path).await;
                 let duration_secs = text.len() as f32 / 15.0;
@@ -194,20 +223,68 @@ impl TtsEngine {
     pub fn available_voices(&self) -> Vec<VoiceInfo> {
         match self.config.provider.as_str() {
             "openai" => vec![
-                VoiceInfo { id: "alloy".into(), name: "Alloy".into(), lang: "en".into() },
-                VoiceInfo { id: "echo".into(), name: "Echo".into(), lang: "en".into() },
-                VoiceInfo { id: "fable".into(), name: "Fable".into(), lang: "en".into() },
-                VoiceInfo { id: "onyx".into(), name: "Onyx".into(), lang: "en".into() },
-                VoiceInfo { id: "nova".into(), name: "Nova".into(), lang: "en".into() },
-                VoiceInfo { id: "shimmer".into(), name: "Shimmer".into(), lang: "en".into() },
+                VoiceInfo {
+                    id: "alloy".into(),
+                    name: "Alloy".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "echo".into(),
+                    name: "Echo".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "fable".into(),
+                    name: "Fable".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "onyx".into(),
+                    name: "Onyx".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "nova".into(),
+                    name: "Nova".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "shimmer".into(),
+                    name: "Shimmer".into(),
+                    lang: "en".into(),
+                },
             ],
             _ => vec![
-                VoiceInfo { id: "vi-VN-HoaiMyNeural".into(), name: "Hoài My (VN)".into(), lang: "vi".into() },
-                VoiceInfo { id: "vi-VN-NamMinhNeural".into(), name: "Nam Minh (VN)".into(), lang: "vi".into() },
-                VoiceInfo { id: "en-US-AriaNeural".into(), name: "Aria (US)".into(), lang: "en".into() },
-                VoiceInfo { id: "en-US-GuyNeural".into(), name: "Guy (US)".into(), lang: "en".into() },
-                VoiceInfo { id: "ja-JP-NanamiNeural".into(), name: "Nanami (JP)".into(), lang: "ja".into() },
-                VoiceInfo { id: "zh-CN-XiaoxiaoNeural".into(), name: "Xiaoxiao (CN)".into(), lang: "zh".into() },
+                VoiceInfo {
+                    id: "vi-VN-HoaiMyNeural".into(),
+                    name: "Hoài My (VN)".into(),
+                    lang: "vi".into(),
+                },
+                VoiceInfo {
+                    id: "vi-VN-NamMinhNeural".into(),
+                    name: "Nam Minh (VN)".into(),
+                    lang: "vi".into(),
+                },
+                VoiceInfo {
+                    id: "en-US-AriaNeural".into(),
+                    name: "Aria (US)".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "en-US-GuyNeural".into(),
+                    name: "Guy (US)".into(),
+                    lang: "en".into(),
+                },
+                VoiceInfo {
+                    id: "ja-JP-NanamiNeural".into(),
+                    name: "Nanami (JP)".into(),
+                    lang: "ja".into(),
+                },
+                VoiceInfo {
+                    id: "zh-CN-XiaoxiaoNeural".into(),
+                    name: "Xiaoxiao (CN)".into(),
+                    lang: "zh".into(),
+                },
             ],
         }
     }

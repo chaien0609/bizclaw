@@ -26,15 +26,15 @@
 //! | 📧 Outreach       | Daily 9:00  | Email outreach automation         |
 //! | 🛡️ Security       | Every 1h    | Security scanning & reporting     |
 
+pub mod guardrails;
 pub mod hand;
 pub mod manifest;
-pub mod guardrails;
 pub mod registry;
 pub mod runner;
 pub mod skills;
 
-pub use hand::{Hand, HandStatus, HandPhase};
-pub use manifest::HandManifest;
 pub use guardrails::{Guardrail, GuardrailAction};
+pub use hand::{Hand, HandPhase, HandStatus};
+pub use manifest::HandManifest;
 pub use registry::HandRegistry;
 pub use runner::HandRunner;

@@ -29,7 +29,10 @@ impl SkillRegistry {
 
     /// Install a skill.
     pub fn install(&mut self, skill: SkillManifest) {
-        info!("📦 Installed skill: {} v{}", skill.metadata.name, skill.metadata.version);
+        info!(
+            "📦 Installed skill: {} v{}",
+            skill.metadata.name, skill.metadata.version
+        );
         self.skills.insert(skill.metadata.name.clone(), skill);
     }
 
@@ -67,7 +70,10 @@ impl SkillRegistry {
                 s.metadata.name.to_lowercase().contains(&q)
                     || s.metadata.description.to_lowercase().contains(&q)
                     || s.metadata.display_name.to_lowercase().contains(&q)
-                    || s.metadata.tags.iter().any(|t| t.to_lowercase().contains(&q))
+                    || s.metadata
+                        .tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&q))
                     || s.metadata.category.to_lowercase().contains(&q)
             })
             .collect()
@@ -86,7 +92,12 @@ impl SkillRegistry {
         let tag_lower = tag.to_lowercase();
         self.skills
             .values()
-            .filter(|s| s.metadata.tags.iter().any(|t| t.to_lowercase() == tag_lower))
+            .filter(|s| {
+                s.metadata
+                    .tags
+                    .iter()
+                    .any(|t| t.to_lowercase() == tag_lower)
+            })
             .collect()
     }
 
@@ -122,8 +133,8 @@ impl SkillRegistry {
         }
 
         let mut count = 0;
-        let entries = std::fs::read_dir(dir)
-            .map_err(|e| format!("Read dir {}: {}", dir.display(), e))?;
+        let entries =
+            std::fs::read_dir(dir).map_err(|e| format!("Read dir {}: {}", dir.display(), e))?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -136,7 +147,11 @@ impl SkillRegistry {
                             count += 1;
                         }
                         Err(e) => {
-                            tracing::warn!("⚠ Failed to load skill from {}: {}", skill_file.display(), e);
+                            tracing::warn!(
+                                "⚠ Failed to load skill from {}: {}",
+                                skill_file.display(),
+                                e
+                            );
                         }
                     }
                 }
@@ -191,9 +206,17 @@ mod tests {
     #[test]
     fn test_registry_search() {
         let mut reg = SkillRegistry::new();
-        reg.install(sample_skill("rust-expert", "coding", vec!["rust", "systems"]));
+        reg.install(sample_skill(
+            "rust-expert",
+            "coding",
+            vec!["rust", "systems"],
+        ));
         reg.install(sample_skill("python-data", "data", vec!["python", "data"]));
-        reg.install(sample_skill("web-scraper", "web", vec!["scraping", "python"]));
+        reg.install(sample_skill(
+            "web-scraper",
+            "web",
+            vec!["scraping", "python"],
+        ));
 
         let results = reg.search("python");
         assert_eq!(results.len(), 2);

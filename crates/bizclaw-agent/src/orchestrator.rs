@@ -231,9 +231,10 @@ impl Orchestrator {
 
     /// Send to the default agent.
     pub async fn send(&mut self, message: &str) -> Result<String> {
-        let default = self.default_agent.clone().ok_or_else(|| {
-            BizClawError::Config("No default agent configured".to_string())
-        })?;
+        let default = self
+            .default_agent
+            .clone()
+            .ok_or_else(|| BizClawError::Config("No default agent configured".to_string()))?;
         self.send_to(&default, message).await
     }
 
@@ -301,9 +302,10 @@ impl Orchestrator {
                 .await?;
 
             // Process the task
-            let to = self.agents.get_mut(to_agent).ok_or_else(|| {
-                BizClawError::AgentNotFound(to_agent.to_string())
-            })?;
+            let to = self
+                .agents
+                .get_mut(to_agent)
+                .ok_or_else(|| BizClawError::AgentNotFound(to_agent.to_string()))?;
             to.message_count += 1;
             let delegate_prompt = format!(
                 "[Delegation from agent '{from_agent}']\n\
@@ -346,9 +348,10 @@ impl Orchestrator {
             Ok(response)
         } else {
             // Fallback: no store, simple delegation (backward compatible)
-            let to = self.agents.get_mut(to_agent).ok_or_else(|| {
-                BizClawError::AgentNotFound(to_agent.to_string())
-            })?;
+            let to = self
+                .agents
+                .get_mut(to_agent)
+                .ok_or_else(|| BizClawError::AgentNotFound(to_agent.to_string()))?;
             to.message_count += 1;
             let delegate_prompt = format!(
                 "[Delegation from agent '{from_agent}']\n\
@@ -546,12 +549,14 @@ impl Orchestrator {
                             let _ = stdin.write_all(current_output.as_bytes()).await;
                         }
                         if let Ok(output) = child.wait_with_output().await
-                            && !output.status.success() && gate.block_on_failure {
-                                return Err(BizClawError::QualityGate(format!(
-                                    "Command gate '{}' failed",
-                                    gate.target
-                                )));
-                            }
+                            && !output.status.success()
+                            && gate.block_on_failure
+                        {
+                            return Err(BizClawError::QualityGate(format!(
+                                "Command gate '{}' failed",
+                                gate.target
+                            )));
+                        }
                     }
                 }
                 QualityGateType::Agent => {
@@ -560,9 +565,10 @@ impl Orchestrator {
                         continue;
                     }
                     if self.agents.contains_key(&gate.target) {
-                        let reviewer = self.agents.get_mut(&gate.target).ok_or_else(|| {
-                            BizClawError::AgentNotFound(gate.target.clone())
-                        })?;
+                        let reviewer = self
+                            .agents
+                            .get_mut(&gate.target)
+                            .ok_or_else(|| BizClawError::AgentNotFound(gate.target.clone()))?;
                         let review_prompt = format!(
                             "[Quality Gate Review]\n\
                              Event: {}\n\
@@ -649,12 +655,13 @@ impl Orchestrator {
         if !task.blocked_by.is_empty() {
             for dep_id in &task.blocked_by {
                 if let Some(dep) = store.get_task(dep_id).await?
-                    && dep.status != TaskStatus::Completed {
-                        return Err(BizClawError::Team(format!(
-                            "Task blocked by '{}' (status: {:?})",
-                            dep_id, dep.status
-                        )));
-                    }
+                    && dep.status != TaskStatus::Completed
+                {
+                    return Err(BizClawError::Team(format!(
+                        "Task blocked by '{}' (status: {:?})",
+                        dep_id, dep.status
+                    )));
+                }
             }
         }
 
@@ -1045,9 +1052,7 @@ mod tests {
 
     #[test]
     fn test_with_store() {
-        let store = Arc::new(
-            bizclaw_db::SqliteStore::in_memory().unwrap()
-        );
+        let store = Arc::new(bizclaw_db::SqliteStore::in_memory().unwrap());
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(store.migrate()).unwrap();
         let orch = Orchestrator::with_store(store);

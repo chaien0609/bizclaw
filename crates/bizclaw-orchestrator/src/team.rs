@@ -67,7 +67,10 @@ pub enum EscalationAction {
     /// Escalate to a specific agent
     EscalateToAgent { agent_id: String },
     /// Notify owner via channel
-    NotifyOwner { channel: String, message_template: String },
+    NotifyOwner {
+        channel: String,
+        message_template: String,
+    },
     /// Pause the agent
     PauseAgent,
     /// Switch to a different LLM model

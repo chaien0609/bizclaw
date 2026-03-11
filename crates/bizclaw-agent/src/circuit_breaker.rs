@@ -12,8 +12,8 @@
 //! HalfOpen --(failure)--> Open (doubled timeout)
 //! ```
 
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 

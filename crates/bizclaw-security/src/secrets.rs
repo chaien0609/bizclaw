@@ -56,7 +56,9 @@ impl SecretStore {
                 decrypt_aes256_cbc(&encrypted, &self.key)?
             } else {
                 // Legacy ECB format — decrypt and will re-encrypt as CBC on save
-                tracing::warn!("⚠️ Secrets file uses legacy ECB encryption — will upgrade to CBC on next save");
+                tracing::warn!(
+                    "⚠️ Secrets file uses legacy ECB encryption — will upgrade to CBC on next save"
+                );
                 let encrypted = BASE64
                     .decode(raw)
                     .map_err(|e| BizClawError::Security(format!("Base64 decode failed: {e}")))?;
@@ -216,7 +218,9 @@ fn encrypt_aes256_cbc(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
 /// Input format: [16-byte IV] + [ciphertext]
 fn decrypt_aes256_cbc(data: &[u8], key: &[u8; 32]) -> Result<String> {
     if data.len() < 32 || data.len() % 16 != 0 {
-        return Err(BizClawError::Security("Invalid CBC ciphertext length".into()));
+        return Err(BizClawError::Security(
+            "Invalid CBC ciphertext length".into(),
+        ));
     }
 
     let cipher = Aes256::new(GenericArray::from_slice(key));

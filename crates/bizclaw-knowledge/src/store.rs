@@ -181,13 +181,14 @@ impl KnowledgeStore {
     pub fn list_documents(&self) -> Vec<(i64, String, String, i64)> {
         let mut stmt = match self
             .conn
-            .prepare("SELECT id, name, source, chunk_count FROM documents ORDER BY id DESC") {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::warn!("list_documents prepare error: {e}");
-                    return Vec::new();
-                }
-            };
+            .prepare("SELECT id, name, source, chunk_count FROM documents ORDER BY id DESC")
+        {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("list_documents prepare error: {e}");
+                return Vec::new();
+            }
+        };
 
         stmt.query_map([], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
@@ -245,8 +246,8 @@ impl KnowledgeStore {
             query,
             query_embedding,
             limit,
-            0.3,  // keyword weight
-            0.7,  // vector weight
+            0.3, // keyword weight
+            0.7, // vector weight
         )
     }
 
@@ -271,15 +272,13 @@ impl KnowledgeStore {
         let mut stmt = match self.conn.prepare(
             "SELECT c.doc_id, c.chunk_idx, c.content FROM chunks c
              LEFT JOIN chunk_embeddings ce ON ce.doc_id = c.doc_id AND ce.chunk_idx = c.chunk_idx
-             WHERE ce.embedding IS NULL"
+             WHERE ce.embedding IS NULL",
         ) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default()
+        stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
     }
 }

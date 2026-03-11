@@ -178,9 +178,15 @@ impl Provider for OpenAiCompatibleProvider {
         // If we've already detected this model can't handle tools, don't send them.
         // This saves tokens and avoids hallucinated tool calls/dumps.
         let tools = {
-            let lock = self.no_tool_models.lock().unwrap_or_else(|p| p.into_inner());
+            let lock = self
+                .no_tool_models
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
             if lock.contains(&params.model) {
-                tracing::debug!("🚫 Skipping tools for model '{}' (known no-tool)", params.model);
+                tracing::debug!(
+                    "🚫 Skipping tools for model '{}' (known no-tool)",
+                    params.model
+                );
                 &[] as &[ToolDefinition]
             } else {
                 tools
@@ -207,7 +213,10 @@ impl Provider for OpenAiCompatibleProvider {
                     "type": "enabled",
                     "budget_tokens": budget
                 });
-                tracing::info!("🧠 Extended thinking enabled (Anthropic, budget: {})", budget);
+                tracing::info!(
+                    "🧠 Extended thinking enabled (Anthropic, budget: {})",
+                    budget
+                );
             } else if !params.reasoning_effort.is_empty() {
                 // OpenAI-compatible: reasoning_effort field (low/medium/high)
                 body["reasoning_effort"] = json!(params.reasoning_effort);
@@ -356,7 +365,8 @@ impl Provider for OpenAiCompatibleProvider {
         let content = choice["message"]["content"].as_str().map(String::from);
 
         // Parse tool_calls FIRST so we can inspect them in detection below
-        let tool_calls: Vec<ToolCall> = if let Some(tc) = choice["message"]["tool_calls"].as_array() {
+        let tool_calls: Vec<ToolCall> = if let Some(tc) = choice["message"]["tool_calls"].as_array()
+        {
             tc.iter()
                 .filter_map(|t| {
                     Some(ToolCall {
@@ -404,7 +414,8 @@ impl Provider for OpenAiCompatibleProvider {
                 if looks_like_tool_dump {
                     tracing::warn!(
                         "⚠️ Model '{}' dumping tool schemas as text (len={}) — retrying without tools",
-                        params.model, text.len()
+                        params.model,
+                        text.len()
                     );
                     needs_retry_without_tools = true;
                 }
@@ -436,7 +447,9 @@ impl Provider for OpenAiCompatibleProvider {
                 if suspicious_calls > 0 {
                     tracing::warn!(
                         "⚠️ Model '{}' produced {}/{} hallucinated tool calls — retrying without tools",
-                        params.model, suspicious_calls, tool_calls.len()
+                        params.model,
+                        suspicious_calls,
+                        tool_calls.len()
                     );
                     needs_retry_without_tools = true;
                 }
@@ -445,9 +458,15 @@ impl Provider for OpenAiCompatibleProvider {
             if needs_retry_without_tools {
                 // Remember this model can't handle tools
                 {
-                    let mut lock = self.no_tool_models.lock().unwrap_or_else(|p| p.into_inner());
+                    let mut lock = self
+                        .no_tool_models
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner());
                     lock.insert(params.model.clone());
-                    tracing::info!("📝 Model '{}' added to no-tool list for future requests", params.model);
+                    tracing::info!(
+                        "📝 Model '{}' added to no-tool list for future requests",
+                        params.model
+                    );
                 }
 
                 // Retry without tools
@@ -493,7 +512,9 @@ impl Provider for OpenAiCompatibleProvider {
                     u.cache_creation_input_tokens,
                     if u.prompt_tokens > 0 {
                         u.cache_read_input_tokens * 100 / u.prompt_tokens.max(1)
-                    } else { 0 }
+                    } else {
+                        0
+                    }
                 );
             }
             if u.thinking_tokens > 0 {

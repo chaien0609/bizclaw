@@ -8,13 +8,7 @@ use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
 
 /// Paths that are always forbidden (case-insensitive prefix match).
-const FORBIDDEN_PATHS: &[&str] = &[
-    "/etc/shadow",
-    "/etc/gshadow",
-    "/proc/",
-    "/sys/",
-    "/dev/",
-];
+const FORBIDDEN_PATHS: &[&str] = &["/etc/shadow", "/etc/gshadow", "/proc/", "/sys/", "/dev/"];
 
 /// Path prefixes that require extra caution (warning but allowed).
 const SENSITIVE_PATHS: &[&str] = &[

@@ -78,7 +78,10 @@ pub enum TicketEventType {
     /// Ticket created
     Created,
     /// Status changed
-    StatusChanged { from: TicketStatus, to: TicketStatus },
+    StatusChanged {
+        from: TicketStatus,
+        to: TicketStatus,
+    },
     /// Agent assigned
     AgentAssigned { agent_id: String },
     /// Message received from customer
@@ -182,12 +185,7 @@ impl Ticket {
     }
 
     /// Add an event to the audit trail.
-    pub fn add_event(
-        &mut self,
-        event_type: TicketEventType,
-        actor: &str,
-        details: Option<String>,
-    ) {
+    pub fn add_event(&mut self, event_type: TicketEventType, actor: &str, details: Option<String>) {
         self.events.push(TicketEvent {
             timestamp: chrono::Utc::now(),
             event_type,

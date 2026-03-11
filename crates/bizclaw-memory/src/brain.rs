@@ -113,13 +113,18 @@ impl BrainWorkspace {
             if !ctx_content.is_empty() {
                 // Limit to prevent context window overflow (max ~4KB from context tree)
                 let truncated = if ctx_content.len() > 4096 {
-                    format!("{}...\n(truncated — {} total files)", &ctx_content[..4096], files_loaded)
+                    format!(
+                        "{}...\n(truncated — {} total files)",
+                        &ctx_content[..4096],
+                        files_loaded
+                    )
                 } else {
                     ctx_content
                 };
                 brain.push_str(&format!(
                     "\n[BYTEROVER CONTEXT TREE ({} files)]\n{}\n[END BYTEROVER CONTEXT TREE]\n",
-                    files_loaded, truncated.trim()
+                    files_loaded,
+                    truncated.trim()
                 ));
             }
         }

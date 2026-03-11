@@ -96,17 +96,18 @@ impl BrowserTool {
             .json(&body)
             .send()
             .await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Create instance: {e}")))?;
+            .map_err(|e| {
+                bizclaw_core::error::BizClawError::Tool(format!("Create instance: {e}"))
+            })?;
 
         let result: serde_json::Value = resp
             .json()
             .await
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Parse: {e}")))?;
 
-        result["id"]
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("No instance ID returned".into()))
+        result["id"].as_str().map(|s| s.to_string()).ok_or_else(|| {
+            bizclaw_core::error::BizClawError::Tool("No instance ID returned".into())
+        })
     }
 }
 
@@ -235,20 +236,20 @@ impl Tool for BrowserTool {
         match action {
             // ── Navigate ──
             "navigate" => {
-                let url = args["url"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'url'".into()))?;
+                let url = args["url"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'url'".into())
+                })?;
 
-                let inst_id = self
-                    .ensure_instance(&client, profile, headless)
-                    .await?;
+                let inst_id = self.ensure_instance(&client, profile, headless).await?;
 
                 let resp = client
                     .post(format!("{}/instances/{}/navigate", self.base_url, inst_id))
                     .json(&serde_json::json!({ "url": url }))
                     .send()
                     .await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Navigate: {e}")))?;
+                    .map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Navigate: {e}"))
+                    })?;
 
                 let result: serde_json::Value = resp.json().await.unwrap_or_default();
                 Ok(ToolResult {
@@ -278,12 +279,18 @@ impl Tool for BrowserTool {
                     ))
                     .send()
                     .await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Snapshot: {e}")))?;
+                    .map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Snapshot: {e}"))
+                    })?;
 
                 let body = resp.text().await.unwrap_or_default();
                 // Truncate if too large
                 let display = if body.len() > 6000 {
-                    format!("{}...\n[truncated, {} bytes total]", &body[..6000], body.len())
+                    format!(
+                        "{}...\n[truncated, {} bytes total]",
+                        &body[..6000],
+                        body.len()
+                    )
                 } else {
                     body
                 };
@@ -297,9 +304,9 @@ impl Tool for BrowserTool {
 
             // ── Click element ──
             "click" => {
-                let elem_ref = args["ref"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'ref' (e.g. 'e5')".into()))?;
+                let elem_ref = args["ref"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'ref' (e.g. 'e5')".into())
+                })?;
 
                 let inst_id = match args["instance_id"].as_str() {
                     Some(id) => id.to_string(),
@@ -323,12 +330,12 @@ impl Tool for BrowserTool {
 
             // ── Fill (type text) ──
             "fill" => {
-                let elem_ref = args["ref"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'ref'".into()))?;
-                let value = args["value"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'value'".into()))?;
+                let elem_ref = args["ref"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'ref'".into())
+                })?;
+                let value = args["value"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'value'".into())
+                })?;
 
                 let inst_id = match args["instance_id"].as_str() {
                     Some(id) => id.to_string(),
@@ -349,7 +356,10 @@ impl Tool for BrowserTool {
                 let result: serde_json::Value = resp.json().await.unwrap_or_default();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("⌨️ Filled '{}' into element: {}\n{}", value, elem_ref, result),
+                    output: format!(
+                        "⌨️ Filled '{}' into element: {}\n{}",
+                        value, elem_ref, result
+                    ),
                     success: true,
                 })
             }
@@ -376,7 +386,11 @@ impl Tool for BrowserTool {
 
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("📄 Page text (~{} tokens):\n{}", display.split_whitespace().count(), display),
+                    output: format!(
+                        "📄 Page text (~{} tokens):\n{}",
+                        display.split_whitespace().count(),
+                        display
+                    ),
                     success: true,
                 })
             }
@@ -384,9 +398,9 @@ impl Tool for BrowserTool {
             // ── Press key ──
             "press" => {
                 let elem_ref = args["ref"].as_str().unwrap_or("body");
-                let key = args["value"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'value' (key name)".into()))?;
+                let key = args["value"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'value' (key name)".into())
+                })?;
 
                 let inst_id = match args["instance_id"].as_str() {
                     Some(id) => id.to_string(),
@@ -414,9 +428,9 @@ impl Tool for BrowserTool {
 
             // ── Evaluate JavaScript ──
             "evaluate" => {
-                let code = args["value"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'value' (JS code)".into()))?;
+                let code = args["value"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'value' (JS code)".into())
+                })?;
 
                 let inst_id = match args["instance_id"].as_str() {
                     Some(id) => id.to_string(),
@@ -433,7 +447,10 @@ impl Tool for BrowserTool {
                 let result: serde_json::Value = resp.json().await.unwrap_or_default();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("🔧 JS result:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default()),
+                    output: format!(
+                        "🔧 JS result:\n{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_default()
+                    ),
                     success: true,
                 })
             }
@@ -481,12 +498,17 @@ impl Tool for BrowserTool {
                     .get(format!("{}/instances", self.base_url))
                     .send()
                     .await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Instances: {e}")))?;
+                    .map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Instances: {e}"))
+                    })?;
 
                 let result: serde_json::Value = resp.json().await.unwrap_or_default();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("🌐 Browser instances:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default()),
+                    output: format!(
+                        "🌐 Browser instances:\n{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_default()
+                    ),
                     success: true,
                 })
             }
@@ -502,16 +524,19 @@ impl Tool for BrowserTool {
                 let result: serde_json::Value = resp.json().await.unwrap_or_default();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("📑 Open tabs:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default()),
+                    output: format!(
+                        "📑 Open tabs:\n{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_default()
+                    ),
                     success: true,
                 })
             }
 
             // ── Close instance ──
             "close" => {
-                let inst_id = args["instance_id"]
-                    .as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'instance_id'".into()))?;
+                let inst_id = args["instance_id"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'instance_id'".into())
+                })?;
 
                 client
                     .delete(format!("{}/instances/{}", self.base_url, inst_id))
@@ -528,7 +553,10 @@ impl Tool for BrowserTool {
 
             _ => Ok(ToolResult {
                 tool_call_id: String::new(),
-                output: format!("Unknown action: {}. Available: navigate, snapshot, click, fill, text, press, evaluate, scroll, wait, instances, tabs, close", action),
+                output: format!(
+                    "Unknown action: {}. Available: navigate, snapshot, click, fill, text, press, evaluate, scroll, wait, instances, tabs, close",
+                    action
+                ),
                 success: false,
             }),
         }
@@ -555,7 +583,12 @@ mod tests {
         assert!(params["properties"]["action"].is_object());
         assert!(params["properties"]["url"].is_object());
         assert!(params["properties"]["ref"].is_object());
-        assert!(params["required"].as_array().unwrap().contains(&serde_json::json!("action")));
+        assert!(
+            params["required"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("action"))
+        );
     }
 
     #[test]
@@ -575,7 +608,10 @@ mod tests {
     async fn test_not_available() {
         // PinchTab is not running in test env
         let tool = BrowserTool::with_url("http://localhost:19999");
-        let result = tool.execute(r#"{"action":"navigate","url":"https://example.com"}"#).await.unwrap();
+        let result = tool
+            .execute(r#"{"action":"navigate","url":"https://example.com"}"#)
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.output.contains("not running"));
     }

@@ -5,6 +5,7 @@
 
 use crate::db::PlatformDb;
 use crate::tenant::TenantManager;
+use axum::extract::DefaultBodyLimit;
 use axum::middleware;
 use axum::{
     Extension, Json, Router,
@@ -14,7 +15,6 @@ use axum::{
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
-use axum::extract::DefaultBodyLimit;
 
 /// Shared application state for the admin server.
 pub struct AdminState {
@@ -26,9 +26,11 @@ pub struct AdminState {
     /// Domain name for this platform instance (e.g. "bizclaw.vn" or "viagent.vn")
     pub domain: String,
     /// Rate limiter: email → (attempt_count, first_attempt_time)
-    pub login_attempts: std::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>,
+    pub login_attempts:
+        std::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>,
     /// Rate limiter for registration: email → (attempt_count, first_attempt_time)
-    pub register_attempts: std::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>,
+    pub register_attempts:
+        std::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>,
     /// PostgreSQL DB for enterprise features (optional — only when DATABASE_URL is set).
     /// Falls back gracefully: enterprise endpoints return 503 if None.
     pub pg_db: Option<crate::db_pg::PgDb>,
@@ -47,11 +49,12 @@ async fn require_auth(
         .unwrap_or("");
 
     if let Some(token) = auth_header.strip_prefix("Bearer ")
-        && let Ok(claims) = crate::auth::validate_token(token, &state.jwt_secret) {
-            let mut req = req;
-            req.extensions_mut().insert(claims);
-            return next.run(req).await;
-        }
+        && let Ok(claims) = crate::auth::validate_token(token, &state.jwt_secret)
+    {
+        let mut req = req;
+        req.extensions_mut().insert(claims);
+        return next.run(req).await;
+    }
 
     axum::response::Response::builder()
         .status(axum::http::StatusCode::UNAUTHORIZED)
@@ -113,25 +116,61 @@ impl AdminServer {
             .route("/api/admin/users", post(create_user_handler))
             .route("/api/admin/users/{id}", delete(delete_user_handler))
             .route("/api/admin/users/{id}/tenant", put(assign_tenant_handler))
-            .route("/api/admin/users/{id}/password/reset", put(admin_reset_user_password))
-            .route("/api/admin/users/{id}/status", put(update_user_status_handler))
+            .route(
+                "/api/admin/users/{id}/password/reset",
+                put(admin_reset_user_password),
+            )
+            .route(
+                "/api/admin/users/{id}/status",
+                put(update_user_status_handler),
+            )
             .route("/api/admin/users/{id}/role", put(update_user_role_handler))
             // Profile
-            .route("/api/admin/users/me/password", put(crate::self_serve::change_password_handler))
+            .route(
+                "/api/admin/users/me/password",
+                put(crate::self_serve::change_password_handler),
+            )
             // ── ENTERPRISE: Multi-user RBAC per Tenant ─────────────────────
             .route("/api/admin/tenants/{id}/members", get(list_members))
-            .route("/api/admin/tenants/{id}/members/invite", post(invite_member))
-            .route("/api/admin/tenants/{id}/members/{uid}/role", put(update_member_role))
-            .route("/api/admin/tenants/{id}/members/{uid}", delete(remove_member))
+            .route(
+                "/api/admin/tenants/{id}/members/invite",
+                post(invite_member),
+            )
+            .route(
+                "/api/admin/tenants/{id}/members/{uid}/role",
+                put(update_member_role),
+            )
+            .route(
+                "/api/admin/tenants/{id}/members/{uid}",
+                delete(remove_member),
+            )
             // ── ENTERPRISE: Human Handoff ───────────────────────────────────
             .route("/api/admin/tenants/{id}/handoffs", get(list_handoffs))
-            .route("/api/admin/tenants/{id}/handoffs/{hid}/claim", post(claim_handoff))
-            .route("/api/admin/tenants/{id}/handoffs/{hid}/reply", post(reply_handoff))
-            .route("/api/admin/tenants/{id}/handoffs/{hid}/resolve", post(resolve_handoff))
-            .route("/api/admin/tenants/{id}/handoffs/{hid}/messages", get(list_handoff_messages))
+            .route(
+                "/api/admin/tenants/{id}/handoffs/{hid}/claim",
+                post(claim_handoff),
+            )
+            .route(
+                "/api/admin/tenants/{id}/handoffs/{hid}/reply",
+                post(reply_handoff),
+            )
+            .route(
+                "/api/admin/tenants/{id}/handoffs/{hid}/resolve",
+                post(resolve_handoff),
+            )
+            .route(
+                "/api/admin/tenants/{id}/handoffs/{hid}/messages",
+                get(list_handoff_messages),
+            )
             // ── ENTERPRISE: BI Analytics ────────────────────────────────────
-            .route("/api/admin/tenants/{id}/analytics/summary", get(analytics_summary))
-            .route("/api/admin/tenants/{id}/analytics/tokens", get(analytics_tokens))
+            .route(
+                "/api/admin/tenants/{id}/analytics/summary",
+                get(analytics_summary),
+            )
+            .route(
+                "/api/admin/tenants/{id}/analytics/tokens",
+                get(analytics_tokens),
+            )
             // ── ENTERPRISE: Budget Quota Control ───────────────────────────
             .route("/api/admin/tenants/{id}/quotas", get(list_quotas))
             .route("/api/admin/tenants/{id}/quotas/{resource}", put(set_quota))
@@ -139,37 +178,74 @@ impl AdminServer {
             .route("/api/admin/tasks", get(mc_list_tasks).post(mc_create_task))
             .route("/api/admin/tasks/board", get(mc_kanban_board))
             .route("/api/admin/tasks/pending-review", get(mc_pending_reviews))
-            .route("/api/admin/tasks/{tid}", get(mc_get_task).put(mc_update_task).delete(mc_delete_task))
-            .route("/api/admin/tasks/{tid}/comments", get(mc_list_comments).post(mc_add_comment))
+            .route(
+                "/api/admin/tasks/{tid}",
+                get(mc_get_task).put(mc_update_task).delete(mc_delete_task),
+            )
+            .route(
+                "/api/admin/tasks/{tid}/comments",
+                get(mc_list_comments).post(mc_add_comment),
+            )
             .route("/api/admin/tasks/{tid}/review", post(mc_submit_review))
             // ── MISSION CONTROL: Agent Session Monitor ─────────────────────
             .route("/api/admin/sessions", get(mc_list_sessions))
             .route("/api/admin/sessions/heartbeat", post(mc_heartbeat))
-            .route("/api/admin/sessions/{key}/terminate", post(mc_terminate_session))
+            .route(
+                "/api/admin/sessions/{key}/terminate",
+                post(mc_terminate_session),
+            )
             // ── MISSION CONTROL: GitHub Issues Sync ────────────────────────
-            .route("/api/admin/tenants/{id}/github-syncs", get(mc_list_github_syncs).post(mc_upsert_github_sync))
-            .route("/api/admin/tenants/{id}/github-syncs/{repo}/trigger", post(mc_trigger_github_sync))
+            .route(
+                "/api/admin/tenants/{id}/github-syncs",
+                get(mc_list_github_syncs).post(mc_upsert_github_sync),
+            )
+            .route(
+                "/api/admin/tenants/{id}/github-syncs/{repo}/trigger",
+                post(mc_trigger_github_sync),
+            )
             // ── CLOUD: Remote Server Provisioner ────────────────────────────
-            .route("/api/admin/servers", get(srv_list_servers).post(srv_provision))
-            .route("/api/admin/servers/{sid}", get(srv_get_server).delete(srv_delete_server))
+            .route(
+                "/api/admin/servers",
+                get(srv_list_servers).post(srv_provision),
+            )
+            .route(
+                "/api/admin/servers/{sid}",
+                get(srv_get_server).delete(srv_delete_server),
+            )
             .route("/api/admin/servers/{sid}/health", get(srv_health_check))
-            .route("/api/admin/servers/{sid}/command", post(srv_execute_command))
+            .route(
+                "/api/admin/servers/{sid}/command",
+                post(srv_execute_command),
+            )
             // ── MISSION CONTROL: Webhooks ───────────────────────────────────
             .route("/api/admin/tenants/{id}/webhooks", get(mc_list_webhooks))
             .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
-
         // Public routes — including invitation acceptance
         let public = Router::new()
             .route("/api/admin/login", post(login))
-            .route("/api/admin/pairing/validate", post(validate_pairing_deprecated))
-            .route("/api/admin/register", post(crate::self_serve::register_handler))
-            .route("/api/admin/password-reset", post(crate::self_serve::forgot_password_handler))
-            .route("/api/admin/password-reset/confirm", post(crate::self_serve::reset_password_handler))
-            .route("/api/admin/invitations/{token}/accept", post(accept_invitation))
+            .route(
+                "/api/admin/pairing/validate",
+                post(validate_pairing_deprecated),
+            )
+            .route(
+                "/api/admin/register",
+                post(crate::self_serve::register_handler),
+            )
+            .route(
+                "/api/admin/password-reset",
+                post(crate::self_serve::forgot_password_handler),
+            )
+            .route(
+                "/api/admin/password-reset/confirm",
+                post(crate::self_serve::reset_password_handler),
+            )
+            .route(
+                "/api/admin/invitations/{token}/accept",
+                post(accept_invitation),
+            )
             .route("/pixel-office", get(pixel_office_page))
             .route("/", get(admin_dashboard_page));
-
 
         // SPA fallback — serve dashboard HTML for all non-API paths
         // so that /tenants, /settings, /ollama etc. all work
@@ -177,10 +253,17 @@ impl AdminServer {
 
         // CORS — configurable via BIZCLAW_CORS_ORIGINS env var
         // H4 FIX: Default to localhost-only CORS (not Any) for security
-        let cors_methods = [axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE, axum::http::Method::OPTIONS];
+        let cors_methods = [
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ];
         let cors = match std::env::var("BIZCLAW_CORS_ORIGINS") {
             Ok(origins) if !origins.is_empty() => {
-                let allowed: Vec<_> = origins.split(',')
+                let allowed: Vec<_> = origins
+                    .split(',')
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
                 CorsLayer::new()
@@ -251,10 +334,16 @@ async fn platform_security_headers(
     headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
     headers.insert("X-Frame-Options", "SAMEORIGIN".parse().unwrap());
     headers.insert("X-XSS-Protection", "1; mode=block".parse().unwrap());
-    headers.insert("Referrer-Policy", "strict-origin-when-cross-origin".parse().unwrap());
+    headers.insert(
+        "Referrer-Policy",
+        "strict-origin-when-cross-origin".parse().unwrap(),
+    );
     // HSTS — only when behind reverse proxy (production)
     if std::env::var("BIZCLAW_BIND_ALL").unwrap_or_default() != "1" {
-        headers.insert("Strict-Transport-Security", "max-age=31536000; includeSubDomains".parse().unwrap());
+        headers.insert(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains".parse().unwrap(),
+        );
     }
     response
 }
@@ -269,7 +358,6 @@ fn internal_error(context: &str, e: impl std::fmt::Display) -> Json<serde_json::
 }
 
 // ── Nginx Sync ─────────────────────────────────────
-
 
 /// Regenerate /etc/nginx/conf.d/{domain}-tenants.conf from the DB
 /// and reload nginx so new/removed tenants are routed correctly.
@@ -301,16 +389,24 @@ async fn sync_nginx_routing(state: &AdminState) {
 
         for t in &tenants {
             // M5 FIX: Validate slug contains only safe chars before injecting into nginx config
-            let safe_slug: String = t.slug.chars()
+            let safe_slug: String = t
+                .slug
+                .chars()
                 .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
                 .collect();
             if safe_slug.is_empty() || safe_slug != t.slug {
-                tracing::warn!("nginx-sync[{domain}]: skipping tenant '{}' — slug contains unsafe chars", t.slug);
+                tracing::warn!(
+                    "nginx-sync[{domain}]: skipping tenant '{}' — slug contains unsafe chars",
+                    t.slug
+                );
                 continue;
             }
             // Skip reserved subdomains
             if reserved_subdomains.contains(&safe_slug.as_str()) {
-                tracing::warn!("nginx-sync[{domain}]: skipping tenant '{}' — reserved subdomain", t.slug);
+                tracing::warn!(
+                    "nginx-sync[{domain}]: skipping tenant '{}' — reserved subdomain",
+                    t.slug
+                );
                 continue;
             }
             map_entries.push_str(&format!("    {}      {};\n", safe_slug, t.port));
@@ -333,8 +429,7 @@ async fn sync_nginx_routing(state: &AdminState) {
 
         // SSL cert directory: configurable via NGINX_SSL_CERT_DIR env var
         // Allows overriding when certbot creates directories like "bizclaw.vn-0001"
-        let ssl_cert_dir = std::env::var("NGINX_SSL_CERT_DIR")
-            .unwrap_or_else(|_| domain.clone());
+        let ssl_cert_dir = std::env::var("NGINX_SSL_CERT_DIR").unwrap_or_else(|_| domain.clone());
 
         let conf = format!(
             r#"# {domain} Dynamic Tenant Routing (auto-generated)
@@ -419,35 +514,64 @@ server {{
 
         // Try to reload nginx — multiple strategies for Docker vs bare-metal
         // Strategy 0: docker exec (when bizclaw runs in a separate container from nginx)
-        let nginx_container = std::env::var("NGINX_CONTAINER_NAME")
-            .unwrap_or_else(|_| "bizclaw-nginx".to_string());
+        let nginx_container =
+            std::env::var("NGINX_CONTAINER_NAME").unwrap_or_else(|_| "bizclaw-nginx".to_string());
         if let Ok(out) = std::process::Command::new("docker")
             .args(["exec", &nginx_container, "nginx", "-s", "reload"])
             .output()
-            && out.status.success() {
-                tracing::info!("nginx-sync[{domain}]: {} tenants synced, nginx reloaded (docker exec {})", tenants.len(), nginx_container);
-                return;
-            }
+            && out.status.success()
+        {
+            tracing::info!(
+                "nginx-sync[{domain}]: {} tenants synced, nginx reloaded (docker exec {})",
+                tenants.len(),
+                nginx_container
+            );
+            return;
+        }
         // Strategy 1: nginx -s reload (works if nginx is in same container)
-        if let Ok(out) = std::process::Command::new("nginx").args(["-s", "reload"]).output()
-            && out.status.success() {
-                tracing::info!("nginx-sync[{domain}]: {} tenants synced, nginx reloaded (nginx -s)", tenants.len());
-                return;
-            }
+        if let Ok(out) = std::process::Command::new("nginx")
+            .args(["-s", "reload"])
+            .output()
+            && out.status.success()
+        {
+            tracing::info!(
+                "nginx-sync[{domain}]: {} tenants synced, nginx reloaded (nginx -s)",
+                tenants.len()
+            );
+            return;
+        }
         // Strategy 2: systemctl reload nginx (bare-metal)
-        if let Ok(out) = std::process::Command::new("systemctl").args(["reload", "nginx"]).output()
-            && out.status.success() {
-                tracing::info!("nginx-sync[{domain}]: {} tenants synced, nginx reloaded (systemctl)", tenants.len());
-                return;
-            }
+        if let Ok(out) = std::process::Command::new("systemctl")
+            .args(["reload", "nginx"])
+            .output()
+            && out.status.success()
+        {
+            tracing::info!(
+                "nginx-sync[{domain}]: {} tenants synced, nginx reloaded (systemctl)",
+                tenants.len()
+            );
+            return;
+        }
         // Strategy 3: send HUP to nginx master process (Docker — if pid is available)
-        if let Ok(out) = std::process::Command::new("sh").args(["-c", "kill -HUP $(cat /var/run/nginx.pid 2>/dev/null) 2>/dev/null"]).output()
-            && out.status.success() {
-                tracing::info!("nginx-sync[{domain}]: {} tenants synced, nginx reloaded (HUP)", tenants.len());
-                return;
-            }
+        if let Ok(out) = std::process::Command::new("sh")
+            .args([
+                "-c",
+                "kill -HUP $(cat /var/run/nginx.pid 2>/dev/null) 2>/dev/null",
+            ])
+            .output()
+            && out.status.success()
+        {
+            tracing::info!(
+                "nginx-sync[{domain}]: {} tenants synced, nginx reloaded (HUP)",
+                tenants.len()
+            );
+            return;
+        }
         // If none worked, config is written but nginx needs manual reload
-        tracing::warn!("nginx-sync[{domain}]: config written ({} tenants) but nginx reload failed — may need manual reload", tenants.len());
+        tracing::warn!(
+            "nginx-sync[{domain}]: config written ({} tenants) but nginx reload failed — may need manual reload",
+            tenants.len()
+        );
     });
 }
 
@@ -462,7 +586,11 @@ fn is_super_admin(claims: &crate::auth::Claims) -> bool {
 /// - superadmin: any tenant
 /// - admin: only tenants where owner_id == claims.sub
 /// - viewer: only the tenant assigned via JWT tenant_id
-fn can_access_tenant(claims: &crate::auth::Claims, tenant_id: &str, db: &crate::db::PlatformDb) -> bool {
+fn can_access_tenant(
+    claims: &crate::auth::Claims,
+    tenant_id: &str,
+    db: &crate::db::PlatformDb,
+) -> bool {
     if is_super_admin(claims) {
         return true;
     }
@@ -484,7 +612,11 @@ fn can_access_tenant(claims: &crate::auth::Claims, tenant_id: &str, db: &crate::
 /// - superadmin: any tenant
 /// - admin: only tenants where owner_id == claims.sub
 /// - viewer: CANNOT write
-fn can_write_tenant(claims: &crate::auth::Claims, tenant_id: &str, db: &crate::db::PlatformDb) -> bool {
+fn can_write_tenant(
+    claims: &crate::auth::Claims,
+    tenant_id: &str,
+    db: &crate::db::PlatformDb,
+) -> bool {
     if claims.role == "viewer" {
         return false;
     }
@@ -498,14 +630,12 @@ async fn get_stats(
     Extension(claims): Extension<crate::auth::Claims>,
 ) -> Json<serde_json::Value> {
     if is_super_admin(&claims) {
-        let (total, running, stopped, error) = state
-            .db
-            .lock().await
-            .tenant_stats()
-            .unwrap_or((0, 0, 0, 0));
+        let (total, running, stopped, error) =
+            state.db.lock().await.tenant_stats().unwrap_or((0, 0, 0, 0));
         let users = state
             .db
-            .lock().await
+            .lock()
+            .await
             .list_users()
             .map(|u| u.len() as u32)
             .unwrap_or(0);
@@ -515,7 +645,10 @@ async fn get_stats(
         }))
     } else {
         // Non-super-admin: only count their own tenants
-        let my_tenants = state.db.lock().await
+        let my_tenants = state
+            .db
+            .lock()
+            .await
             .list_tenants_by_owner(&claims.sub)
             .unwrap_or_default();
         let running = my_tenants.iter().filter(|t| t.status == "running").count() as u32;
@@ -532,16 +665,13 @@ async fn get_activity(
     State(state): State<Arc<AdminState>>,
     Extension(claims): Extension<crate::auth::Claims>,
 ) -> Json<serde_json::Value> {
-    let events = state
-        .db
-        .lock().await
-        .recent_events(20)
-        .unwrap_or_default();
+    let events = state.db.lock().await.recent_events(20).unwrap_or_default();
     // For non-super-admin, filter to only their events
     if is_super_admin(&claims) {
         Json(serde_json::json!({ "events": events }))
     } else {
-        let filtered: Vec<_> = events.into_iter()
+        let filtered: Vec<_> = events
+            .into_iter()
             .filter(|e| e.actor_id == claims.sub)
             .collect();
         Json(serde_json::json!({ "events": filtered }))
@@ -558,7 +688,10 @@ async fn list_tenants(
         Json(serde_json::json!({ "tenants": tenants }))
     } else if claims.role == "admin" {
         // Admin sees only their own tenants (owner_id match)
-        let tenants = state.db.lock().await
+        let tenants = state
+            .db
+            .lock()
+            .await
             .list_tenants_by_owner(&claims.sub)
             .unwrap_or_default();
         Json(serde_json::json!({ "tenants": tenants }))
@@ -592,15 +725,17 @@ async fn create_tenant(
 ) -> Json<serde_json::Value> {
     // Role check: viewer cannot create tenants
     if claims.role == "viewer" {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền tạo tenant. Liên hệ admin để nâng cấp role."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền tạo tenant. Liên hệ admin để nâng cấp role."}),
+        );
     }
 
     // Sanitize slug: only ASCII alphanumeric + hyphens allowed
     let clean_slug = crate::self_serve::generate_safe_slug(&req.slug);
-    let slug = if clean_slug.is_empty() { 
-        crate::self_serve::generate_safe_slug(&req.name) 
-    } else { 
-        clean_slug 
+    let slug = if clean_slug.is_empty() {
+        crate::self_serve::generate_safe_slug(&req.name)
+    } else {
+        clean_slug
     };
 
     let port = {
@@ -630,7 +765,8 @@ async fn create_tenant(
         Ok(tenant) => {
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event(
                     "tenant_created",
                     "admin",
@@ -646,14 +782,27 @@ async fn create_tenant(
                 match mgr.start_tenant(&tenant, &state.bizclaw_bin, &db) {
                     Ok(pid) => {
                         drop(db);
-                        state.db.lock().await
-                            .update_tenant_status(&tenant.id, "running", Some(pid)).ok();
-                        tracing::info!("auto-start: tenant '{}' started on port {} (pid={})", slug, port, pid);
+                        state
+                            .db
+                            .lock()
+                            .await
+                            .update_tenant_status(&tenant.id, "running", Some(pid))
+                            .ok();
+                        tracing::info!(
+                            "auto-start: tenant '{}' started on port {} (pid={})",
+                            slug,
+                            port,
+                            pid
+                        );
                     }
                     Err(e) => {
                         drop(db);
-                        state.db.lock().await
-                            .update_tenant_status(&tenant.id, "error", None).ok();
+                        state
+                            .db
+                            .lock()
+                            .await
+                            .update_tenant_status(&tenant.id, "error", None)
+                            .ok();
                         tracing::warn!("auto-start: failed to start tenant '{}': {e}", slug);
                     }
                 }
@@ -673,7 +822,9 @@ async fn get_tenant(
 ) -> Json<serde_json::Value> {
     let db = state.db.lock().await;
     if !can_access_tenant(&claims, &id, &db) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}),
+        );
     }
     match db.get_tenant(&id) {
         Ok(t) => Json(serde_json::json!({"ok": true, "tenant": t})),
@@ -698,7 +849,8 @@ async fn delete_tenant(
         Ok(()) => {
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event("tenant_deleted", "admin", &id, None)
                 .ok();
             sync_nginx_routing(&state).await;
@@ -714,7 +866,9 @@ async fn start_tenant(
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
     if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền khởi động tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền khởi động tenant này."}),
+        );
     }
     let tenant = match state.db.lock().await.get_tenant(&id) {
         Ok(t) => t,
@@ -728,12 +882,14 @@ async fn start_tenant(
             drop(db);
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .update_tenant_status(&id, "running", Some(pid))
                 .ok();
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event("tenant_started", "admin", &id, None)
                 .ok();
             sync_nginx_routing(&state).await;
@@ -743,7 +899,8 @@ async fn start_tenant(
             drop(db);
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .update_tenant_status(&id, "error", None)
                 .ok();
             internal_error("start_tenant", e)
@@ -762,12 +919,14 @@ async fn stop_tenant(
     state.manager.lock().await.stop_tenant(&id).ok();
     state
         .db
-        .lock().await
+        .lock()
+        .await
         .update_tenant_status(&id, "stopped", None)
         .ok();
     state
         .db
-        .lock().await
+        .lock()
+        .await
         .log_event("tenant_stopped", "admin", &id, None)
         .ok();
     sync_nginx_routing(&state).await;
@@ -780,7 +939,9 @@ async fn restart_tenant(
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
     if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền khởi động lại tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền khởi động lại tenant này."}),
+        );
     }
     let tenant = match state.db.lock().await.get_tenant(&id) {
         Ok(t) => t,
@@ -795,16 +956,28 @@ async fn restart_tenant(
     }; // Both locks dropped here
     match restart_result {
         Ok(pid) => {
-            state.db.lock().await
-                .update_tenant_status(&id, "running", Some(pid)).ok();
-            state.db.lock().await
-                .log_event("tenant_restarted", "admin", &id, None).ok();
+            state
+                .db
+                .lock()
+                .await
+                .update_tenant_status(&id, "running", Some(pid))
+                .ok();
+            state
+                .db
+                .lock()
+                .await
+                .log_event("tenant_restarted", "admin", &id, None)
+                .ok();
             sync_nginx_routing(&state).await;
             Json(serde_json::json!({"ok": true, "pid": pid}))
         }
         Err(e) => {
-            state.db.lock().await
-                .update_tenant_status(&id, "error", None).ok();
+            state
+                .db
+                .lock()
+                .await
+                .update_tenant_status(&id, "error", None)
+                .ok();
             internal_error("restart_tenant", e)
         }
     }
@@ -822,7 +995,8 @@ async fn list_users(
     } else {
         // Non-super-admin can only see themselves
         let all_users = state.db.lock().await.list_users().unwrap_or_default();
-        let my_users: Vec<_> = all_users.into_iter()
+        let my_users: Vec<_> = all_users
+            .into_iter()
             .filter(|u| u.id == claims.sub)
             .collect();
         Json(serde_json::json!({"users": my_users}))
@@ -881,7 +1055,11 @@ async fn login(
                     let db = state.db.lock().await;
                     match db.get_user_by_id(&id) {
                         Ok(Some(u)) => {
-                            let tid = if u.status == "pending" { None } else { u.tenant_id.clone() };
+                            let tid = if u.status == "pending" {
+                                None
+                            } else {
+                                u.tenant_id.clone()
+                            };
                             (tid, u.status.clone())
                         }
                         _ => (None, "active".into()),
@@ -899,11 +1077,18 @@ async fn login(
                         "error": "Tài khoản đã bị tạm khóa. Vui lòng liên hệ admin."
                     }));
                 }
-                match crate::auth::create_token(&id, &req.email, &role, tenant_id.as_deref(), &state.jwt_secret) {
+                match crate::auth::create_token(
+                    &id,
+                    &req.email,
+                    &role,
+                    tenant_id.as_deref(),
+                    &state.jwt_secret,
+                ) {
                     Ok(token) => {
                         state
                             .db
-                            .lock().await
+                            .lock()
+                            .await
                             .log_event("login_success", "user", &id, None)
                             .ok();
                         Json(serde_json::json!({"ok": true, "token": token, "role": role}))
@@ -921,7 +1106,9 @@ async fn login(
         Ok(None) => Json(serde_json::json!({"ok": false, "error": "Invalid credentials"})),
         Err(e) => {
             tracing::error!("login: DB error: {e}");
-            Json(serde_json::json!({"ok": false, "error": "An internal error occurred. Please try again."}))
+            Json(
+                serde_json::json!({"ok": false, "error": "An internal error occurred. Please try again."}),
+            )
         }
     }
 }
@@ -943,7 +1130,10 @@ async fn validate_pairing_deprecated(
 async fn admin_dashboard_page() -> impl axum::response::IntoResponse {
     (
         [
-            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            (
+                axum::http::header::CACHE_CONTROL,
+                "no-cache, no-store, must-revalidate",
+            ),
             (axum::http::header::PRAGMA, "no-cache"),
         ],
         axum::response::Html(include_str!("admin_dashboard.html")),
@@ -966,7 +1156,9 @@ async fn list_channels(
     {
         let db = state.db.lock().await;
         if !can_access_tenant(&claims, &id, &db) {
-            return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+            return Json(
+                serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}),
+            );
         }
     } // lock dropped here
     match state.db.lock().await.list_channels(&id) {
@@ -989,17 +1181,24 @@ async fn upsert_channel(
     Json(req): Json<UpsertChannelReq>,
 ) -> Json<serde_json::Value> {
     if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}),
+        );
     }
     let config_json = serde_json::to_string(&req.config).unwrap_or_default();
     // IMPORTANT: separate lock scopes to avoid Mutex deadlock
-    let upsert_result = state.db.lock().await
-        .upsert_channel(&id, &req.channel_type, req.enabled, &config_json);
+    let upsert_result =
+        state
+            .db
+            .lock()
+            .await
+            .upsert_channel(&id, &req.channel_type, req.enabled, &config_json);
     match upsert_result {
         Ok(channel) => {
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event(
                     "channel_configured",
                     "admin",
@@ -1030,7 +1229,8 @@ async fn delete_channel(
         Ok(()) => {
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event(
                     "channel_deleted",
                     "admin",
@@ -1234,14 +1434,19 @@ async fn list_tenant_configs(
     {
         let db = state.db.lock().await;
         if !can_access_tenant(&claims, &id, &db) {
-            return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+            return Json(
+                serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}),
+            );
         }
     } // lock dropped here
     match state.db.lock().await.list_configs(&id) {
         Ok(configs) => {
             let mut obj = serde_json::Map::new();
             for cfg in &configs {
-                obj.insert(cfg.key.clone(), serde_json::Value::String(cfg.value.clone()));
+                obj.insert(
+                    cfg.key.clone(),
+                    serde_json::Value::String(cfg.value.clone()),
+                );
             }
             Json(serde_json::json!({"ok": true, "configs": obj}))
         }
@@ -1258,7 +1463,9 @@ async fn set_tenant_configs(
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}),
+        );
     }
     let configs = match body.get("configs").and_then(|c| c.as_object()) {
         Some(c) => c,
@@ -1279,17 +1486,23 @@ async fn set_tenant_configs(
 
     // Also update the tenants table provider/model for consistency
     if let Some(provider) = configs.get("default_provider").and_then(|v| v.as_str())
-        && let Some(model) = configs.get("default_model").and_then(|v| v.as_str()) {
-            db.update_tenant_provider(&id, provider, model).ok();
-        }
+        && let Some(model) = configs.get("default_model").and_then(|v| v.as_str())
+    {
+        db.update_tenant_provider(&id, provider, model).ok();
+    }
 
     drop(db);
-    state.db.lock().await.log_event(
-        "config_updated",
-        "admin",
-        &id,
-        Some(&format!("keys={}", saved_count)),
-    ).ok();
+    state
+        .db
+        .lock()
+        .await
+        .log_event(
+            "config_updated",
+            "admin",
+            &id,
+            Some(&format!("keys={}", saved_count)),
+        )
+        .ok();
 
     Json(serde_json::json!({"ok": true, "saved": saved_count}))
 }
@@ -1309,7 +1522,9 @@ async fn list_tenant_agents(
     {
         let db = state.db.lock().await;
         if !can_access_tenant(&claims, &id, &db) {
-            return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+            return Json(
+                serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}),
+            );
         }
     } // lock dropped here
     match state.db.lock().await.list_agents(&id) {
@@ -1336,14 +1551,22 @@ async fn upsert_tenant_agent(
     Json(req): Json<UpsertAgentReq>,
 ) -> Json<serde_json::Value> {
     if !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}),
+        );
     }
     let db = state.db.lock().await;
 
     // Get tenant defaults for fallback values
     let tenant = db.get_tenant(&id).ok();
-    let default_provider = tenant.as_ref().map(|t| t.provider.as_str()).unwrap_or("openai");
-    let default_model = tenant.as_ref().map(|t| t.model.as_str()).unwrap_or("gpt-4o-mini");
+    let default_provider = tenant
+        .as_ref()
+        .map(|t| t.provider.as_str())
+        .unwrap_or("openai");
+    let default_model = tenant
+        .as_ref()
+        .map(|t| t.model.as_str())
+        .unwrap_or("gpt-4o-mini");
 
     match db.upsert_agent(
         &id,
@@ -1356,12 +1579,17 @@ async fn upsert_tenant_agent(
     ) {
         Ok(agent) => {
             drop(db);
-            state.db.lock().await.log_event(
-                "agent_upserted",
-                "admin",
-                &id,
-                Some(&format!("name={}", req.name)),
-            ).ok();
+            state
+                .db
+                .lock()
+                .await
+                .log_event(
+                    "agent_upserted",
+                    "admin",
+                    &id,
+                    Some(&format!("name={}", req.name)),
+                )
+                .ok();
             Json(serde_json::json!({"ok": true, "agent": agent}))
         }
         Err(e) => internal_error("admin", e),
@@ -1381,12 +1609,17 @@ async fn delete_tenant_agent(
     let del_result = state.db.lock().await.delete_agent_by_name(&id, &name);
     match del_result {
         Ok(()) => {
-            state.db.lock().await.log_event(
-                "agent_deleted",
-                "admin",
-                &id,
-                Some(&format!("name={}", name)),
-            ).ok();
+            state
+                .db
+                .lock()
+                .await
+                .log_event(
+                    "agent_deleted",
+                    "admin",
+                    &id,
+                    Some(&format!("name={}", name)),
+                )
+                .ok();
             Json(serde_json::json!({"ok": true}))
         }
         Err(e) => internal_error("admin", e),
@@ -1411,7 +1644,9 @@ async fn create_user_handler(
     Json(req): Json<CreateUserReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền tạo user."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền tạo user."}),
+        );
     }
     tracing::debug!("create_user: {}", req.email);
     if req.email.is_empty() || req.password.is_empty() {
@@ -1421,10 +1656,8 @@ async fn create_user_handler(
     // Hash password in blocking thread
     let password = req.password.clone();
     tracing::debug!("create_user: hashing password");
-    let hash = match tokio::task::spawn_blocking(move || {
-        crate::auth::hash_password(&password)
-    })
-    .await
+    let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&password))
+        .await
     {
         Ok(Ok(h)) => h,
         Ok(Err(e)) => {
@@ -1439,14 +1672,25 @@ async fn create_user_handler(
 
     let role = req.role.as_deref().unwrap_or("admin");
     // Extracted lock to avoid deadlock with subsequent log_event lock
-    let db_res = state.db.lock().await.create_user(&req.email, &hash, role, req.tenant_id.as_deref().filter(|s| !s.is_empty()));
-    
+    let db_res = state.db.lock().await.create_user(
+        &req.email,
+        &hash,
+        role,
+        req.tenant_id.as_deref().filter(|s| !s.is_empty()),
+    );
+
     match db_res {
         Ok(id) => {
             state
                 .db
-                .lock().await
-                .log_event("user_created", "admin", &id, Some(&format!("email={}", req.email)))
+                .lock()
+                .await
+                .log_event(
+                    "user_created",
+                    "admin",
+                    &id,
+                    Some(&format!("email={}", req.email)),
+                )
                 .ok();
             Json(serde_json::json!({"ok": true, "id": id}))
         }
@@ -1470,13 +1714,21 @@ async fn delete_user_handler(
 ) -> Json<serde_json::Value> {
     // Only super-admin can delete users
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Only super admin can delete users"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Only super admin can delete users"}),
+        );
     }
-    
-    tracing::info!("delete_user_handler: Cascade deleting user {} and their tenants", id);
-    
+
+    tracing::info!(
+        "delete_user_handler: Cascade deleting user {} and their tenants",
+        id
+    );
+
     // Stop all tenant processes first
-    let tenant_ids = state.db.lock().await
+    let tenant_ids = state
+        .db
+        .lock()
+        .await
         .list_tenants_by_owner(&id)
         .unwrap_or_default()
         .into_iter()
@@ -1485,26 +1737,34 @@ async fn delete_user_handler(
     for tid in &tenant_ids {
         state.manager.lock().await.stop_tenant(tid).ok();
     }
-    
+
     // Cascade delete user + tenants
     let db_res = state.db.lock().await.delete_user_cascade(&id);
-    
+
     match db_res {
         Ok(deleted_tenants) => {
-            tracing::info!("delete_user_handler: Deleted user {} and {} tenants", id, deleted_tenants.len());
+            tracing::info!(
+                "delete_user_handler: Deleted user {} and {} tenants",
+                id,
+                deleted_tenants.len()
+            );
             state
                 .db
-                .lock().await
-                .log_event("user_deleted_cascade", "admin", &id, Some(&format!("tenants_deleted={}", deleted_tenants.len())))
+                .lock()
+                .await
+                .log_event(
+                    "user_deleted_cascade",
+                    "admin",
+                    &id,
+                    Some(&format!("tenants_deleted={}", deleted_tenants.len())),
+                )
                 .ok();
             if !deleted_tenants.is_empty() {
                 sync_nginx_routing(&state).await;
             }
             Json(serde_json::json!({"ok": true, "tenants_deleted": deleted_tenants.len()}))
         }
-        Err(e) => {
-            internal_error("delete_user", e)
-        }
+        Err(e) => internal_error("delete_user", e),
     }
 }
 
@@ -1521,17 +1781,20 @@ async fn assign_tenant_handler(
     Json(req): Json<AssignTenantReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền gán tenant."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền gán tenant."}),
+        );
     }
     let tenant_id_str = req.tenant_id.as_deref().filter(|s| !s.is_empty());
     let db_res = state.db.lock().await.update_user_tenant(&id, tenant_id_str);
-    
+
     match db_res {
         Ok(()) => {
             let details = format!("tenant_id={}", tenant_id_str.unwrap_or("none"));
             state
                 .db
-                .lock().await
+                .lock()
+                .await
                 .log_event("user_assigned", "admin", &id, Some(&details))
                 .ok();
             Json(serde_json::json!({"ok": true}))
@@ -1557,14 +1820,19 @@ async fn admin_reset_user_password(
     Json(req): Json<AdminResetPasswordReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền reset mật khẩu."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền reset mật khẩu."}),
+        );
     }
     if req.new_password.len() < 8 {
-        return Json(serde_json::json!({"ok": false, "error": "Password must be at least 8 characters"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Password must be at least 8 characters"}),
+        );
     }
 
     let new_pwd = req.new_password.clone();
-    let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await {
+    let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&new_pwd)).await
+    {
         Ok(Ok(h)) => h,
         Ok(Err(e)) => return internal_error("hash_password", e),
         Err(e) => return internal_error("hash_task", e),
@@ -1575,8 +1843,14 @@ async fn admin_reset_user_password(
         Ok(()) => {
             state
                 .db
-                .lock().await
-                .log_event("admin_password_reset", "admin", &id, Some("password force-reset by admin"))
+                .lock()
+                .await
+                .log_event(
+                    "admin_password_reset",
+                    "admin",
+                    &id,
+                    Some("password force-reset by admin"),
+                )
                 .ok();
             Json(serde_json::json!({"ok": true}))
         }
@@ -1601,12 +1875,16 @@ async fn update_user_status_handler(
     Json(req): Json<UpdateUserStatusReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Only super admin can change user status"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Only super admin can change user status"}),
+        );
     }
 
     let valid_statuses = ["pending", "active", "suspended"];
     if !valid_statuses.contains(&req.status.as_str()) {
-        return Json(serde_json::json!({"ok": false, "error": "Invalid status. Must be: pending, active, suspended"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Invalid status. Must be: pending, active, suspended"}),
+        );
     }
 
     let db_res = state.db.lock().await.update_user_status(&id, &req.status);
@@ -1614,16 +1892,29 @@ async fn update_user_status_handler(
         Ok(()) => {
             state
                 .db
-                .lock().await
-                .log_event("user_status_changed", "admin", &id, Some(&format!("status={}", req.status)))
+                .lock()
+                .await
+                .log_event(
+                    "user_status_changed",
+                    "admin",
+                    &id,
+                    Some(&format!("status={}", req.status)),
+                )
                 .ok();
-            
+
             // If activating a user, try to start their stopped tenant(s)
             if req.status == "active" {
-                let tenants = state.db.lock().await
+                let tenants = state
+                    .db
+                    .lock()
+                    .await
                     .list_tenants_by_owner(&id)
                     .unwrap_or_default();
-                let stopped: Vec<_> = tenants.iter().filter(|t| t.status == "stopped").cloned().collect();
+                let stopped: Vec<_> = tenants
+                    .iter()
+                    .filter(|t| t.status == "stopped")
+                    .cloned()
+                    .collect();
                 for tenant in &stopped {
                     // Acquire locks one at a time — never hold db + manager simultaneously
                     let start_result = {
@@ -1633,14 +1924,29 @@ async fn update_user_status_handler(
                     }; // Both locks dropped here
                     match start_result {
                         Ok(pid) => {
-                            state.db.lock().await
-                                .update_tenant_status(&tenant.id, "running", Some(pid)).ok();
-                            tracing::info!("user-activate: started tenant '{}' (pid={})", tenant.slug, pid);
+                            state
+                                .db
+                                .lock()
+                                .await
+                                .update_tenant_status(&tenant.id, "running", Some(pid))
+                                .ok();
+                            tracing::info!(
+                                "user-activate: started tenant '{}' (pid={})",
+                                tenant.slug,
+                                pid
+                            );
                         }
                         Err(e) => {
-                            state.db.lock().await
-                                .update_tenant_status(&tenant.id, "error", None).ok();
-                            tracing::warn!("user-activate: failed to start tenant '{}': {e}", tenant.slug);
+                            state
+                                .db
+                                .lock()
+                                .await
+                                .update_tenant_status(&tenant.id, "error", None)
+                                .ok();
+                            tracing::warn!(
+                                "user-activate: failed to start tenant '{}': {e}",
+                                tenant.slug
+                            );
                         }
                     }
                 }
@@ -1648,7 +1954,7 @@ async fn update_user_status_handler(
                     sync_nginx_routing(&state).await;
                 }
             }
-            
+
             Json(serde_json::json!({"ok": true}))
         }
         Err(e) => internal_error("admin", e),
@@ -1672,12 +1978,16 @@ async fn update_user_role_handler(
     Json(req): Json<UpdateUserRoleReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) {
-        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền đổi role."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền đổi role."}),
+        );
     }
 
     let valid_roles = ["superadmin", "admin", "viewer"];
     if !valid_roles.contains(&req.role.as_str()) {
-        return Json(serde_json::json!({"ok": false, "error": "Role không hợp lệ. Phải là: superadmin, admin, viewer"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Role không hợp lệ. Phải là: superadmin, admin, viewer"}),
+        );
     }
 
     // Protect the platform owner account
@@ -1685,16 +1995,27 @@ async fn update_user_role_handler(
         let db = state.db.lock().await;
         let users = db.list_users().unwrap_or_default();
         if let Some(target) = users.iter().find(|u| u.id == id)
-            && target.email == "admin@bizclaw.vn" {
-                return Json(serde_json::json!({"ok": false, "error": "Không thể thay đổi role của Super Admin gốc."}));
-            }
+            && target.email == "admin@bizclaw.vn"
+        {
+            return Json(
+                serde_json::json!({"ok": false, "error": "Không thể thay đổi role của Super Admin gốc."}),
+            );
+        }
     }
 
     let db_res = state.db.lock().await.update_user_role(&id, &req.role);
     match db_res {
         Ok(()) => {
-            state.db.lock().await
-                .log_event("user_role_changed", "admin", &id, Some(&format!("role={}", req.role)))
+            state
+                .db
+                .lock()
+                .await
+                .log_event(
+                    "user_role_changed",
+                    "admin",
+                    &id,
+                    Some(&format!("role={}", req.role)),
+                )
                 .ok();
             Json(serde_json::json!({"ok": true}))
         }
@@ -1719,12 +2040,17 @@ async fn list_members(
             Ok(members) => Json(serde_json::json!({"ok": true, "members": members})),
             Err(e) => internal_error("list_members", e),
         },
-        None => Json(serde_json::json!({"ok": false, "error": "PostgreSQL required for enterprise features"})),
+        None => Json(
+            serde_json::json!({"ok": false, "error": "PostgreSQL required for enterprise features"}),
+        ),
     }
 }
 
 #[derive(serde::Deserialize)]
-struct InviteMemberReq { email: String, role: String }
+struct InviteMemberReq {
+    email: String,
+    role: String,
+}
 
 async fn invite_member(
     State(state): State<Arc<AdminState>>,
@@ -1737,12 +2063,18 @@ async fn invite_member(
     }
     let valid_roles = ["owner", "admin", "operator", "viewer"];
     if !valid_roles.contains(&req.role.as_str()) {
-        return Json(serde_json::json!({"ok": false, "error": "Role không hợp lệ. Phải là: owner, admin, operator, viewer"}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Role không hợp lệ. Phải là: owner, admin, operator, viewer"}),
+        );
     }
     match &state.pg_db {
-        Some(pg) => match pg.create_invitation(&id, &req.email, &req.role, &claims.sub, 72).await {
+        Some(pg) => match pg
+            .create_invitation(&id, &req.email, &req.role, &claims.sub, 72)
+            .await
+        {
             Ok(inv) => {
-                let base_url = std::env::var("BIZCLAW_BASE_URL").unwrap_or_else(|_| "https://app.bizclaw.vn".into());
+                let base_url = std::env::var("BIZCLAW_BASE_URL")
+                    .unwrap_or_else(|_| "https://app.bizclaw.vn".into());
                 let invite_url = format!("{base_url}/api/admin/invitations/{}/accept", inv.token);
                 Json(serde_json::json!({
                     "ok": true,
@@ -1758,7 +2090,9 @@ async fn invite_member(
 }
 
 #[derive(serde::Deserialize)]
-struct UpdateMemberRoleReq { role: String }
+struct UpdateMemberRoleReq {
+    role: String,
+}
 
 async fn update_member_role(
     State(state): State<Arc<AdminState>>,
@@ -1796,7 +2130,9 @@ async fn remove_member(
 }
 
 #[derive(serde::Deserialize)]
-struct AcceptInvitationReq { user_id: String }
+struct AcceptInvitationReq {
+    user_id: String,
+}
 
 async fn accept_invitation(
     State(state): State<Arc<AdminState>>,
@@ -1852,7 +2188,9 @@ async fn claim_handoff(
 }
 
 #[derive(serde::Deserialize)]
-struct HandoffReplyReq { content: String }
+struct HandoffReplyReq {
+    content: String,
+}
 
 async fn reply_handoff(
     State(state): State<Arc<AdminState>>,
@@ -1861,7 +2199,10 @@ async fn reply_handoff(
     Json(req): Json<HandoffReplyReq>,
 ) -> Json<serde_json::Value> {
     match &state.pg_db {
-        Some(pg) => match pg.add_handoff_message(&hid, "operator", Some(&claims.sub), &req.content).await {
+        Some(pg) => match pg
+            .add_handoff_message(&hid, "operator", Some(&claims.sub), &req.content)
+            .await
+        {
             Ok(msg) => Json(serde_json::json!({"ok": true, "message": msg})),
             Err(e) => internal_error("reply_handoff", e),
         },
@@ -1913,10 +2254,15 @@ async fn analytics_summary(
     if !can_access_tenant(&claims, &id, &*state.db.lock().await) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền."}));
     }
-    let days: i32 = params.get("days").and_then(|d| d.parse().ok()).unwrap_or(30);
+    let days: i32 = params
+        .get("days")
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(30);
     match &state.pg_db {
         Some(pg) => match pg.get_analytics_summary(&id, days).await {
-            Ok(summary) => Json(serde_json::json!({"ok": true, "period_days": days, "summary": summary})),
+            Ok(summary) => {
+                Json(serde_json::json!({"ok": true, "period_days": days, "summary": summary}))
+            }
             Err(e) => internal_error("analytics_summary", e),
         },
         None => Json(serde_json::json!({"ok": false, "error": "PostgreSQL required"})),
@@ -1932,7 +2278,10 @@ async fn analytics_tokens(
     if !can_access_tenant(&claims, &id, &*state.db.lock().await) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền."}));
     }
-    let days: i32 = params.get("days").and_then(|d| d.parse().ok()).unwrap_or(30);
+    let days: i32 = params
+        .get("days")
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(30);
     match &state.pg_db {
         Some(pg) => match pg.get_token_usage_by_day(&id, days).await {
             Ok(usage) => Json(serde_json::json!({"ok": true, "period_days": days, "usage": usage})),
@@ -1964,7 +2313,9 @@ async fn list_quotas(
 }
 
 #[derive(serde::Deserialize)]
-struct SetQuotaReq { limit_value: i64 }
+struct SetQuotaReq {
+    limit_value: i64,
+}
 
 async fn set_quota(
     State(state): State<Arc<AdminState>>,
@@ -1973,7 +2324,9 @@ async fn set_quota(
     Json(req): Json<SetQuotaReq>,
 ) -> Json<serde_json::Value> {
     if !is_super_admin(&claims) && !can_write_tenant(&claims, &id, &*state.db.lock().await) {
-        return Json(serde_json::json!({"ok": false, "error": "Chỉ Admin mới có thể thay đổi quota."}));
+        return Json(
+            serde_json::json!({"ok": false, "error": "Chỉ Admin mới có thể thay đổi quota."}),
+        );
     }
     let valid = ["tokens_per_month", "messages_per_day", "handoffs_per_month"];
     if !valid.contains(&resource.as_str()) {
@@ -1981,7 +2334,9 @@ async fn set_quota(
     }
     match &state.pg_db {
         Some(pg) => match pg.set_quota(&id, &resource, req.limit_value).await {
-            Ok(()) => Json(serde_json::json!({"ok": true, "resource": resource, "limit": req.limit_value})),
+            Ok(()) => Json(
+                serde_json::json!({"ok": true, "resource": resource, "limit": req.limit_value}),
+            ),
             Err(e) => internal_error("set_quota", e),
         },
         None => Json(serde_json::json!({"ok": false, "error": "PostgreSQL required"})),
@@ -2000,13 +2355,19 @@ async fn mc_list_tasks(
     match &state.pg_db {
         Some(pg) => {
             let tenant_id = params.get("tenant_id").map(|s| s.as_str());
-            let status    = params.get("status").map(|s| s.as_str());
-            let priority  = params.get("priority").map(|s| s.as_str());
-            let assigned  = params.get("assigned_to").map(|s| s.as_str());
-            let limit: i64 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(100);
-            match pg.list_tasks(tenant_id, status, priority, assigned, limit).await {
+            let status = params.get("status").map(|s| s.as_str());
+            let priority = params.get("priority").map(|s| s.as_str());
+            let assigned = params.get("assigned_to").map(|s| s.as_str());
+            let limit: i64 = params
+                .get("limit")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(100);
+            match pg
+                .list_tasks(tenant_id, status, priority, assigned, limit)
+                .await
+            {
                 Ok(tasks) => Json(serde_json::json!({ "ok": true, "tasks": tasks })),
-                Err(e)    => internal_error("mc_list_tasks", e),
+                Err(e) => internal_error("mc_list_tasks", e),
             }
         }
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
@@ -2015,16 +2376,16 @@ async fn mc_list_tasks(
 
 #[derive(serde::Deserialize)]
 struct McCreateTaskReq {
-    title:          String,
-    description:    Option<String>,
-    status:         Option<String>,
-    priority:       Option<String>,
-    assigned_to:    Option<String>,
+    title: String,
+    description: Option<String>,
+    status: Option<String>,
+    priority: Option<String>,
+    assigned_to: Option<String>,
     assigned_agent: Option<String>,
-    tags:           Option<String>,
-    due_at:         Option<String>,
-    quality_gate:   Option<bool>,
-    tenant_id:      Option<String>,
+    tags: Option<String>,
+    due_at: Option<String>,
+    quality_gate: Option<bool>,
+    tenant_id: Option<String>,
 }
 
 async fn mc_create_task(
@@ -2035,15 +2396,20 @@ async fn mc_create_task(
     match &state.pg_db {
         Some(pg) => {
             let create_req = crate::mission_control::CreateTaskReq {
-                title: req.title, description: req.description,
-                status: req.status, priority: req.priority,
-                assigned_to: req.assigned_to, assigned_agent: req.assigned_agent,
-                tags: req.tags, due_at: req.due_at,
-                quality_gate: req.quality_gate, tenant_id: req.tenant_id,
+                title: req.title,
+                description: req.description,
+                status: req.status,
+                priority: req.priority,
+                assigned_to: req.assigned_to,
+                assigned_agent: req.assigned_agent,
+                tags: req.tags,
+                due_at: req.due_at,
+                quality_gate: req.quality_gate,
+                tenant_id: req.tenant_id,
             };
             match pg.create_task(&create_req, &claims.sub).await {
                 Ok(task) => Json(serde_json::json!({ "ok": true, "task": task })),
-                Err(e)   => internal_error("mc_create_task", e),
+                Err(e) => internal_error("mc_create_task", e),
             }
         }
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
@@ -2060,7 +2426,7 @@ async fn mc_kanban_board(
             let tenant_id = params.get("tenant_id").map(|s| s.as_str());
             match pg.get_kanban_board(tenant_id).await {
                 Ok(board) => Json(serde_json::json!({ "ok": true, "board": board })),
-                Err(e)    => internal_error("mc_kanban_board", e),
+                Err(e) => internal_error("mc_kanban_board", e),
             }
         }
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
@@ -2076,8 +2442,10 @@ async fn mc_pending_reviews(
         Some(pg) => {
             let tenant_id = params.get("tenant_id").map(|s| s.as_str());
             match pg.get_pending_reviews(tenant_id).await {
-                Ok(tasks) => Json(serde_json::json!({ "ok": true, "tasks": tasks, "count": tasks.len() })),
-                Err(e)    => internal_error("mc_pending_reviews", e),
+                Ok(tasks) => {
+                    Json(serde_json::json!({ "ok": true, "tasks": tasks, "count": tasks.len() }))
+                }
+                Err(e) => internal_error("mc_pending_reviews", e),
             }
         }
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
@@ -2091,7 +2459,7 @@ async fn mc_get_task(
     match &state.pg_db {
         Some(pg) => match pg.get_task(&tid).await {
             Ok(task) => Json(serde_json::json!({ "ok": true, "task": task })),
-            Err(e)   => internal_error("mc_get_task", e),
+            Err(e) => internal_error("mc_get_task", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2099,13 +2467,13 @@ async fn mc_get_task(
 
 #[derive(serde::Deserialize)]
 struct McUpdateTaskReq {
-    title:          Option<String>,
-    description:    Option<String>,
-    status:         Option<String>,
-    priority:       Option<String>,
-    assigned_to:    Option<String>,
+    title: Option<String>,
+    description: Option<String>,
+    status: Option<String>,
+    priority: Option<String>,
+    assigned_to: Option<String>,
     assigned_agent: Option<String>,
-    position:       Option<i32>,
+    position: Option<i32>,
 }
 
 async fn mc_update_task(
@@ -2114,15 +2482,21 @@ async fn mc_update_task(
     Json(req): Json<McUpdateTaskReq>,
 ) -> Json<serde_json::Value> {
     match &state.pg_db {
-        Some(pg) => match pg.update_task(
-            &tid,
-            req.title.as_deref(), req.description.as_deref(),
-            req.status.as_deref(), req.priority.as_deref(),
-            req.assigned_to.as_deref(), req.assigned_agent.as_deref(),
-            req.position,
-        ).await {
+        Some(pg) => match pg
+            .update_task(
+                &tid,
+                req.title.as_deref(),
+                req.description.as_deref(),
+                req.status.as_deref(),
+                req.priority.as_deref(),
+                req.assigned_to.as_deref(),
+                req.assigned_agent.as_deref(),
+                req.position,
+            )
+            .await
+        {
             Ok(task) => Json(serde_json::json!({ "ok": true, "task": task })),
-            Err(e)   => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+            Err(e) => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2148,14 +2522,16 @@ async fn mc_list_comments(
     match &state.pg_db {
         Some(pg) => match pg.list_task_comments(&tid).await {
             Ok(comments) => Json(serde_json::json!({ "ok": true, "comments": comments })),
-            Err(e)       => internal_error("mc_list_comments", e),
+            Err(e) => internal_error("mc_list_comments", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
 }
 
 #[derive(serde::Deserialize)]
-struct McCommentReq { content: String }
+struct McCommentReq {
+    content: String,
+}
 
 async fn mc_add_comment(
     State(state): State<Arc<AdminState>>,
@@ -2164,7 +2540,10 @@ async fn mc_add_comment(
     Json(req): Json<McCommentReq>,
 ) -> Json<serde_json::Value> {
     match &state.pg_db {
-        Some(pg) => match pg.add_task_comment(&tid, Some(&claims.sub), &claims.email, &req.content).await {
+        Some(pg) => match pg
+            .add_task_comment(&tid, Some(&claims.sub), &claims.email, &req.content)
+            .await
+        {
             Ok(c) => Json(serde_json::json!({ "ok": true, "comment": c })),
             Err(e) => internal_error("mc_add_comment", e),
         },
@@ -2174,8 +2553,8 @@ async fn mc_add_comment(
 
 #[derive(serde::Deserialize)]
 struct McReviewReq {
-    status: String,     // approved | rejected
-    notes:  Option<String>,
+    status: String, // approved | rejected
+    notes: Option<String>,
 }
 
 async fn mc_submit_review(
@@ -2186,14 +2565,23 @@ async fn mc_submit_review(
 ) -> Json<serde_json::Value> {
     let valid = ["approved", "rejected"];
     if !valid.contains(&req.status.as_str()) {
-        return Json(serde_json::json!({ "ok": false, "error": "status phải là: approved | rejected" }));
+        return Json(
+            serde_json::json!({ "ok": false, "error": "status phải là: approved | rejected" }),
+        );
     }
     match &state.pg_db {
-        Some(pg) => match pg.submit_quality_review(
-            &tid, Some(&claims.sub), &claims.email, &req.status, req.notes.as_deref()
-        ).await {
+        Some(pg) => match pg
+            .submit_quality_review(
+                &tid,
+                Some(&claims.sub),
+                &claims.email,
+                &req.status,
+                req.notes.as_deref(),
+            )
+            .await
+        {
             Ok(review) => Json(serde_json::json!({ "ok": true, "review": review })),
-            Err(e)     => internal_error("mc_submit_review", e),
+            Err(e) => internal_error("mc_submit_review", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2212,7 +2600,7 @@ async fn mc_list_sessions(
             let tenant_id = params.get("tenant_id").map(|s| s.as_str());
             match pg.list_agent_sessions(tenant_id).await {
                 Ok(sessions) => Json(serde_json::json!({ "ok": true, "sessions": sessions })),
-                Err(e)       => internal_error("mc_list_sessions", e),
+                Err(e) => internal_error("mc_list_sessions", e),
             }
         }
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
@@ -2221,13 +2609,13 @@ async fn mc_list_sessions(
 
 #[derive(serde::Deserialize)]
 struct McHeartbeatReq {
-    agent_name:         String,
-    session_key:        String,
-    tenant_id:          Option<String>,
-    prompt_tokens:      Option<i64>,
-    completion_tokens:  Option<i64>,
-    cost_usd:           Option<f32>,
-    model:              Option<String>,
+    agent_name: String,
+    session_key: String,
+    tenant_id: Option<String>,
+    prompt_tokens: Option<i64>,
+    completion_tokens: Option<i64>,
+    cost_usd: Option<f32>,
+    model: Option<String>,
 }
 
 async fn mc_heartbeat(
@@ -2235,15 +2623,20 @@ async fn mc_heartbeat(
     Json(req): Json<McHeartbeatReq>,
 ) -> Json<serde_json::Value> {
     match &state.pg_db {
-        Some(pg) => match pg.upsert_agent_session(
-            req.tenant_id.as_deref(), &req.agent_name, &req.session_key,
-            req.prompt_tokens.unwrap_or(0),
-            req.completion_tokens.unwrap_or(0),
-            req.cost_usd.unwrap_or(0.0),
-            req.model.as_deref(),
-        ).await {
+        Some(pg) => match pg
+            .upsert_agent_session(
+                req.tenant_id.as_deref(),
+                &req.agent_name,
+                &req.session_key,
+                req.prompt_tokens.unwrap_or(0),
+                req.completion_tokens.unwrap_or(0),
+                req.cost_usd.unwrap_or(0.0),
+                req.model.as_deref(),
+            )
+            .await
+        {
             Ok(session) => Json(serde_json::json!({ "ok": true, "session": session })),
-            Err(e)      => internal_error("mc_heartbeat", e),
+            Err(e) => internal_error("mc_heartbeat", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2277,7 +2670,7 @@ async fn mc_list_github_syncs(
     match &state.pg_db {
         Some(pg) => match pg.list_github_syncs(&id).await {
             Ok(syncs) => Json(serde_json::json!({ "ok": true, "syncs": syncs })),
-            Err(e)    => internal_error("mc_list_github_syncs", e),
+            Err(e) => internal_error("mc_list_github_syncs", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2285,10 +2678,10 @@ async fn mc_list_github_syncs(
 
 #[derive(serde::Deserialize)]
 struct McGithubSyncReq {
-    repo:          String,
-    access_token:  Option<String>,
-    label_filter:  Option<String>,
-    auto_assign:   Option<String>,
+    repo: String,
+    access_token: Option<String>,
+    label_filter: Option<String>,
+    auto_assign: Option<String>,
 }
 
 async fn mc_upsert_github_sync(
@@ -2301,13 +2694,18 @@ async fn mc_upsert_github_sync(
         return Json(serde_json::json!({ "ok": false, "error": "Không có quyền." }));
     }
     match &state.pg_db {
-        Some(pg) => match pg.upsert_github_sync(
-            &id, &req.repo, req.access_token.as_deref(),
-            req.label_filter.as_deref().unwrap_or(""),
-            req.auto_assign.as_deref().unwrap_or(""),
-        ).await {
+        Some(pg) => match pg
+            .upsert_github_sync(
+                &id,
+                &req.repo,
+                req.access_token.as_deref(),
+                req.label_filter.as_deref().unwrap_or(""),
+                req.auto_assign.as_deref().unwrap_or(""),
+            )
+            .await
+        {
             Ok(sync) => Json(serde_json::json!({ "ok": true, "sync": sync })),
-            Err(e)   => internal_error("mc_upsert_github_sync", e),
+            Err(e) => internal_error("mc_upsert_github_sync", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2351,7 +2749,7 @@ async fn mc_list_webhooks(
     match &state.pg_db {
         Some(pg) => match pg.list_webhooks(&id).await {
             Ok(webhooks) => Json(serde_json::json!({ "ok": true, "webhooks": webhooks })),
-            Err(e)       => internal_error("mc_list_webhooks", e),
+            Err(e) => internal_error("mc_list_webhooks", e),
         },
         None => Json(serde_json::json!({ "ok": false, "error": "PostgreSQL required" })),
     }
@@ -2392,7 +2790,10 @@ async fn srv_provision(
 
     // Register server in DB
     let port = req.port.unwrap_or(3001);
-    match pg.register_server(&req.name, &req.ip, req.domain.as_deref(), port).await {
+    match pg
+        .register_server(&req.name, &req.ip, req.domain.as_deref(), port)
+        .await
+    {
         Ok(server) => {
             let server_id = server.id.clone();
             let pg_clone = pg.clone();
@@ -2402,15 +2803,15 @@ async fn srv_provision(
                 match crate::server_provisioner::provision_server(&req).await {
                     Ok(result) => {
                         let status = if result.success { "online" } else { "error" };
-                        let _ = pg_clone.update_server_health(
-                            &server_id, status, None, 0, None, None, None,
-                        ).await;
+                        let _ = pg_clone
+                            .update_server_health(&server_id, status, None, 0, None, None, None)
+                            .await;
                         tracing::info!("Provision completed for {}: {}", server_id, result.message);
                     }
                     Err(e) => {
-                        let _ = pg_clone.update_server_health(
-                            &server_id, "error", None, 0, None, None, None,
-                        ).await;
+                        let _ = pg_clone
+                            .update_server_health(&server_id, "error", None, 0, None, None, None)
+                            .await;
                         tracing::error!("Provision failed for {}: {}", server_id, e);
                     }
                 }
@@ -2481,10 +2882,17 @@ async fn srv_health_check(
         Some(server) => {
             let health = crate::server_provisioner::health_check(&server.ip, server.port).await;
             let status = if health.online { "online" } else { "offline" };
-            let _ = pg.update_server_health(
-                &sid, status, health.version.as_deref(), health.tenants,
-                health.cpu, health.ram, health.disk,
-            ).await;
+            let _ = pg
+                .update_server_health(
+                    &sid,
+                    status,
+                    health.version.as_deref(),
+                    health.tenants,
+                    health.cpu,
+                    health.ram,
+                    health.disk,
+                )
+                .await;
             Json(serde_json::json!({ "ok": true, "health": health }))
         }
         None => Json(serde_json::json!({ "ok": false, "error": "Server not found" })),
@@ -2518,13 +2926,19 @@ async fn srv_execute_command(
                 "stop" => "systemctl stop bizclaw",
                 "start" => "systemctl start bizclaw",
                 "status" => "systemctl status bizclaw --no-pager",
-                "update" => "cd /opt/bizclaw && git pull origin master && cargo build --release && systemctl restart bizclaw",
+                "update" => {
+                    "cd /opt/bizclaw && git pull origin master && cargo build --release && systemctl restart bizclaw"
+                }
                 "logs" => "journalctl -u bizclaw -n 100 --no-pager",
-                "version" => "/opt/bizclaw/bizclaw-platform --version 2>/dev/null || echo 'unknown'",
-                _ => return Json(serde_json::json!({
-                    "ok": false,
-                    "error": format!("Unknown action: {}. Use: restart, stop, start, status, update, logs, version", cmd.action),
-                })),
+                "version" => {
+                    "/opt/bizclaw/bizclaw-platform --version 2>/dev/null || echo 'unknown'"
+                }
+                _ => {
+                    return Json(serde_json::json!({
+                        "ok": false,
+                        "error": format!("Unknown action: {}. Use: restart, stop, start, status, update, logs, version", cmd.action),
+                    }));
+                }
             };
 
             match crate::server_provisioner::remote_exec(&server.ip, remote_cmd).await {
@@ -2535,4 +2949,3 @@ async fn srv_execute_command(
         None => Json(serde_json::json!({ "ok": false, "error": "Server not found" })),
     }
 }
-

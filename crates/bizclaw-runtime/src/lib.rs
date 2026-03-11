@@ -22,7 +22,9 @@ impl Default for NativeRuntime {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(900);
-        Self { timeout_secs: timeout }
+        Self {
+            timeout_secs: timeout,
+        }
     }
 }
 
@@ -74,7 +76,11 @@ impl RuntimeAdapter for NativeRuntime {
                 "[exit {}] {}\n{}",
                 code,
                 stdout.trim(),
-                if stderr.is_empty() { "" } else { stderr.trim_end() }
+                if stderr.is_empty() {
+                    ""
+                } else {
+                    stderr.trim_end()
+                }
             ))
         }
     }
@@ -97,11 +103,26 @@ impl Default for SandboxedRuntime {
             .unwrap_or(900);
         Self {
             allowed_commands: vec![
-                "ls".into(), "cat".into(), "echo".into(), "grep".into(),
-                "head".into(), "tail".into(), "wc".into(), "date".into(),
-                "whoami".into(), "pwd".into(), "find".into(), "sort".into(),
-                "uniq".into(), "tr".into(), "cut".into(), "sed".into(),
-                "awk".into(), "curl".into(), "python3".into(), "node".into(),
+                "ls".into(),
+                "cat".into(),
+                "echo".into(),
+                "grep".into(),
+                "head".into(),
+                "tail".into(),
+                "wc".into(),
+                "date".into(),
+                "whoami".into(),
+                "pwd".into(),
+                "find".into(),
+                "sort".into(),
+                "uniq".into(),
+                "tr".into(),
+                "cut".into(),
+                "sed".into(),
+                "awk".into(),
+                "curl".into(),
+                "python3".into(),
+                "node".into(),
             ],
             timeout_secs: timeout,
         }
@@ -147,7 +168,10 @@ mod tests {
     #[tokio::test]
     async fn test_native_runtime_echo() {
         let rt = NativeRuntime::default();
-        let result = rt.execute_command("echo 'hello from runtime'", None).await.unwrap();
+        let result = rt
+            .execute_command("echo 'hello from runtime'", None)
+            .await
+            .unwrap();
         assert!(result.contains("hello from runtime"));
     }
 
@@ -161,7 +185,10 @@ mod tests {
     #[tokio::test]
     async fn test_native_runtime_stderr() {
         let rt = NativeRuntime::default();
-        let result = rt.execute_command("ls /nonexistent_path_abc123", None).await.unwrap();
+        let result = rt
+            .execute_command("ls /nonexistent_path_abc123", None)
+            .await
+            .unwrap();
         assert!(result.contains("exit"));
     }
 

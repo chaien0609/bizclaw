@@ -345,7 +345,11 @@ mod tests {
         let reg = HandRegistry::with_defaults();
         assert_eq!(reg.count(), 7, "Should have 7 built-in hands");
 
-        let names: Vec<_> = reg.list().iter().map(|h| h.manifest.name.as_str()).collect();
+        let names: Vec<_> = reg
+            .list()
+            .iter()
+            .map(|h| h.manifest.name.as_str())
+            .collect();
         assert!(names.contains(&"research"));
         assert!(names.contains(&"analytics"));
         assert!(names.contains(&"content"));

@@ -38,8 +38,8 @@ pub mod group_summarizer;
 pub mod http_request;
 pub mod memory_search;
 pub mod orchestration;
-pub mod plan_tool;
 pub mod plan_store;
+pub mod plan_tool;
 pub mod registry;
 pub mod session_context;
 pub mod shell;
@@ -112,9 +112,7 @@ impl ToolRegistry {
         self.register(Box::new(byterover::ByteRoverQueryTool::new(
             workspace_dir.clone(),
         )));
-        self.register(Box::new(byterover::ByteRoverCurateTool::new(
-            workspace_dir,
-        )));
+        self.register(Box::new(byterover::ByteRoverCurateTool::new(workspace_dir)));
         tracing::info!("🧠 ByteRover Context Tree tools registered");
     }
 

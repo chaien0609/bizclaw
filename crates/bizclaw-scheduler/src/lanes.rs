@@ -35,10 +35,10 @@ impl Lane {
     /// Max concurrent tasks per lane (edge-device friendly limits).
     pub fn max_concurrent(&self) -> usize {
         match self {
-            Lane::Main => 4,      // Direct user requests
-            Lane::Cron => 2,      // Scheduled tasks
-            Lane::Subagent => 3,  // Spawned sub-agents
-            Lane::Delegate => 2,  // Delegated tasks
+            Lane::Main => 4,     // Direct user requests
+            Lane::Cron => 2,     // Scheduled tasks
+            Lane::Subagent => 3, // Spawned sub-agents
+            Lane::Delegate => 2, // Delegated tasks
         }
     }
 }

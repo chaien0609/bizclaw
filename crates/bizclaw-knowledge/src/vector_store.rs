@@ -48,11 +48,9 @@ pub fn store_embedding(
 
 /// Count chunks that have embeddings.
 pub fn embedded_chunk_count(conn: &Connection) -> usize {
-    conn.query_row(
-        "SELECT COUNT(*) FROM chunk_embeddings",
-        [],
-        |row| row.get::<_, i64>(0),
-    )
+    conn.query_row("SELECT COUNT(*) FROM chunk_embeddings", [], |row| {
+        row.get::<_, i64>(0)
+    })
     .unwrap_or(0) as usize
 }
 
@@ -187,7 +185,11 @@ pub fn hybrid_search(
     }
 
     let mut results: Vec<SearchResult> = combined.into_values().map(|(_, r)| r).collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
     results
 }

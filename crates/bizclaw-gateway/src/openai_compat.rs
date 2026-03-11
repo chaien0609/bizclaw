@@ -8,7 +8,7 @@
 use axum::extract::State;
 use axum::{Json, http::StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 
 use super::server::AppState;
@@ -84,14 +84,16 @@ fn extract_api_key(headers: &axum::http::HeaderMap) -> Option<String> {
     // Try Authorization: Bearer <key>
     if let Some(auth) = headers.get("authorization")
         && let Ok(val) = auth.to_str()
-            && let Some(token) = val.strip_prefix("Bearer ") {
-                return Some(token.trim().to_string());
-            }
+        && let Some(token) = val.strip_prefix("Bearer ")
+    {
+        return Some(token.trim().to_string());
+    }
     // Try x-api-key header
     if let Some(key) = headers.get("x-api-key")
-        && let Ok(val) = key.to_str() {
-            return Some(val.trim().to_string());
-        }
+        && let Ok(val) = key.to_str()
+    {
+        return Some(val.trim().to_string());
+    }
     None
 }
 
@@ -125,7 +127,8 @@ pub async fn chat_completions(
 
     // Route "model" field to agent name — if model matches an agent, use it
     // Otherwise use the default agent
-    let user_content = req.messages
+    let user_content = req
+        .messages
         .iter()
         .rev()
         .find(|m| m.role == "user")
@@ -189,7 +192,9 @@ pub async fn chat_completions(
     {
         let _ = state.db.track_usage("requests", 1.0);
         let _ = state.db.track_usage("tokens_in", est_prompt_tokens as f64);
-        let _ = state.db.track_usage("tokens_out", est_completion_tokens as f64);
+        let _ = state
+            .db
+            .track_usage("tokens_out", est_completion_tokens as f64);
         let cost = estimate_cost(&req.model, est_prompt_tokens, est_completion_tokens);
         let _ = state.db.track_usage("cost_usd", cost);
     }
@@ -198,7 +203,11 @@ pub async fn chat_completions(
     let _ = state.activity_tx.send(ActivityEvent {
         event_type: "llm.completed".into(),
         agent: req.model.clone(),
-        detail: format!("{}tok in {}ms", est_prompt_tokens + est_completion_tokens, elapsed.as_millis()),
+        detail: format!(
+            "{}tok in {}ms",
+            est_prompt_tokens + est_completion_tokens,
+            elapsed.as_millis()
+        ),
         timestamp: chrono::Utc::now(),
     });
 
@@ -241,14 +250,17 @@ pub async fn list_models(
     let orch = state.orchestrator.lock().await;
     let agents = orch.list_agents();
 
-    let mut models: Vec<Value> = agents.iter().map(|a| {
-        json!({
-            "id": a["name"].as_str().unwrap_or("default"),
-            "object": "model",
-            "created": chrono::Utc::now().timestamp(),
-            "owned_by": format!("bizclaw:{}", a["provider"].as_str().unwrap_or("unknown")),
+    let mut models: Vec<Value> = agents
+        .iter()
+        .map(|a| {
+            json!({
+                "id": a["name"].as_str().unwrap_or("default"),
+                "object": "model",
+                "created": chrono::Utc::now().timestamp(),
+                "owned_by": format!("bizclaw:{}", a["provider"].as_str().unwrap_or("unknown")),
+            })
         })
-    }).collect();
+        .collect();
 
     // Also add "default" model
     models.push(json!({
@@ -319,9 +331,7 @@ fn estimate_cost(model: &str, prompt_tokens: u32, completion_tokens: u32) -> f64
 // ─── Trace API Handlers ──────────────────────────────────────────────────────
 
 /// GET /api/v1/traces — list recent LLM call traces.
-pub async fn list_traces(
-    State(state): State<Arc<AppState>>,
-) -> Json<Value> {
+pub async fn list_traces(State(state): State<Arc<AppState>>) -> Json<Value> {
     let traces = state.traces.lock().unwrap_or_else(|p| p.into_inner());
     let recent: Vec<_> = traces.iter().rev().take(100).cloned().collect();
 
@@ -349,12 +359,11 @@ pub async fn list_traces(
 }
 
 /// GET /api/v1/traces/cost — cost breakdown by model/provider.
-pub async fn cost_breakdown(
-    State(state): State<Arc<AppState>>,
-) -> Json<Value> {
+pub async fn cost_breakdown(State(state): State<Arc<AppState>>) -> Json<Value> {
     let traces = state.traces.lock().unwrap_or_else(|p| p.into_inner());
 
-    let mut by_model: std::collections::HashMap<String, (f64, u64, usize)> = std::collections::HashMap::new();
+    let mut by_model: std::collections::HashMap<String, (f64, u64, usize)> =
+        std::collections::HashMap::new();
     for t in traces.iter() {
         let entry = by_model.entry(t.model.clone()).or_insert((0.0, 0, 0));
         entry.0 += t.cost_usd;
@@ -362,14 +371,17 @@ pub async fn cost_breakdown(
         entry.2 += 1;
     }
 
-    let breakdown: Vec<_> = by_model.iter().map(|(model, (cost, tokens, calls))| {
-        json!({
-            "model": model,
-            "cost_usd": cost,
-            "total_tokens": tokens,
-            "calls": calls,
+    let breakdown: Vec<_> = by_model
+        .iter()
+        .map(|(model, (cost, tokens, calls))| {
+            json!({
+                "model": model,
+                "cost_usd": cost,
+                "total_tokens": tokens,
+                "calls": calls,
+            })
         })
-    }).collect();
+        .collect();
 
     let total: f64 = by_model.values().map(|(c, _, _)| c).sum();
 
@@ -382,9 +394,7 @@ pub async fn cost_breakdown(
 }
 
 /// GET /api/v1/activity — recent activity events.
-pub async fn list_activity(
-    State(state): State<Arc<AppState>>,
-) -> Json<Value> {
+pub async fn list_activity(State(state): State<Arc<AppState>>) -> Json<Value> {
     let events = state.activity_log.lock().unwrap_or_else(|p| p.into_inner());
     let recent: Vec<_> = events.iter().rev().take(50).cloned().collect();
     Json(json!({

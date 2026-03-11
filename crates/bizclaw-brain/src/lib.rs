@@ -4,11 +4,7 @@
 //! Runs LLaMA-architecture models in GGUF format with mmap, SIMD, and quantization.
 
 // SIMD/math code: intentional loop indexing, unused struct fields for future use
-#![allow(
-    clippy::needless_range_loop,
-    clippy::too_many_arguments,
-    dead_code
-)]
+#![allow(clippy::needless_range_loop, clippy::too_many_arguments, dead_code)]
 
 pub mod attention;
 pub mod forward;

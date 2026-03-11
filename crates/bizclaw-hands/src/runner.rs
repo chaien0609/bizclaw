@@ -66,11 +66,7 @@ impl HandRunner {
                 let result = execute_hand(hand).await;
                 hand.record_run(result);
 
-                tracing::info!(
-                    "🤚 Hand {} completed: {}",
-                    hand.manifest.label,
-                    hand.status
-                );
+                tracing::info!("🤚 Hand {} completed: {}", hand.manifest.label, hand.status);
             }
         }
     }
@@ -109,7 +105,8 @@ async fn execute_hand(hand: &Hand) -> HandRunResult {
             &phase_manifest.description,
             context,
             &phase_manifest.allowed_tools,
-        ).await;
+        )
+        .await;
 
         let phase_tokens = tokens;
         total_tokens += phase_tokens;

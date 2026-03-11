@@ -28,7 +28,9 @@ pub struct SlackConfig {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for SlackConfig {
     fn default() -> Self {
@@ -68,7 +70,8 @@ impl SlackChannel {
             body["thread_ts"] = serde_json::Value::String(ts.to_string());
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://slack.com/api/chat.postMessage")
             .header("Authorization", format!("Bearer {}", self.config.bot_token))
             .json(&body)
@@ -116,31 +119,40 @@ impl SlackChannel {
 
 #[async_trait]
 impl Channel for SlackChannel {
-    fn name(&self) -> &str { "slack" }
+    fn name(&self) -> &str {
+        "slack"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         if self.config.bot_token.is_empty() {
             return Err(BizClawError::Channel("Slack bot_token required".into()));
         }
         // Verify token with auth.test
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://slack.com/api/auth.test")
             .header("Authorization", format!("Bearer {}", self.config.bot_token))
             .send()
             .await
             .map_err(|e| BizClawError::Channel(format!("Slack auth test: {e}")))?;
 
-        let body: serde_json::Value = resp.json().await
+        let body: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Slack response: {e}")))?;
 
         if body["ok"].as_bool() != Some(true) {
-            return Err(BizClawError::AuthFailed(
-                format!("Slack auth failed: {}", body["error"].as_str().unwrap_or("unknown"))
-            ));
+            return Err(BizClawError::AuthFailed(format!(
+                "Slack auth failed: {}",
+                body["error"].as_str().unwrap_or("unknown")
+            )));
         }
 
         self.connected = true;
-        tracing::info!("💬 Slack connected as: {}", body["user"].as_str().unwrap_or("bot"));
+        tracing::info!(
+            "💬 Slack connected as: {}",
+            body["user"].as_str().unwrap_or("bot")
+        );
         Ok(())
     }
 
@@ -149,7 +161,9 @@ impl Channel for SlackChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         let channel = if message.thread_id.is_empty() {
@@ -157,7 +171,8 @@ impl Channel for SlackChannel {
         } else {
             &message.thread_id
         };
-        self.post_message(channel, &message.content, message.reply_to.as_deref()).await
+        self.post_message(channel, &message.content, message.reply_to.as_deref())
+            .await
     }
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {

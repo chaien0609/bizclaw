@@ -247,8 +247,14 @@ impl DataStore for PostgresStore {
     // ── Delegations ────────────────────────────────────────
 
     async fn create_delegation(&self, d: &Delegation) -> Result<()> {
-        let mode = serde_json::to_string(&d.mode).unwrap_or_default().trim_matches('"').to_string();
-        let status = serde_json::to_string(&d.status).unwrap_or_default().trim_matches('"').to_string();
+        let mode = serde_json::to_string(&d.mode)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        let status = serde_json::to_string(&d.status)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
         sqlx::query(
             "INSERT INTO delegations (id, from_agent, to_agent, task, mode, status, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)",
@@ -273,12 +279,16 @@ impl DataStore for PostgresStore {
         result: Option<&str>,
         error: Option<&str>,
     ) -> Result<()> {
-        let status_str = serde_json::to_string(&status).unwrap_or_default().trim_matches('"').to_string();
-        let completed = if status == DelegationStatus::Completed || status == DelegationStatus::Failed {
-            Some(chrono::Utc::now())
-        } else {
-            None
-        };
+        let status_str = serde_json::to_string(&status)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        let completed =
+            if status == DelegationStatus::Completed || status == DelegationStatus::Failed {
+                Some(chrono::Utc::now())
+            } else {
+                None
+            };
         sqlx::query(
             "UPDATE delegations SET status = $1, result = $2, error = $3, completed_at = $4 WHERE id = $5",
         )
@@ -376,47 +386,56 @@ impl DataStore for PostgresStore {
     }
 
     async fn get_team(&self, id: &str) -> Result<Option<AgentTeam>> {
-        let row = sqlx::query("SELECT id, name, description, members, created_at FROM teams WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| BizClawError::Database(format!("Get team: {e}")))?;
+        let row = sqlx::query(
+            "SELECT id, name, description, members, created_at FROM teams WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| BizClawError::Database(format!("Get team: {e}")))?;
         Ok(row.map(|r| AgentTeam {
             id: r.get("id"),
             name: r.get("name"),
             description: r.get("description"),
-            members: serde_json::from_value(r.get::<serde_json::Value, _>("members")).unwrap_or_default(),
+            members: serde_json::from_value(r.get::<serde_json::Value, _>("members"))
+                .unwrap_or_default(),
             created_at: r.get("created_at"),
         }))
     }
 
     async fn get_team_by_name(&self, name: &str) -> Result<Option<AgentTeam>> {
-        let row = sqlx::query("SELECT id, name, description, members, created_at FROM teams WHERE name = $1")
-            .bind(name)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| BizClawError::Database(format!("Get team by name: {e}")))?;
+        let row = sqlx::query(
+            "SELECT id, name, description, members, created_at FROM teams WHERE name = $1",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| BizClawError::Database(format!("Get team by name: {e}")))?;
         Ok(row.map(|r| AgentTeam {
             id: r.get("id"),
             name: r.get("name"),
             description: r.get("description"),
-            members: serde_json::from_value(r.get::<serde_json::Value, _>("members")).unwrap_or_default(),
+            members: serde_json::from_value(r.get::<serde_json::Value, _>("members"))
+                .unwrap_or_default(),
             created_at: r.get("created_at"),
         }))
     }
 
     async fn list_teams(&self) -> Result<Vec<AgentTeam>> {
-        let rows = sqlx::query("SELECT id, name, description, members, created_at FROM teams ORDER BY created_at DESC")
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| BizClawError::Database(format!("List teams: {e}")))?;
+        let rows = sqlx::query(
+            "SELECT id, name, description, members, created_at FROM teams ORDER BY created_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| BizClawError::Database(format!("List teams: {e}")))?;
         Ok(rows
             .iter()
             .map(|r| AgentTeam {
                 id: r.get("id"),
                 name: r.get("name"),
                 description: r.get("description"),
-                members: serde_json::from_value(r.get::<serde_json::Value, _>("members")).unwrap_or_default(),
+                members: serde_json::from_value(r.get::<serde_json::Value, _>("members"))
+                    .unwrap_or_default(),
                 created_at: r.get("created_at"),
             })
             .collect())
@@ -435,7 +454,10 @@ impl DataStore for PostgresStore {
 
     async fn create_task(&self, task: &TeamTask) -> Result<()> {
         let blocked_by = serde_json::to_value(&task.blocked_by).unwrap_or_default();
-        let status = serde_json::to_string(&task.status).unwrap_or_default().trim_matches('"').to_string();
+        let status = serde_json::to_string(&task.status)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
         sqlx::query(
             "INSERT INTO team_tasks (id, team_id, title, description, status, created_by, assigned_to, blocked_by, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
@@ -463,7 +485,10 @@ impl DataStore for PostgresStore {
         assigned_to: Option<&str>,
         result: Option<&str>,
     ) -> Result<()> {
-        let status_str = serde_json::to_string(&status).unwrap_or_default().trim_matches('"').to_string();
+        let status_str = serde_json::to_string(&status)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
         sqlx::query(
             "UPDATE team_tasks SET status = $1, assigned_to = $2, result = $3, updated_at = NOW() WHERE id = $4",
         )
@@ -494,7 +519,8 @@ impl DataStore for PostgresStore {
             status: parse_task_status(&r.get::<String, _>("status")),
             created_by: r.get("created_by"),
             assigned_to: r.get("assigned_to"),
-            blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by")).unwrap_or_default(),
+            blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by"))
+                .unwrap_or_default(),
             result: r.get("result"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
@@ -520,7 +546,8 @@ impl DataStore for PostgresStore {
                 status: parse_task_status(&r.get::<String, _>("status")),
                 created_by: r.get("created_by"),
                 assigned_to: r.get("assigned_to"),
-                blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by")).unwrap_or_default(),
+                blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by"))
+                    .unwrap_or_default(),
                 result: r.get("result"),
                 created_at: r.get("created_at"),
                 updated_at: r.get("updated_at"),
@@ -547,7 +574,8 @@ impl DataStore for PostgresStore {
                 status: parse_task_status(&r.get::<String, _>("status")),
                 created_by: r.get("created_by"),
                 assigned_to: r.get("assigned_to"),
-                blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by")).unwrap_or_default(),
+                blocked_by: serde_json::from_value(r.get::<serde_json::Value, _>("blocked_by"))
+                    .unwrap_or_default(),
                 result: r.get("result"),
                 created_at: r.get("created_at"),
                 updated_at: r.get("updated_at"),

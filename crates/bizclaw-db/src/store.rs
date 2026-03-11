@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use bizclaw_core::error::Result;
 use bizclaw_core::types::{
-    AgentLink, AgentTeam, Delegation, DelegationStatus, Handoff, LlmTrace, TeamMessage, TeamTask,
-    TaskStatus,
+    AgentLink, AgentTeam, Delegation, DelegationStatus, Handoff, LlmTrace, TaskStatus, TeamMessage,
+    TeamTask,
 };
 
 /// Unified data store interface — implemented by SQLite and PostgreSQL.

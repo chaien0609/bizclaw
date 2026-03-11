@@ -156,9 +156,7 @@ impl Provider for FailoverProvider {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| {
-            BizClawError::Provider("All providers unhealthy".into())
-        }))
+        Err(last_error.unwrap_or_else(|| BizClawError::Provider("All providers unhealthy".into())))
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>> {
@@ -166,9 +164,10 @@ impl Provider for FailoverProvider {
         let mut all = Vec::new();
         for slot in &self.slots {
             if slot.is_healthy()
-                && let Ok(models) = slot.provider.list_models().await {
-                    all.extend(models);
-                }
+                && let Ok(models) = slot.provider.list_models().await
+            {
+                all.extend(models);
+            }
         }
         Ok(all)
     }
@@ -177,9 +176,10 @@ impl Provider for FailoverProvider {
         // Healthy if at least one provider is healthy
         for slot in &self.slots {
             if slot.is_healthy()
-                && let Ok(true) = slot.provider.health_check().await {
-                    return Ok(true);
-                }
+                && let Ok(true) = slot.provider.health_check().await
+            {
+                return Ok(true);
+            }
         }
         Ok(false)
     }
