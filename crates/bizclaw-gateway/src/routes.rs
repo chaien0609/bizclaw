@@ -3548,7 +3548,7 @@ mod tests {
             start_time: std::time::Instant::now(),
             // pairing_code removed — SaaS uses JWT
             jwt_secret: String::new(),
-            auth_failures: Arc::new(tokio::sync::Mutex::new((0, std::time::Instant::now()))),
+            auth_failures: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             agent: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             orchestrator: std::sync::Arc::new(tokio::sync::Mutex::new(
                 bizclaw_agent::orchestrator::Orchestrator::new(),
