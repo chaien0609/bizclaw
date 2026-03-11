@@ -371,7 +371,9 @@ pub async fn update_config(
             if let Some(parent) = state.config_path.parent() {
                 let sync_path = parent.join("config_sync.json");
                 if let Ok(json) = serde_json::to_string_pretty(&sync_data) {
-                    std::fs::write(&sync_path, json).ok();
+                    if let Err(e) = std::fs::write(&sync_path, json) {
+                        tracing::warn!("Failed to write config sync file to {}: {e}", sync_path.display());
+                    }
                     tracing::info!("📋 Config sync file written to {}", sync_path.display());
                 }
             }
@@ -471,7 +473,9 @@ pub async fn update_channel(
                     .parent()
                     .unwrap_or(std::path::Path::new("."));
                 let cookie_path = cookie_dir.join("zalo_cookie.txt");
-                std::fs::write(&cookie_path, v).ok();
+                if let Err(e) = std::fs::write(&cookie_path, v) {
+                    tracing::warn!("Failed to save Zalo cookie to {}: {e}", cookie_path.display());
+                }
                 zalo_cfg.personal.cookie_path = cookie_path.display().to_string();
             }
             if let Some(v) = req.get("imei").and_then(|v| v.as_str()) {
@@ -693,11 +697,12 @@ pub async fn update_channel(
                     })).collect::<Vec<_>>(),
                 });
                 let sync_path = parent.join("channels_sync.json");
-                std::fs::write(
+                if let Err(e) = std::fs::write(
                     &sync_path,
                     serde_json::to_string_pretty(&channels_json).unwrap_or_default(),
-                )
-                .ok();
+                ) {
+                    tracing::warn!("Failed to write channels sync to {}: {e}", sync_path.display());
+                }
             }
             Json(serde_json::json!({"ok": true, "message": format!("{channel_type} config saved")}))
         }
@@ -731,7 +736,9 @@ fn load_channel_instances(state: &AppState) -> Vec<serde_json::Value> {
 fn save_channel_instances(state: &AppState, instances: &[serde_json::Value]) {
     let path = channel_instances_path(state);
     let json = serde_json::to_string_pretty(instances).unwrap_or_default();
-    std::fs::write(&path, json).ok();
+    if let Err(e) = std::fs::write(&path, json) {
+        tracing::warn!("Failed to save channel instances to {}: {e}", path.display());
+    }
     // SECURITY: Set file permissions to 0600 (owner-only) since it contains secrets
     #[cfg(unix)]
     {
@@ -905,7 +912,9 @@ pub async fn save_channel_instance(
             _ => {} // Other types handled as-is
         }
         let content = toml::to_string_pretty(&*full_cfg).unwrap_or_default();
-        std::fs::write(&state.config_path, &content).ok();
+        if let Err(e) = std::fs::write(&state.config_path, &content) {
+            tracing::warn!("Failed to persist config during channel instance save: {e}");
+        }
         drop(full_cfg);
     }
 
@@ -916,11 +925,12 @@ pub async fn save_channel_instance(
             "telegram": cfg.channel.telegram.iter().map(|t| serde_json::json!({"name": t.name, "enabled": t.enabled, "bot_token": t.bot_token, "allowed_chat_ids": t.allowed_chat_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", ")})).collect::<Vec<_>>(),
             "webhook": cfg.channel.webhook.iter().map(|wh| serde_json::json!({"enabled": wh.enabled, "secret": wh.secret, "outbound_url": wh.outbound_url})).collect::<Vec<_>>(),
         });
-        std::fs::write(
+        if let Err(e) = std::fs::write(
             parent.join("channels_sync.json"),
             serde_json::to_string_pretty(&channels_json).unwrap_or_default(),
-        )
-        .ok();
+        ) {
+            tracing::warn!("Failed to write channels_sync.json for instance: {e}");
+        }
     }
     drop(cfg);
 
@@ -1573,7 +1583,9 @@ pub async fn fetch_provider_models(
                         })
                         .unwrap_or_default();
                     // Cache in DB
-                    state.db.update_provider_models(&name, &models).ok();
+                    if let Err(e) = state.db.update_provider_models(&name, &models) {
+                        tracing::warn!("Failed to cache models for provider '{name}': {e}");
+                    }
                     return Json(serde_json::json!({
                         "ok": true,
                         "provider": name,
@@ -1629,7 +1641,9 @@ pub async fn fetch_provider_models(
             }
         }
         if !models.is_empty() {
-            state.db.update_provider_models("brain", &models).ok();
+            if let Err(e) = state.db.update_provider_models("brain", &models) {
+                tracing::warn!("Failed to cache brain models in DB: {e}");
+            }
         }
         return Json(serde_json::json!({
             "ok": true,
@@ -1709,7 +1723,9 @@ pub async fn fetch_provider_models(
                     .unwrap_or_default();
                 if !models.is_empty() {
                     // Cache in DB
-                    state.db.update_provider_models(&name, &models).ok();
+                    if let Err(e) = state.db.update_provider_models(&name, &models) {
+                        tracing::warn!("Failed to cache models for provider '{name}': {e}");
+                    }
                 }
                 let is_live = !models.is_empty();
                 let result_models = if is_live { models } else { provider.models };
@@ -5301,5 +5317,183 @@ pub async fn get_system_metrics(State(state): State<Arc<AppState>>) -> Json<serd
             "limits": limits,
             "uptime_seconds": uptime_secs,
         }
+    }))
+}
+
+// ═══ Prometheus Metrics (text/plain, OpenMetrics format) ═══
+
+/// GET /metrics — Prometheus-compatible metrics endpoint.
+/// Returns text/plain in OpenMetrics exposition format for Prometheus scraping.
+pub async fn prometheus_metrics(State(state): State<Arc<AppState>>) -> axum::response::Response {
+    let agents_count = {
+        let orch = state.orchestrator.lock().await;
+        orch.list_agents().len()
+    };
+    let providers = state.db.list_providers("").map(|p| p.len()).unwrap_or(0);
+    let active_providers = state.db.list_providers("").map(|p| p.iter().filter(|x| x.is_active).count()).unwrap_or(0);
+    let api_keys = state.db.list_api_keys().map(|k| k.len()).unwrap_or(0);
+    let (traces_count, total_tokens, total_cost) = {
+        let traces = state.traces.lock().unwrap();
+        let count = traces.len();
+        let tokens: i64 = traces.iter().map(|t| t.total_tokens as i64).sum();
+        let cost: f64 = traces.iter().map(|t| t.cost_usd).sum();
+        (count, tokens, cost)
+    };
+    let uptime_secs = state.start_time.elapsed().as_secs();
+
+    let mut output = String::with_capacity(2048);
+    output.push_str("# HELP bizclaw_agents_total Number of configured agents\n");
+    output.push_str("# TYPE bizclaw_agents_total gauge\n");
+    output.push_str(&format!("bizclaw_agents_total {agents_count}\n"));
+    output.push_str("# HELP bizclaw_providers_total Number of configured providers\n");
+    output.push_str("# TYPE bizclaw_providers_total gauge\n");
+    output.push_str(&format!("bizclaw_providers_total {providers}\n"));
+    output.push_str("# HELP bizclaw_providers_active Number of active providers\n");
+    output.push_str("# TYPE bizclaw_providers_active gauge\n");
+    output.push_str(&format!("bizclaw_providers_active {active_providers}\n"));
+    output.push_str("# HELP bizclaw_api_keys_total Number of API keys\n");
+    output.push_str("# TYPE bizclaw_api_keys_total gauge\n");
+    output.push_str(&format!("bizclaw_api_keys_total {api_keys}\n"));
+    output.push_str("# HELP bizclaw_traces_session_total Number of LLM traces in current session\n");
+    output.push_str("# TYPE bizclaw_traces_session_total counter\n");
+    output.push_str(&format!("bizclaw_traces_session_total {traces_count}\n"));
+    output.push_str("# HELP bizclaw_tokens_session_total Total tokens consumed in current session\n");
+    output.push_str("# TYPE bizclaw_tokens_session_total counter\n");
+    output.push_str(&format!("bizclaw_tokens_session_total {total_tokens}\n"));
+    output.push_str("# HELP bizclaw_cost_session_usd Total cost in USD for current session\n");
+    output.push_str("# TYPE bizclaw_cost_session_usd counter\n");
+    output.push_str(&format!("bizclaw_cost_session_usd {total_cost:.6}\n"));
+    output.push_str("# HELP bizclaw_uptime_seconds Uptime in seconds\n");
+    output.push_str("# TYPE bizclaw_uptime_seconds counter\n");
+    output.push_str(&format!("bizclaw_uptime_seconds {uptime_secs}\n"));
+
+    axum::response::Response::builder()
+        .status(200)
+        .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        .body(axum::body::Body::from(output))
+        .unwrap()
+}
+
+
+/// GET /api/v1/audit — List audit log entries.
+pub async fn list_audit_log(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let limit = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50i64);
+    let offset = params.get("offset").and_then(|v| v.parse().ok()).unwrap_or(0i64);
+    match state.db.get_audit_log(limit, offset) {
+        Ok(entries) => Json(serde_json::json!({ "ok": true, "entries": entries, "count": entries.len() })),
+        Err(e) => Json(serde_json::json!({ "ok": false, "error": e })),
+    }
+}
+
+// ═══ Backup & Restore API ═══
+
+/// GET /api/v1/backup — Export system configuration as JSON snapshot.
+/// Admin-only. Excludes sensitive data (API keys are masked).
+pub async fn export_backup(State(state): State<Arc<AppState>>) -> axum::response::Response {
+    let mut backup = serde_json::json!({
+        "version": "1.0",
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "type": "bizclaw-backup"
+    });
+
+    // Providers (mask API keys)
+    if let Ok(providers) = state.db.list_providers("") {
+        let masked: Vec<_> = providers.iter().map(|p| {
+            let mut v = serde_json::to_value(p).unwrap_or_default();
+            if let Some(obj) = v.as_object_mut() {
+                obj.insert("api_key".into(), serde_json::json!("***MASKED***"));
+            }
+            v
+        }).collect();
+        backup["providers"] = serde_json::json!(masked);
+    }
+
+    // Agents
+    if let Ok(agents) = state.db.list_agents() {
+        backup["agents"] = serde_json::to_value(&agents).unwrap_or_default();
+    }
+
+    // Agent-Channel bindings
+    if let Ok(bindings) = state.db.all_agent_channels() {
+        backup["agent_channels"] = serde_json::to_value(&bindings).unwrap_or_default();
+    }
+
+    // Plan limits
+    if let Ok(limits) = state.db.get_plan_limits() {
+        backup["plan_limits"] = limits;
+    }
+
+    // Config file
+    if let Ok(content) = std::fs::read_to_string(&state.config_path) {
+        backup["config_file"] = serde_json::json!(content);
+    }
+
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
+    let filename = format!("bizclaw_backup_{timestamp}.json");
+    let body = serde_json::to_string_pretty(&backup).unwrap_or_default();
+
+    axum::response::Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .header("Content-Disposition", format!("attachment; filename=\"{filename}\""))
+        .body(axum::body::Body::from(body))
+        .unwrap()
+}
+
+/// POST /api/v1/restore — Import system configuration from JSON backup.
+/// Admin-only. Restores agents and agent-channel bindings. Does NOT restore API keys.
+pub async fn import_restore(
+    State(state): State<Arc<AppState>>,
+    Json(backup): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    // Validate backup format
+    if backup.get("type").and_then(|v| v.as_str()) != Some("bizclaw-backup") {
+        return Json(serde_json::json!({ "ok": false, "error": "Invalid backup format — missing type: bizclaw-backup" }));
+    }
+
+    let mut restored = serde_json::Map::new();
+
+    // Restore agents
+    if let Some(agents) = backup.get("agents").and_then(|v| v.as_array()) {
+        let mut count = 0;
+        for agent in agents {
+            let name = agent.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let role = agent.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
+            let description = agent.get("description").and_then(|v| v.as_str()).unwrap_or("");
+            let provider = agent.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
+            let model = agent.get("model").and_then(|v| v.as_str()).unwrap_or("gpt-4o-mini");
+            let system_prompt = agent.get("system_prompt").and_then(|v| v.as_str()).unwrap_or("");
+            if !name.is_empty() {
+                if state.db.upsert_agent(name, role, description, provider, model, system_prompt).is_ok() {
+                    count += 1;
+                }
+            }
+        }
+        restored.insert("agents_restored".into(), serde_json::json!(count));
+    }
+
+    // Restore agent-channel bindings
+    if let Some(bindings) = backup.get("agent_channels").and_then(|v| v.as_object()) {
+        let mut count = 0;
+        for (agent_name, channels) in bindings {
+            if let Some(ch_arr) = channels.as_array() {
+                let channels: Vec<String> = ch_arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+                if state.db.set_agent_channels(agent_name, &channels).is_ok() {
+                    count += 1;
+                }
+            }
+        }
+        restored.insert("bindings_restored".into(), serde_json::json!(count));
+    }
+
+    Json(serde_json::json!({
+        "ok": true,
+        "restored": restored,
+        "note": "API keys are not restored for security — please reconfigure them manually."
     }))
 }

@@ -25,8 +25,8 @@ pub struct AppState {
     /// JWT secret — shared with Platform for token validation.
     /// When set, Gateway accepts `Authorization: Bearer <JWT>` from Platform login.
     pub jwt_secret: String,
-    /// Brute-force protection — (failed_count, last_failed_at)
-    pub auth_failures: Arc<tokio::sync::Mutex<(u32, std::time::Instant)>>,
+    /// Brute-force protection — per-IP tracking: IP → (failed_count, last_failed_at)
+    pub auth_failures: Arc<tokio::sync::Mutex<std::collections::HashMap<String, (u32, std::time::Instant)>>>,
     /// The Agent engine — handles chat with tools, memory, and all providers.
     pub agent: Arc<tokio::sync::Mutex<Option<bizclaw_agent::Agent>>>,
     /// Multi-Agent Orchestrator — manages multiple named agents.
@@ -104,18 +104,34 @@ async fn dashboard_static(
     }
 }
 
-/// Auth middleware — JWT-only authentication.
+/// Auth middleware — JWT-only authentication with RBAC role injection.
 /// SaaS mode: users login via Platform → get JWT → use JWT to access tenant gateway.
 /// Checks: 1) Authorization: Bearer <JWT>  2) Cookie: bizclaw_token=<JWT>  3) ?token=<JWT>
+/// On success, injects `AuthUser` into request extensions for downstream role checks.
 async fn require_auth(
     State(state): State<Arc<AppState>>,
-    req: axum::http::Request<axum::body::Body>,
+    mut req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    // Dev mode: if no JWT secret configured, allow all requests
+    // Dev mode: if no JWT secret configured, allow all requests with admin role
     if state.jwt_secret.is_empty() {
+        req.extensions_mut().insert(AuthUser {
+            email: "dev@localhost".into(),
+            role: Role::Admin,
+            role_str: "admin".into(),
+        });
         return next.run(req).await;
     }
+
+    // Helper: validate JWT and inject AuthUser into request
+    let inject_user = |req: &mut axum::http::Request<axum::body::Body>, claims: &JwtClaims| {
+        let role = Role::from_str(&claims.role);
+        req.extensions_mut().insert(AuthUser {
+            email: claims.email.clone(),
+            role,
+            role_str: claims.role.clone(),
+        });
+    };
 
     // ── Check JWT token from multiple sources ──
     // Source 1: Authorization: Bearer <JWT>
@@ -123,9 +139,11 @@ async fn require_auth(
         .headers()
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_string();
     if let Some(token) = auth_header.strip_prefix("Bearer ") {
-        if let Ok(_claims) = validate_jwt(token, &state.jwt_secret) {
+        if let Ok(claims) = validate_jwt(token, &state.jwt_secret) {
+            inject_user(&mut req, &claims);
             return next.run(req).await;
         }
     }
@@ -135,54 +153,80 @@ async fn require_auth(
         .headers()
         .get("Cookie")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_string();
     for part in cookie_header.split(';') {
         let part = part.trim();
         if let Some(token) = part.strip_prefix("bizclaw_token=") {
-            if let Ok(_claims) = validate_jwt(token.trim(), &state.jwt_secret) {
+            if let Ok(claims) = validate_jwt(token.trim(), &state.jwt_secret) {
+                inject_user(&mut req, &claims);
                 return next.run(req).await;
             }
         }
     }
 
     // Source 3: Query param ?token=<JWT>
-    if let Some(query) = req.uri().query() {
-        for pair in query.split('&') {
-            if let Some(token) = pair.strip_prefix("token=") {
-                if let Ok(_claims) = validate_jwt(token, &state.jwt_secret) {
-                    return next.run(req).await;
-                }
+    let query_str = req.uri().query().unwrap_or("").to_string();
+    for pair in query_str.split('&') {
+        if let Some(token) = pair.strip_prefix("token=") {
+            if let Ok(claims) = validate_jwt(token, &state.jwt_secret) {
+                inject_user(&mut req, &claims);
+                return next.run(req).await;
             }
         }
     }
 
-    // ── Brute-force protection ──
+    // ── Brute-force protection (per-IP) ──
+    // Extract client IP from X-Forwarded-For (behind reverse proxy) or X-Real-IP
+    let client_ip = req.headers()
+        .get("X-Forwarded-For")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| req.headers()
+            .get("X-Real-IP")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+
     {
-        let failures = state.auth_failures.lock().await;
-        if failures.0 >= 5 && failures.1.elapsed().as_secs() < 60 {
-            tracing::warn!(
-                "[security] Auth locked out — {} failed attempts",
-                failures.0
-            );
-            return axum::response::Response::builder()
-                .status(axum::http::StatusCode::TOO_MANY_REQUESTS)
-                .header("Content-Type", "application/json")
-                .header("Retry-After", "60")
-                .body(axum::body::Body::from(
-                    serde_json::json!({"ok": false, "error": "Too many failed attempts. Try again in 60 seconds."}).to_string()
-                ))
-                .unwrap();
+        let mut failures = state.auth_failures.lock().await;
+        // Cleanup expired entries (> 120s old) to prevent memory leak
+        if failures.len() > 100 {
+            failures.retain(|_, (_, last)| last.elapsed().as_secs() < 120);
+        }
+        // Check if this IP is locked out
+        if let Some((count, last)) = failures.get(&client_ip) {
+            if *count >= 5 && last.elapsed().as_secs() < 60 {
+                tracing::warn!(
+                    "[security] Auth locked out for IP {} — {} failed attempts",
+                    client_ip, count
+                );
+                return axum::response::Response::builder()
+                    .status(axum::http::StatusCode::TOO_MANY_REQUESTS)
+                    .header("Content-Type", "application/json")
+                    .header("Retry-After", "60")
+                    .body(axum::body::Body::from(
+                        serde_json::json!({"ok": false, "error": "Too many failed attempts. Try again in 60 seconds."}).to_string()
+                    ))
+                    .unwrap();
+            }
         }
     }
 
-    // Track failed attempt
+    // Track failed attempt (per-IP)
     {
         let mut failures = state.auth_failures.lock().await;
-        failures.0 += 1;
-        failures.1 = std::time::Instant::now();
+        let entry = failures.entry(client_ip.clone()).or_insert((0, std::time::Instant::now()));
+        // Reset counter if previous attempts were > 60s ago
+        if entry.1.elapsed().as_secs() >= 60 {
+            entry.0 = 0;
+        }
+        entry.0 += 1;
+        entry.1 = std::time::Instant::now();
         tracing::warn!(
-            "[security] Failed auth attempt #{} from request",
-            failures.0
+            "[security] Failed auth attempt #{} from IP {}",
+            entry.0, client_ip
         );
     }
     axum::response::Response::builder()
@@ -285,19 +329,105 @@ pub fn validate_jwt_public(token: &str, secret: &str) -> std::result::Result<(),
 }
 
 /// JWT claims structure — mirrors Platform's auth::Claims.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct JwtClaims {
     sub: String,
     email: String,
+    #[serde(default = "default_role")]
     role: String,
     #[serde(default)]
     tenant_id: Option<String>,
     exp: usize,
 }
 
+fn default_role() -> String {
+    "admin".to_string() // backward compat: existing JWTs without role get admin
+}
+
+/// RBAC role hierarchy: admin > manager > user > viewer
+/// Each higher role inherits permissions of lower roles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    Viewer = 0,
+    User = 1,
+    Manager = 2,
+    Admin = 3,
+}
+
+impl Role {
+    fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "admin" | "owner" | "superadmin" => Role::Admin,
+            "manager" | "editor" => Role::Manager,
+            "user" | "agent" | "operator" => Role::User,
+            "viewer" | "readonly" | "guest" => Role::Viewer,
+            _ => Role::User, // default to User for unknown roles
+        }
+    }
+}
+
+/// Extension to store authenticated user info in request.
+#[derive(Debug, Clone)]
+pub struct AuthUser {
+    pub email: String,
+    pub role: Role,
+    pub role_str: String,
+}
+
 /// Constant-time string comparison to prevent timing attacks (M3).
 /// Does NOT short-circuit on length mismatch to avoid leaking length info.
 // constant_time_eq removed — was only used for legacy pairing code comparison
+
+/// RBAC middleware — require Admin role for sensitive operations.
+/// Apply this to routes that manage system config, API keys, providers, plan limits.
+async fn require_role_admin(
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if let Some(user) = req.extensions().get::<AuthUser>() {
+        if user.role >= Role::Admin {
+            return next.run(req).await;
+        }
+        tracing::warn!("[rbac] User '{}' (role={}) denied access to admin route", user.email, user.role_str);
+        return axum::response::Response::builder()
+            .status(axum::http::StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({"ok": false, "error": "Forbidden — admin role required", "required_role": "admin", "your_role": user.role_str}).to_string()
+            ))
+            .unwrap();
+    }
+    // No auth user injected — shouldn't happen if require_auth ran first
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::UNAUTHORIZED)
+        .body(axum::body::Body::from("Unauthorized"))
+        .unwrap()
+}
+
+/// RBAC middleware — require Manager or higher role.
+/// Apply to routes that manage agents, channels, knowledge, workflows.
+async fn require_role_manager(
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if let Some(user) = req.extensions().get::<AuthUser>() {
+        if user.role >= Role::Manager {
+            return next.run(req).await;
+        }
+        tracing::warn!("[rbac] User '{}' (role={}) denied access to manager route", user.email, user.role_str);
+        return axum::response::Response::builder()
+            .status(axum::http::StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({"ok": false, "error": "Forbidden — manager role required", "required_role": "manager", "your_role": user.role_str}).to_string()
+            ))
+            .unwrap();
+    }
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::UNAUTHORIZED)
+        .body(axum::body::Body::from("Unauthorized"))
+        .unwrap()
+}
 
 /// Security headers middleware — CSP, HSTS, XSS protection.
 async fn security_headers(
@@ -331,13 +461,11 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
-    // Protected routes — require valid JWT token
-    let protected = Router::new()
-        .route("/api/v1/info", get(super::routes::system_info))
-        .route("/api/v1/config", get(super::routes::get_config))
+    // ═══ ADMIN-only routes — require "admin" role ═══
+    // Config changes, provider CRUD, API key management, plan limits, system metrics
+    let admin_routes = Router::new()
         .route("/api/v1/config/update", post(super::routes::update_config))
         .route("/api/v1/config/full", get(super::routes::get_full_config))
-        .route("/api/v1/providers", get(super::routes::list_providers))
         .route("/api/v1/providers", post(super::routes::create_provider))
         .route(
             "/api/v1/providers/{name}",
@@ -347,19 +475,40 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
             "/api/v1/providers/{name}",
             axum::routing::delete(super::routes::delete_provider),
         )
+        // PaaS: API Key Management (admin only)
+        .route("/api/v1/api-keys", get(super::routes::list_api_keys))
+        .route("/api/v1/api-keys", post(super::routes::create_api_key))
         .route(
-            "/api/v1/providers/{name}/models",
-            get(super::routes::fetch_provider_models),
+            "/api/v1/api-keys/{id}",
+            axum::routing::delete(super::routes::revoke_api_key),
         )
-        .route("/api/v1/channels", get(super::routes::list_channels))
+        // PaaS: Plan limits (admin only)
+        .route(
+            "/api/v1/usage/limits",
+            axum::routing::put(super::routes::update_plan_limits),
+        )
+        // PaaS: System Metrics (admin only)
+        .route("/api/v1/metrics", get(super::routes::get_system_metrics))
+        // Audit Trail (admin only)
+        .route("/api/v1/audit", get(super::routes::list_audit_log))
+        // Backup & Restore (admin only)
+        .route("/api/v1/backup", get(super::routes::export_backup))
+        .route("/api/v1/restore", post(super::routes::import_restore))
+        .route_layer(axum::middleware::from_fn(require_role_admin));
+
+    // ═══ MANAGER routes — require "manager" or higher role ═══
+    // Agent CRUD, channel write, knowledge write, workflow write, skills write
+    let manager_routes = Router::new()
+        .route("/api/v1/agents", post(super::routes::create_agent))
+        .route(
+            "/api/v1/agents/{name}",
+            axum::routing::delete(super::routes::delete_agent),
+        )
+        .route("/api/v1/agents/{name}", put(super::routes::update_agent))
+        // Channels write
         .route(
             "/api/v1/channels/update",
             post(super::routes::update_channel),
-        )
-        // Multi-instance channel management
-        .route(
-            "/api/v1/channel-instances",
-            get(super::routes::list_channel_instances),
         )
         .route(
             "/api/v1/channel-instances",
@@ -369,17 +518,77 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
             "/api/v1/channel-instances/{id}",
             axum::routing::delete(super::routes::delete_channel_instance),
         )
-        .route("/api/v1/ollama/models", get(super::routes::ollama_models))
+        // Knowledge write
         .route(
-            "/api/v1/brain/models",
-            get(super::routes::brain_scan_models),
+            "/api/v1/knowledge/documents",
+            post(super::routes::knowledge_add_doc),
         )
-        .route("/api/v1/zalo/qr", post(super::routes::zalo_qr_code))
-        // Scheduler API
         .route(
-            "/api/v1/scheduler/tasks",
-            get(super::routes::scheduler_list_tasks),
+            "/api/v1/knowledge/documents/{id}",
+            axum::routing::delete(super::routes::knowledge_remove_doc),
         )
+        .route(
+            "/api/v1/knowledge/upload",
+            post(super::routes::knowledge_upload_file),
+        )
+        // Workflows write
+        .route("/api/v1/workflows", post(super::routes::workflows_create))
+        .route("/api/v1/workflows/run", post(super::routes::workflows_run))
+        .route(
+            "/api/v1/workflows/{id}",
+            axum::routing::put(super::routes::workflows_update),
+        )
+        .route(
+            "/api/v1/workflows/{id}",
+            axum::routing::delete(super::routes::workflows_delete),
+        )
+        .route(
+            "/api/v1/workflow-rules",
+            post(super::routes::workflow_rules_add),
+        )
+        .route(
+            "/api/v1/workflow-rules/{id}",
+            axum::routing::delete(super::routes::workflow_rules_delete),
+        )
+        // Skills write
+        .route("/api/v1/skills", post(super::routes::skills_create))
+        .route(
+            "/api/v1/skills/install",
+            post(super::routes::skills_install),
+        )
+        .route(
+            "/api/v1/skills/uninstall",
+            post(super::routes::skills_uninstall),
+        )
+        .route(
+            "/api/v1/skills/{id}",
+            axum::routing::put(super::routes::skills_update),
+        )
+        .route(
+            "/api/v1/skills/{id}",
+            axum::routing::delete(super::routes::skills_delete),
+        )
+        // Tools write
+        .route("/api/v1/tools", post(super::routes::tools_create))
+        .route(
+            "/api/v1/tools/{name}/toggle",
+            post(super::routes::tools_toggle),
+        )
+        .route(
+            "/api/v1/tools/{name}",
+            axum::routing::delete(super::routes::tools_delete),
+        )
+        // Gallery write
+        .route("/api/v1/gallery", post(super::routes::gallery_create))
+        .route(
+            "/api/v1/gallery/{id}",
+            axum::routing::delete(super::routes::gallery_delete),
+        )
+        .route(
+            "/api/v1/gallery/{id}/md",
+            post(super::routes::gallery_upload_md),
+        )
+        // Scheduler write
         .route(
             "/api/v1/scheduler/tasks",
             post(super::routes::scheduler_add_task),
@@ -392,49 +601,7 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
             "/api/v1/scheduler/tasks/{id}/toggle",
             post(super::routes::scheduler_toggle_task),
         )
-        .route(
-            "/api/v1/scheduler/notifications",
-            get(super::routes::scheduler_notifications),
-        )
-        // Knowledge Base API
-        .route(
-            "/api/v1/knowledge/search",
-            post(super::routes::knowledge_search),
-        )
-        .route(
-            "/api/v1/knowledge/documents",
-            get(super::routes::knowledge_list_docs),
-        )
-        .route(
-            "/api/v1/knowledge/documents",
-            post(super::routes::knowledge_add_doc),
-        )
-        .route(
-            "/api/v1/knowledge/documents/{id}",
-            axum::routing::delete(super::routes::knowledge_remove_doc),
-        )
-        // PDF/File upload for knowledge base
-        .route(
-            "/api/v1/knowledge/upload",
-            post(super::routes::knowledge_upload_file),
-        )
-        // Multi-Agent Orchestrator API
-        .route("/api/v1/agents", get(super::routes::list_agents))
-        .route("/api/v1/agents", post(super::routes::create_agent))
-        .route(
-            "/api/v1/agents/{name}",
-            axum::routing::delete(super::routes::delete_agent),
-        )
-        .route("/api/v1/agents/{name}", put(super::routes::update_agent))
-        .route(
-            "/api/v1/agents/{name}/chat",
-            post(super::routes::agent_chat),
-        )
-        .route(
-            "/api/v1/agents/broadcast",
-            post(super::routes::agent_broadcast),
-        )
-        // Orchestration API
+        // Orchestration write
         .route(
             "/api/v1/orchestration/delegate",
             post(super::routes::orch_delegate),
@@ -453,11 +620,103 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         )
         .route(
             "/api/v1/orchestration/links",
-            get(super::routes::orch_list_links).post(super::routes::orch_create_link),
+            post(super::routes::orch_create_link),
         )
         .route(
             "/api/v1/orchestration/links/{id}",
             axum::routing::delete(super::routes::orch_delete_link),
+        )
+        // Agent-Channel bindings write
+        .route(
+            "/api/v1/agents/{name}/channels",
+            post(super::routes::agent_bind_channels),
+        )
+        // Telegram Bot connect/disconnect
+        .route(
+            "/api/v1/agents/{name}/telegram",
+            post(super::routes::connect_telegram),
+        )
+        .route(
+            "/api/v1/agents/{name}/telegram",
+            axum::routing::delete(super::routes::disconnect_telegram),
+        )
+        // Brain workspace write
+        .route(
+            "/api/v1/brain/files/{filename}",
+            axum::routing::put(super::routes::brain_write_file),
+        )
+        .route(
+            "/api/v1/brain/files/{filename}",
+            axum::routing::delete(super::routes::brain_delete_file),
+        )
+        .route(
+            "/api/v1/brain/personalize",
+            post(super::routes::brain_personalize),
+        )
+        // Traces/Activity clear
+        .route(
+            "/api/v1/traces",
+            axum::routing::delete(super::routes::clear_traces),
+        )
+        .route(
+            "/api/v1/activity",
+            axum::routing::delete(super::routes::clear_activity),
+        )
+        .route_layer(axum::middleware::from_fn(require_role_manager));
+
+    // ═══ USER routes — any authenticated user (viewer, user, manager, admin) ═══
+    // Read-only views, chat, search, list operations
+    let user_routes = Router::new()
+        .route("/api/v1/info", get(super::routes::system_info))
+        .route("/api/v1/config", get(super::routes::get_config))
+        .route("/api/v1/providers", get(super::routes::list_providers))
+        .route(
+            "/api/v1/providers/{name}/models",
+            get(super::routes::fetch_provider_models),
+        )
+        .route("/api/v1/channels", get(super::routes::list_channels))
+        .route(
+            "/api/v1/channel-instances",
+            get(super::routes::list_channel_instances),
+        )
+        .route("/api/v1/ollama/models", get(super::routes::ollama_models))
+        .route(
+            "/api/v1/brain/models",
+            get(super::routes::brain_scan_models),
+        )
+        .route("/api/v1/zalo/qr", post(super::routes::zalo_qr_code))
+        // Scheduler read
+        .route(
+            "/api/v1/scheduler/tasks",
+            get(super::routes::scheduler_list_tasks),
+        )
+        .route(
+            "/api/v1/scheduler/notifications",
+            get(super::routes::scheduler_notifications),
+        )
+        // Knowledge read + search
+        .route(
+            "/api/v1/knowledge/search",
+            post(super::routes::knowledge_search),
+        )
+        .route(
+            "/api/v1/knowledge/documents",
+            get(super::routes::knowledge_list_docs),
+        )
+        // Agents read + chat
+        .route("/api/v1/agents", get(super::routes::list_agents))
+        .route(
+            "/api/v1/agents/{name}/chat",
+            post(super::routes::agent_chat),
+        )
+        .route(
+            "/api/v1/agents/broadcast",
+            post(super::routes::agent_broadcast),
+        )
+        // Orchestration read
+        .route(
+            "/api/v1/orchestration/links",
+            get(super::routes::orch_list_links),
         )
         .route(
             "/api/v1/orchestration/delegations",
@@ -467,154 +726,63 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
             "/api/v1/orchestration/traces",
             get(super::routes::orch_list_traces),
         )
-        // Gallery API
+        // Gallery read
         .route("/api/v1/gallery", get(super::routes::gallery_list))
-        .route("/api/v1/gallery", post(super::routes::gallery_create))
-        .route(
-            "/api/v1/gallery/{id}",
-            axum::routing::delete(super::routes::gallery_delete),
-        )
-        .route(
-            "/api/v1/gallery/{id}/md",
-            post(super::routes::gallery_upload_md),
-        )
         .route(
             "/api/v1/gallery/{id}/md",
             get(super::routes::gallery_get_md),
         )
-        // Agent-Channel Bindings
-        .route(
-            "/api/v1/agents/{name}/channels",
-            post(super::routes::agent_bind_channels),
-        )
+        // Agent-Channel bindings read
         .route(
             "/api/v1/agents/channels",
             get(super::routes::agent_channel_bindings),
         )
-        // Telegram Bot ↔ Agent API
-        .route(
-            "/api/v1/agents/{name}/telegram",
-            post(super::routes::connect_telegram),
-        )
-        .route(
-            "/api/v1/agents/{name}/telegram",
-            axum::routing::delete(super::routes::disconnect_telegram),
-        )
+        // Telegram status read
         .route(
             "/api/v1/agents/{name}/telegram",
             get(super::routes::telegram_status),
         )
-        // Brain Workspace API
+        // Brain workspace read
         .route("/api/v1/brain/files", get(super::routes::brain_list_files))
         .route(
             "/api/v1/brain/files/{filename}",
             get(super::routes::brain_read_file),
         )
-        .route(
-            "/api/v1/brain/files/{filename}",
-            axum::routing::put(super::routes::brain_write_file),
-        )
-        .route(
-            "/api/v1/brain/files/{filename}",
-            axum::routing::delete(super::routes::brain_delete_file),
-        )
-        // Brain Personalization
-        .route(
-            "/api/v1/brain/personalize",
-            post(super::routes::brain_personalize),
-        )
         // Health Check
         .route("/api/v1/health", get(super::routes::system_health_check))
-        // LLM Traces & Cost API
+        // LLM Traces & Cost read
         .route("/api/v1/traces", get(super::openai_compat::list_traces))
-        .route(
-            "/api/v1/traces",
-            axum::routing::delete(super::routes::clear_traces),
-        )
         .route(
             "/api/v1/traces/cost",
             get(super::openai_compat::cost_breakdown),
         )
         .route("/api/v1/activity", get(super::openai_compat::list_activity))
-        .route(
-            "/api/v1/activity",
-            axum::routing::delete(super::routes::clear_activity),
-        )
-        // Tools CRUD API
+        // Tools read
         .route("/api/v1/tools", get(super::routes::tools_list))
-        .route("/api/v1/tools", post(super::routes::tools_create))
-        .route(
-            "/api/v1/tools/{name}/toggle",
-            post(super::routes::tools_toggle),
-        )
-        .route(
-            "/api/v1/tools/{name}",
-            axum::routing::delete(super::routes::tools_delete),
-        )
-        // MCP Servers API (stub — returns configured MCP servers)
+        // MCP read
         .route("/api/v1/mcp/servers", get(super::routes::mcp_list_servers))
-        // Workflows + Skills + TTS API
+        // Workflows read
         .route("/api/v1/workflows", get(super::routes::workflows_list))
-        .route("/api/v1/workflows", post(super::routes::workflows_create))
-        .route("/api/v1/workflows/run", post(super::routes::workflows_run))
-        .route(
-            "/api/v1/workflows/{id}",
-            axum::routing::put(super::routes::workflows_update),
-        )
-        .route(
-            "/api/v1/workflows/{id}",
-            axum::routing::delete(super::routes::workflows_delete),
-        )
         .route(
             "/api/v1/workflow-rules",
             get(super::routes::workflow_rules_list),
         )
-        .route(
-            "/api/v1/workflow-rules",
-            post(super::routes::workflow_rules_add),
-        )
-        .route(
-            "/api/v1/workflow-rules/{id}",
-            axum::routing::delete(super::routes::workflow_rules_delete),
-        )
+        // Skills read
         .route("/api/v1/skills", get(super::routes::skills_list))
-        .route("/api/v1/skills", post(super::routes::skills_create))
-        .route(
-            "/api/v1/skills/install",
-            post(super::routes::skills_install),
-        )
-        .route(
-            "/api/v1/skills/uninstall",
-            post(super::routes::skills_uninstall),
-        )
         .route("/api/v1/skills/{id}", get(super::routes::skills_detail))
-        .route(
-            "/api/v1/skills/{id}",
-            axum::routing::put(super::routes::skills_update),
-        )
-        .route(
-            "/api/v1/skills/{id}",
-            axum::routing::delete(super::routes::skills_delete),
-        )
+        // TTS
         .route("/api/v1/tts/voices", get(super::routes::tts_voices))
-        // PaaS: API Key Management
-        .route("/api/v1/api-keys", get(super::routes::list_api_keys))
-        .route("/api/v1/api-keys", post(super::routes::create_api_key))
-        .route(
-            "/api/v1/api-keys/{id}",
-            axum::routing::delete(super::routes::revoke_api_key),
-        )
-        // PaaS: Usage & Quotas
+        // Usage read
         .route("/api/v1/usage", get(super::routes::get_usage))
         .route("/api/v1/usage/daily", get(super::routes::get_usage_daily))
         .route("/api/v1/usage/limits", get(super::routes::get_plan_limits))
-        .route(
-            "/api/v1/usage/limits",
-            axum::routing::put(super::routes::update_plan_limits),
-        )
-        // PaaS: System Metrics
-        .route("/api/v1/metrics", get(super::routes::get_system_metrics))
-        .route("/ws", get(super::ws::ws_handler))
+        // WebSocket (chat)
+        .route("/ws", get(super::ws::ws_handler));
+
+    // Merge all RBAC layers under a single auth gate
+    let protected = admin_routes
+        .merge(manager_routes)
+        .merge(user_routes)
         .route_layer(axum::middleware::from_fn_with_state(
             shared.clone(),
             require_auth,
@@ -626,6 +794,8 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/legacy", get(legacy_dashboard_page))
         .route("/static/dashboard/{*path}", get(dashboard_static))
         .route("/health", get(super::routes::health_check))
+        // Prometheus metrics — public for scraper access (text/plain)
+        .route("/metrics", get(super::routes::prometheus_metrics))
         .route("/api/v1/verify-pairing", post(verify_auth)) // kept same path for backward compat
         // WhatsApp webhook — must be public for Meta verification
         .route(
@@ -673,17 +843,25 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
                 .allow_headers(Any)
                 .max_age(std::time::Duration::from_secs(3600));
 
-            // Restrict CORS origins in production via env var
-            // Example: BIZCLAW_CORS_ORIGINS=https://bizclaw.vn,https://sales.bizclaw.vn
+            // CORS origin policy:
+            // 1. BIZCLAW_CORS_ORIGINS env var → explicit whitelist (production)
+            // 2. No JWT secret (dev mode) → allow all origins for convenience
+            // 3. JWT secret set but no CORS env → same-origin only (secure default)
             if let Ok(origins_str) = std::env::var("BIZCLAW_CORS_ORIGINS") {
                 let origins: Vec<_> = origins_str
                     .split(',')
                     .filter_map(|s| s.trim().parse::<axum::http::HeaderValue>().ok())
                     .collect();
+                tracing::info!("🔒 CORS: restricted to {} origin(s)", origins.len());
                 cors.allow_origin(origins)
-            } else {
-                // Development fallback — allow all origins
+            } else if shared.jwt_secret.is_empty() {
+                // Dev mode — no auth, allow all origins
+                tracing::warn!("⚠️ CORS: allow-all (dev mode, no JWT secret configured)");
                 cors.allow_origin(Any)
+            } else {
+                // Production with JWT but no explicit CORS — restrict to same-origin
+                tracing::info!("🔒 CORS: same-origin only (set BIZCLAW_CORS_ORIGINS to whitelist domains)");
+                cors
             }
         })
         .layer(TraceLayer::new_for_http())
@@ -1051,7 +1229,7 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         start_time: std::time::Instant::now(),
         // pairing_code removed — SaaS uses JWT from Platform login
         jwt_secret: std::env::var("JWT_SECRET").unwrap_or_default(),
-        auth_failures: Arc::new(tokio::sync::Mutex::new((0, std::time::Instant::now()))),
+        auth_failures: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         agent: Arc::new(tokio::sync::Mutex::new(agent)),
         orchestrator: orchestrator_arc.clone(),
         scheduler,

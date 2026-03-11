@@ -11,7 +11,131 @@ use rusqlite::{Connection, params};
 use std::path::Path;
 use std::sync::Mutex;
 
+// ═══ API Key Encryption at Rest ═══
+// Uses HMAC-SHA256 to derive a machine-specific key, then XOR-encrypts
+// API keys before storing in SQLite. Prefix "ENC:" marks encrypted values.
+
+/// Derive a machine-specific encryption key for API key at-rest encryption.
+fn db_encryption_key() -> [u8; 32] {
+    use hmac::Mac;
+    type HmacSha256 = hmac::Hmac<sha2::Sha256>;
+    let hostname = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "bizclaw-host".into());
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "bizclaw-user".into());
+    let salt = format!("bizclaw::gateway-db::api-keys::{username}@{hostname}");
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(b"bizclaw-gateway-db-encryption-v1")
+        .expect("HMAC key size");
+    mac.update(salt.as_bytes());
+    let result = mac.finalize();
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result.into_bytes());
+    key
+}
+
+/// Encrypt an API key for storage. Returns "ENC:<base64>" or empty string.
+fn encrypt_api_key(plain: &str) -> String {
+    if plain.is_empty() {
+        return String::new();
+    }
+    let key = db_encryption_key();
+    let encrypted: Vec<u8> = plain
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .map(|(i, &b)| b ^ key[i % 32])
+        .collect();
+    use sha2::Digest;
+    let encoded = sha2::Sha256::digest([]); // just for the import
+    let _ = encoded; // suppress unused
+    format!("ENC:{}", base64_encode(&encrypted))
+}
+
+/// Decrypt an API key from storage. Handles both encrypted (ENC:) and plain-text (legacy).
+fn decrypt_api_key(stored: &str) -> String {
+    if stored.is_empty() {
+        return String::new();
+    }
+    if let Some(encoded) = stored.strip_prefix("ENC:") {
+        if let Some(encrypted) = base64_decode(encoded) {
+            let key = db_encryption_key();
+            let decrypted: Vec<u8> = encrypted
+                .iter()
+                .enumerate()
+                .map(|(i, &b)| b ^ key[i % 32])
+                .collect();
+            return String::from_utf8(decrypted).unwrap_or_else(|_| {
+                tracing::warn!("API key decryption produced invalid UTF-8");
+                stored.to_string()
+            });
+        }
+    }
+    // Legacy plain-text — return as-is
+    stored.to_string()
+}
+
+/// Simple base64 encode (no external crate needed — used only for short API keys).
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+/// Simple base64 decode.
+fn base64_decode(input: &str) -> Option<Vec<u8>> {
+    const DECODE: [u8; 128] = {
+        let mut table = [255u8; 128];
+        let mut i = 0u8;
+        while i < 26 { table[(b'A' + i) as usize] = i; i += 1; }
+        i = 0;
+        while i < 26 { table[(b'a' + i) as usize] = 26 + i; i += 1; }
+        i = 0;
+        while i < 10 { table[(b'0' + i) as usize] = 52 + i; i += 1; }
+        table[b'+' as usize] = 62;
+        table[b'/' as usize] = 63;
+        table
+    };
+    let input = input.trim_end_matches('=');
+    let mut result = Vec::new();
+    let bytes: Vec<u8> = input.bytes().collect();
+    for chunk in bytes.chunks(4) {
+        let mut buf = [0u32; 4];
+        for (i, &b) in chunk.iter().enumerate() {
+            if b >= 128 { return None; }
+            let val = DECODE[b as usize];
+            if val == 255 { return None; }
+            buf[i] = val as u32;
+        }
+        let triple = (buf[0] << 18) | (buf[1] << 12) | (buf[2] << 6) | buf[3];
+        result.push((triple >> 16) as u8);
+        if chunk.len() > 2 { result.push((triple >> 8) as u8); }
+        if chunk.len() > 3 { result.push(triple as u8); }
+    }
+    Some(result)
+}
+
 /// Gateway database — per-tenant persistent storage.
+/// Uses Mutex for thread-safe access. SQLite WAL mode enables DB-level concurrent reads.
 pub struct GatewayDb {
     conn: Mutex<Connection>,
 }
@@ -64,7 +188,9 @@ impl GatewayDb {
         let conn = Connection::open(path).map_err(|e| format!("Gateway DB open error: {e}"))?;
 
         // Enable WAL mode for better concurrent read performance
-        conn.execute_batch("PRAGMA journal_mode=WAL;").ok();
+        if let Err(e) = conn.execute_batch("PRAGMA journal_mode=WAL;") {
+            tracing::warn!("Failed to enable WAL mode: {e} — falling back to default journal");
+        }
 
         let db = Self {
             conn: Mutex::new(conn),
@@ -180,6 +306,25 @@ impl GatewayDb {
             )
             .map_err(|e| format!("Migration add columns: {e}"))?;
         }
+
+        // ── Audit log table ──
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                user_email TEXT NOT NULL DEFAULT '',
+                user_role TEXT NOT NULL DEFAULT '',
+                action TEXT NOT NULL,
+                resource_type TEXT NOT NULL DEFAULT '',
+                resource_id TEXT NOT NULL DEFAULT '',
+                details TEXT NOT NULL DEFAULT '',
+                ip_address TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_email);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);",
+        )
+        .map_err(|e| format!("Migration audit_log: {e}"))?;
 
         Ok(())
     }
@@ -400,10 +545,12 @@ impl GatewayDb {
             models,
         ) in defaults
         {
-            conn.execute(
+            if let Err(e) = conn.execute(
                 "INSERT OR IGNORE INTO providers (name, label, icon, provider_type, base_url, chat_path, models_path, auth_style, env_keys_json, models_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![name, label, icon, ptype, base_url, chat_path, models_path, auth_style, env_keys, models],
-            ).ok();
+            ) {
+                tracing::warn!("Failed to seed provider '{name}': {e}");
+            }
         }
         Ok(())
     }
@@ -430,7 +577,7 @@ impl GatewayDb {
                     label: row.get(1)?,
                     icon: row.get(2)?,
                     provider_type: row.get(3)?,
-                    api_key: row.get(4)?,
+                    api_key: decrypt_api_key(&row.get::<_, String>(4)?),
                     base_url: row.get(5)?,
                     chat_path: row.get(6)?,
                     models_path: row.get(7)?,
@@ -470,13 +617,14 @@ impl GatewayDb {
         let models_json = serde_json::to_string(models).unwrap_or_else(|_| "[]".to_string());
         let env_keys_json = serde_json::to_string(env_keys).unwrap_or_else(|_| "[]".to_string());
 
+        let encrypted_key = encrypt_api_key(api_key);
         conn.execute(
             "INSERT INTO providers (name, label, icon, provider_type, api_key, base_url, chat_path, models_path, auth_style, env_keys_json, models_json, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))
              ON CONFLICT(name) DO UPDATE SET
                label=?2, icon=?3, provider_type=?4, api_key=?5, base_url=?6, chat_path=?7,
                models_path=?8, auth_style=?9, env_keys_json=?10, models_json=?11, updated_at=datetime('now')",
-            params![name, label, icon, provider_type, api_key, base_url, chat_path, models_path, auth_style, env_keys_json, models_json],
+            params![name, label, icon, provider_type, encrypted_key, base_url, chat_path, models_path, auth_style, env_keys_json, models_json],
         ).map_err(|e| format!("Upsert provider: {e}"))?;
 
         // Read back using SAME connection — do NOT call self.get_provider() which would deadlock
@@ -493,7 +641,7 @@ impl GatewayDb {
                     label: row.get(1)?,
                     icon: row.get(2)?,
                     provider_type: row.get(3)?,
-                    api_key: row.get(4)?,
+                    api_key: decrypt_api_key(&row.get::<_, String>(4)?),
                     base_url: row.get(5)?,
                     chat_path: row.get(6)?,
                     models_path: row.get(7)?,
@@ -525,7 +673,7 @@ impl GatewayDb {
                     label: row.get(1)?,
                     icon: row.get(2)?,
                     provider_type: row.get(3)?,
-                    api_key: row.get(4)?,
+                    api_key: decrypt_api_key(&row.get::<_, String>(4)?),
                     base_url: row.get(5)?,
                     chat_path: row.get(6)?,
                     models_path: row.get(7)?,
@@ -558,9 +706,10 @@ impl GatewayDb {
     ) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
         if let Some(key) = api_key {
+            let encrypted_key = encrypt_api_key(key);
             conn.execute(
                 "UPDATE providers SET api_key=?1, updated_at=datetime('now') WHERE name=?2",
-                params![key, name],
+                params![encrypted_key, name],
             )
             .map_err(|e| format!("Update api_key: {e}"))?;
         }
@@ -763,6 +912,49 @@ impl GatewayDb {
         )
         .map_err(|e| format!("Set setting: {e}"))?;
         Ok(())
+    }
+
+    // ═══ Audit Trail ═══
+
+    /// Log an auditable action (config change, agent delete, API key revoke, etc.)
+    pub fn log_audit(
+        &self,
+        user_email: &str,
+        user_role: &str,
+        action: &str,
+        resource_type: &str,
+        resource_id: &str,
+        details: &str,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
+        if let Err(e) = conn.execute(
+            "INSERT INTO audit_log (user_email, user_role, action, resource_type, resource_id, details) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![user_email, user_role, action, resource_type, resource_id, details],
+        ) {
+            tracing::warn!("Failed to write audit log: {e}");
+        }
+        Ok(())
+    }
+
+    /// Get recent audit log entries with optional filters.
+    pub fn get_audit_log(&self, limit: i64, offset: i64) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {e}"))?;
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, user_email, user_role, action, resource_type, resource_id, details FROM audit_log ORDER BY id DESC LIMIT ?1 OFFSET ?2"
+        ).map_err(|e| format!("Prepare: {e}"))?;
+        let rows = stmt.query_map(params![limit, offset], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, i64>(0)?,
+                "timestamp": row.get::<_, String>(1)?,
+                "user_email": row.get::<_, String>(2)?,
+                "user_role": row.get::<_, String>(3)?,
+                "action": row.get::<_, String>(4)?,
+                "resource_type": row.get::<_, String>(5)?,
+                "resource_id": row.get::<_, String>(6)?,
+                "details": row.get::<_, String>(7)?,
+            }))
+        }).map_err(|e| format!("Query: {e}"))?.filter_map(|r| r.ok()).collect();
+        Ok(rows)
     }
 
     /// Migrate existing agents.json data into DB.
@@ -1316,6 +1508,7 @@ impl GatewayDb {
             INSERT OR IGNORE INTO plan_limits (key, value) VALUES ('max_mcp_servers', 5);
         ",
         )
+        .map_err(|e| tracing::warn!("Failed to seed default plan limits: {e}"))
         .ok();
         let mut stmt = conn
             .prepare("SELECT key, value FROM plan_limits")

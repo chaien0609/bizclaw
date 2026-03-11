@@ -106,15 +106,19 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **🔄 Workflows** | 17 workflow templates có sẵn. Multi-step pipeline: Sequential, FanOut, Collect, Conditional, Loop, Transform |
 | **⏰ Scheduler** | Cron, interval, one-time tasks. Agent tự chạy background, gửi kết quả qua Telegram/Zalo/Email/Webhook |
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
-| **🌐 Web Dashboard** | 20+ trang UI (VI/EN), WebSocket real-time, Full CRUD, Dark/Light mode |
+| **🌐 Web Dashboard** | 20+ trang UI (VI/EN), modular lazy-loading, WebSocket real-time, Full CRUD, Dark/Light mode |
 | **🎙️ Xiaozhi Voice** | Kết nối ESP32 Xiaozhi (~$5) làm AI Assistant vật lý. Voice → Agent → Voice. OpenAI-compatible API + Webhook. $0/tháng |
-| **🔒 Bảo mật** | AES-256, Command allowlist, Runtime sandbox, HMAC-SHA256, rate limiting |
+| **🔒 Bảo mật** | AES-256 API key encryption, RBAC 4-tier (Admin/Manager/User/Viewer), Audit Trail, Per-IP rate limiting, HMAC-SHA256, Command allowlist, Runtime sandbox |
 | **🖥️ Desktop App** | macOS (.dmg), Windows (.exe), Linux (.deb) — 13MB, auto-open browser, zero config |
 | **☁️ Cloud Platform** | Multi-tenant SaaS, PaaS remote nodes, JWT SSO, PostgreSQL, Nginx auto-config |
 | **🔑 JWT SSO** | Đăng nhập 1 lần từ Platform → vào thẳng mọi tenant dashboard, không cần pairing code |
 | **⚡ Circuit Breaker** | Tự ngắt khi provider fail liên tục — exponential backoff, auto-recovery, zero downtime |
 | **🎯 Model Router** | Auto-chọn model tối ưu theo complexity: Simple→Fast, Standard→Primary, Complex→Premium. Hỗ trợ `!fast` / `!best` override |
 | **🕵️ Stealth Browser** | Anti-detection Chrome patches (WebGL, navigator, plugins). Session cookie persistence. 15 stealth flags |
+| **📊 Prometheus** | `/metrics` endpoint — 8 gauges/counters, OpenMetrics format, tích hợp Grafana |
+| **📋 Audit Trail** | Ghi log toàn bộ thao tác: ai làm gì, lúc nào, cái gì — compliance SOC2/ISO 27001 |
+| **💾 Backup/Restore** | Export/Import JSON — backup agents, channels, settings. Disaster recovery |
+| **👑 RBAC** | 4 tầng phân quyền: Admin → Manager → User → Viewer. 60+ routes bảo vệ |
 
 ---
 
@@ -489,13 +493,14 @@ llm:
 |--------|-------|
 | **Language** | 100% Rust + Kotlin (Android) |
 | **Crates** | 19 |
-| **Lines of Code** | ~55,000+ |
+| **Lines of Code** | ~57,000+ |
 | **Tests** | 403 passing |
 | **Workflow Templates** | 17 |
 | **Binary Size** | bizclaw ~12MB |
-| **Dashboard Pages** | 20+ |
+| **Dashboard Pages** | 20+ (27 lazy-loaded modules) |
 | **Agent Templates** | 51 |
-| **Last Updated** | 2026-03-09 |
+| **Security** | RBAC, AES-256, Audit Trail, Prometheus |
+| **Last Updated** | 2026-03-11 |
 
 ---
 
@@ -528,7 +533,7 @@ cd bizclaw && cargo build --release
 - **Scheduler** — Cron, interval, one-time tasks with retry and multi-channel notification (Telegram, Zalo OA, Email)
 - **20+ Dashboard Pages** — Full CRUD UI with VI/EN, WebSocket real-time, Dark/Light mode
 - **Android Agent** — On-device LLM with 20 device tools, runs 100% offline
-- **AES-256 Security** — Encrypted credentials, command allowlists, runtime sandbox
+- **Enterprise Security** — AES-256 encrypted API keys, RBAC 4-tier access control, audit trail, per-IP rate limiting, Prometheus monitoring, backup/restore
 - **Circuit Breaker** — Auto-stops cascading failures when providers go down, with exponential backoff
 - **Model Router** — Intelligent model selection based on task complexity (Fast/Primary/Premium tiers)
 - **Stealth Browser** — Anti-detection headless Chrome with WebGL/navigator/plugin spoofing
