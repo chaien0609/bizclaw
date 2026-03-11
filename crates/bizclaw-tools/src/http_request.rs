@@ -70,53 +70,10 @@ impl Tool for HttpRequestTool {
         let timeout = args["timeout_secs"].as_u64().unwrap_or(15);
 
         // Safety check: block requests to internal/private/metadata endpoints (SSRF protection)
-        let lower_url = url.to_lowercase();
-        // Must be HTTP(S)
-        if !lower_url.starts_with("http://") && !lower_url.starts_with("https://") {
+        if let Some(reason) = is_url_blocked(url) {
             return Ok(ToolResult {
                 tool_call_id: String::new(),
-                output: "Blocked: Only HTTP/HTTPS schemes allowed".into(),
-                success: false,
-            });
-        }
-        // Block private/internal destinations
-        let blocked_patterns = [
-            "127.0.0.1",
-            "localhost",
-            "0.0.0.0",
-            "[::1]",
-            "[::0]",
-            "169.254.",
-            "metadata.google",
-            "metadata.aws",
-            "10.",
-            "192.168.",
-            // 172.16.0.0/12
-            "172.16.",
-            "172.17.",
-            "172.18.",
-            "172.19.",
-            "172.20.",
-            "172.21.",
-            "172.22.",
-            "172.23.",
-            "172.24.",
-            "172.25.",
-            "172.26.",
-            "172.27.",
-            "172.28.",
-            "172.29.",
-            "172.30.",
-            "172.31.",
-        ];
-        // Extract host portion (after ://)
-        let host_part = lower_url.split("://").nth(1).unwrap_or("");
-        let host = host_part.split('/').next().unwrap_or("");
-        let host_no_port = host.split(':').next().unwrap_or("");
-        if blocked_patterns.iter().any(|p| host_no_port.contains(p)) {
-            return Ok(ToolResult {
-                tool_call_id: String::new(),
-                output: format!("Blocked: Cannot access internal/private network ({host_no_port})"),
+                output: format!("Blocked: {reason}"),
                 success: false,
             });
         }
@@ -218,46 +175,66 @@ impl Tool for HttpRequestTool {
 }
 
 /// Check if a URL is blocked by SSRF protection.
-/// Extracted for testability.
+/// Uses proper URL parsing to handle IPv6 and edge cases.
 pub fn is_url_blocked(url: &str) -> Option<String> {
     let lower_url = url.to_lowercase();
     if !lower_url.starts_with("http://") && !lower_url.starts_with("https://") {
         return Some("Only HTTP/HTTPS schemes allowed".into());
     }
+
+    // Parse URL properly to extract host (handles IPv6, ports, etc.)
+    let host = match url::Url::parse(url) {
+        Ok(parsed) => parsed.host_str().unwrap_or("").to_lowercase(),
+        Err(_) => {
+            // Fallback to manual extraction if URL parser fails
+            let host_part = lower_url.split("://").nth(1).unwrap_or("");
+            let h = host_part.split('/').next().unwrap_or("");
+            // Strip port: for IPv6 [::1]:8080 → [::1], for IPv4 1.2.3.4:80 → 1.2.3.4
+            if h.starts_with('[') {
+                h.split(']').next().unwrap_or("").trim_start_matches('[').to_string()
+            } else {
+                h.split(':').next().unwrap_or("").to_string()
+            }
+        }
+    };
+
+    // Strip brackets from IPv6 for pattern matching
+    let host_clean = host.trim_start_matches('[').trim_end_matches(']');
+
+    // IPv6 loopback and private checks
+    let ipv6_blocked = [
+        "::1",     // loopback
+        "::0",     // unspecified
+        "::",      // unspecified shorthand
+        "0:0:0:0:0:0:0:1", // full loopback
+        "0:0:0:0:0:0:0:0", // full unspecified
+    ];
+    if ipv6_blocked.iter().any(|p| host_clean == *p) {
+        return Some(format!("Cannot access loopback address ({host})"));
+    }
+    // IPv6 link-local (fe80::/10) and unique-local (fc00::/7)
+    if host_clean.starts_with("fe80:") || host_clean.starts_with("fc") || host_clean.starts_with("fd") {
+        return Some(format!("Cannot access private IPv6 network ({host})"));
+    }
+
+    // IPv4 and hostname blocked patterns
     let blocked_patterns = [
         "127.0.0.1",
         "localhost",
         "0.0.0.0",
-        "[::1]",
-        "[::0]",
         "169.254.",
         "metadata.google",
         "metadata.aws",
         "10.",
         "192.168.",
-        "172.16.",
-        "172.17.",
-        "172.18.",
-        "172.19.",
-        "172.20.",
-        "172.21.",
-        "172.22.",
-        "172.23.",
-        "172.24.",
-        "172.25.",
-        "172.26.",
-        "172.27.",
-        "172.28.",
-        "172.29.",
-        "172.30.",
-        "172.31.",
+        "172.16.", "172.17.", "172.18.", "172.19.",
+        "172.20.", "172.21.", "172.22.", "172.23.",
+        "172.24.", "172.25.", "172.26.", "172.27.",
+        "172.28.", "172.29.", "172.30.", "172.31.",
     ];
-    let host_part = lower_url.split("://").nth(1).unwrap_or("");
-    let host = host_part.split('/').next().unwrap_or("");
-    let host_no_port = host.split(':').next().unwrap_or("");
-    if blocked_patterns.iter().any(|p| host_no_port.contains(p)) {
+    if blocked_patterns.iter().any(|p| host_clean.contains(p)) {
         return Some(format!(
-            "Cannot access internal/private network ({host_no_port})"
+            "Cannot access internal/private network ({host})"
         ));
     }
     None

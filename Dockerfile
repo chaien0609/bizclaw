@@ -35,11 +35,17 @@ COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=builder /build/target/release/bizclaw /usr/local/bin/bizclaw
 COPY --from=builder /build/target/release/bizclaw-platform /usr/local/bin/bizclaw-platform
 
-# Create data directory
-RUN mkdir -p /root/.bizclaw
+# ── Security: Non-root user ──────────────────────────────────
+# Create dedicated user to run the application (no root access)
+RUN groupadd -r bizclaw && useradd -r -g bizclaw -m -s /bin/false bizclaw
+
+# Create data directory with proper ownership
+RUN mkdir -p /home/bizclaw/.bizclaw && chown -R bizclaw:bizclaw /home/bizclaw/.bizclaw
 
 # Environment — GMT+7
-ENV BIZCLAW_CONFIG=/root/.bizclaw/config.toml
+ENV BIZCLAW_CONFIG=/home/bizclaw/.bizclaw/config.toml
+ENV BIZCLAW_DATA_DIR=/home/bizclaw/.bizclaw
+ENV HOME=/home/bizclaw
 ENV RUST_LOG=info
 ENV TZ=Asia/Ho_Chi_Minh
 
@@ -53,7 +59,10 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 # OCI Labels
 LABEL org.opencontainers.image.title="BizClaw AI Platform"
 LABEL org.opencontainers.image.description="Multi-tenant AI Agent platform for SME businesses"
-LABEL org.opencontainers.image.version="0.3.1"
+LABEL org.opencontainers.image.version="0.3.2"
+
+# ── Switch to non-root user ──────────────────────────────────
+USER bizclaw
 
 # Default: run the platform
 ENTRYPOINT ["bizclaw-platform"]

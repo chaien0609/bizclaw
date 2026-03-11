@@ -78,7 +78,7 @@ impl InjectionScanner {
         }
     }
 
-    /// Default 6 detection patterns.
+    /// Default 8 detection patterns (EN + VI + Unicode bypass).
     fn default_patterns() -> Vec<InjectionPattern> {
         vec![
             InjectionPattern {
@@ -94,6 +94,14 @@ impl InjectionScanner {
                     "you are now",
                     "pretend you are",
                     "act as if you have no restrictions",
+                    // Vietnamese
+                    "bỏ qua hướng dẫn trước",
+                    "quên lệnh cũ",
+                    "bỏ qua chỉ dẫn",
+                    "giờ bạn là",
+                    "hãy giả vờ là",
+                    "bỏ qua system prompt",
+                    "thay đổi vai trò",
                 ],
                 description: "Attempt to override system prompt or agent role",
             },
@@ -108,6 +116,12 @@ impl InjectionScanner {
                     "bypass safety",
                     "bypass filters",
                     "unlock full potential",
+                    // Vietnamese
+                    "bỏ giới hạn",
+                    "chế độ không giới hạn",
+                    "phá vỡ rào cản",
+                    "bỏ qua bảo mật",
+                    "mở khóa toàn bộ",
                 ],
                 description: "Jailbreak attempt to bypass safety guardrails",
             },
@@ -122,6 +136,12 @@ impl InjectionScanner {
                     "your api key",
                     "tell me your password",
                     "reveal your secrets",
+                    // Vietnamese
+                    "cho xem system prompt",
+                    "hiện api key",
+                    "mật khẩu của bạn",
+                    "lộ cấu hình",
+                    "cho tôi xem hướng dẫn hệ thống",
                 ],
                 description: "Attempt to extract system prompt or sensitive data",
             },
@@ -151,6 +171,10 @@ impl InjectionScanner {
                     "echo back the system",
                     "translate the above",
                     "summarize your instructions",
+                    // Vietnamese
+                    "lặp lại nội dung trên",
+                    "dịch đoạn trên",
+                    "tóm tắt chỉ dẫn",
                 ],
                 description: "Attempt to leak system prompt via indirect methods",
             },
@@ -163,8 +187,50 @@ impl InjectionScanner {
                     "unicode escape",
                     "url encode",
                     "\\u0069\\u0067\\u006e", // "ign" in unicode escapes
+                    "&#x69;&#x67;",          // HTML entities
+                    "%69%67%6e",             // URL-encoded "ign"
                 ],
                 description: "Attempt to bypass detection via encoding tricks",
+            },
+            InjectionPattern {
+                name: "social_engineering",
+                keywords: vec![
+                    "i am the developer",
+                    "i am your creator",
+                    "admin override",
+                    "sudo mode",
+                    "maintenance mode",
+                    "emergency access",
+                    "this is a test prompt",
+                    "security testing ignore",
+                    // Vietnamese
+                    "tôi là lập trình viên",
+                    "tôi là admin",
+                    "quyền quản trị",
+                    "chế độ bảo trì",
+                    "truy cập khẩn cấp",
+                ],
+                description: "Social engineering attempt to gain elevated access",
+            },
+            InjectionPattern {
+                name: "multi_language_override",
+                keywords: vec![
+                    // Chinese
+                    "忽略之前的指示",
+                    "你现在是",
+                    // Japanese
+                    "以前の指示を無視",
+                    // Korean
+                    "이전 지시를 무시",
+                    // Markdown/format injection
+                    "```system",
+                    "[system]:",
+                    "<|system|>",
+                    "### instruction:",
+                    "system: you are",
+                    "<<sys>>",
+                ],
+                description: "Multi-language instruction override or format injection",
             },
         ]
     }
@@ -248,6 +314,6 @@ mod tests {
         let stats = scanner.stats();
         assert_eq!(stats.total_scans, 3);
         assert_eq!(stats.total_detections, 1);
-        assert_eq!(stats.pattern_count, 6);
+        assert_eq!(stats.pattern_count, 8);
     }
 }

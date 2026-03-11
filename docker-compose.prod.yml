@@ -46,8 +46,10 @@ services:
       - "127.0.0.1:10008:10008"  # Tenant port 8
       - "127.0.0.1:10009:10009"  # Tenant port 9
       - "127.0.0.1:10010:10010"  # Tenant port 10
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - bizclaw_data:/root/.bizclaw
+      - bizclaw_data:/home/bizclaw/.bizclaw
       - nginx_dynamic:/etc/nginx/dynamic
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -84,8 +86,10 @@ services:
       - "127.0.0.1:10013:10003"  # Tenant gateway 3
       - "127.0.0.1:10014:10004"  # Tenant gateway 4
       - "127.0.0.1:10015:10005"  # Tenant gateway 5
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - viagent_data:/root/.bizclaw
+      - viagent_data:/home/bizclaw/.bizclaw
       - nginx_dynamic:/etc/nginx/dynamic
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
