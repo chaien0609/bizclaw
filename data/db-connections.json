@@ -35,6 +35,18 @@
       "sensitive_columns": [],
       "allowed_tables": [],
       "enabled": false
+    },
+    {
+      "id": "demo_shop",
+      "db_type": "sqlite",
+      "connection_string": "sqlite://data/demo_shop.db",
+      "read_only": true,
+      "max_rows": 100,
+      "timeout_secs": 5,
+      "description": "Demo Shop — cửa hàng điện tử mẫu (20 sản phẩm, 20 đơn hàng)",
+      "sensitive_columns": ["customer_phone"],
+      "allowed_tables": ["products", "orders", "order_items"],
+      "enabled": true
     }
   ]
 }
