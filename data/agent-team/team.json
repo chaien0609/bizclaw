@@ -1,0 +1,183 @@
+{
+  "team": {
+    "name": "OpenClaw Micro SaaS Team",
+    "description": "5-agent AI team for Micro SaaS product — US & English-speaking markets",
+    "version": "1.0.0"
+  },
+  "agents": [
+    {
+      "id": "max",
+      "name": "Max",
+      "role": "Lead",
+      "title": "COO / Orchestrator",
+      "description": "Chief coordinator — routes tasks, approves actions, synthesizes cross-team data, single source of truth",
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "channels": ["telegram"],
+      "specialties": ["orchestration", "synthesis", "approval", "reporting"],
+      "active": true,
+      "system_prompt_file": "prompts/max.md",
+      "budget": {
+        "monthly_token_limit": 2000000,
+        "monthly_usd_limit": 50.0,
+        "alert_at_percent": 80.0,
+        "on_exceed": "switch_to_local",
+        "fallback_model": "gemini-2.5-flash"
+      }
+    },
+    {
+      "id": "vigor",
+      "name": "Vigor",
+      "role": "Specialist",
+      "title": "Growth Agent",
+      "description": "SEO optimization, blog publishing, trend scouting (2h cycles), landing page copy, social monitoring (Reddit, HN, IndieHackers)",
+      "model": "gemini-2.5-flash",
+      "provider": "google",
+      "channels": [],
+      "specialties": ["seo", "blog", "trends", "copy", "social_monitoring"],
+      "active": true,
+      "system_prompt_file": "prompts/vigor.md",
+      "budget": {
+        "monthly_token_limit": 5000000,
+        "monthly_usd_limit": 30.0,
+        "alert_at_percent": 80.0,
+        "on_exceed": "notify",
+        "fallback_model": ""
+      }
+    },
+    {
+      "id": "fidus",
+      "name": "Fidus",
+      "role": "Specialist",
+      "title": "Ops Agent",
+      "description": "Platform health monitoring (instance/DB/disk/RAM), token cost tracking, cache hit monitoring (alert <60%), runaway request prevention (>200/day)",
+      "model": "deepseek-chat",
+      "provider": "deepseek",
+      "channels": [],
+      "specialties": ["infra", "health", "database", "cost_tracking", "monitoring"],
+      "active": true,
+      "system_prompt_file": "prompts/fidus.md",
+      "budget": {
+        "monthly_token_limit": 3000000,
+        "monthly_usd_limit": 10.0,
+        "alert_at_percent": 80.0,
+        "on_exceed": "notify",
+        "fallback_model": ""
+      },
+      "guard_rails": {
+        "never_restart_without_approval": true
+      }
+    },
+    {
+      "id": "optimo",
+      "name": "Optimo",
+      "role": "Specialist",
+      "title": "Optimizer Agent",
+      "description": "Conversion funnel audit (weekly), A/B test suggestions & tracking, landing page & demo copy edits",
+      "model": "gemini-2.5-flash",
+      "provider": "google",
+      "channels": [],
+      "specialties": ["ab_testing", "conversion", "landing_page", "demo", "funnel"],
+      "active": true,
+      "system_prompt_file": "prompts/optimo.md",
+      "budget": {
+        "monthly_token_limit": 2000000,
+        "monthly_usd_limit": 15.0,
+        "alert_at_percent": 80.0,
+        "on_exceed": "notify",
+        "fallback_model": ""
+      },
+      "guard_rails": {
+        "max_concurrent_tests": 1,
+        "min_test_duration_days": 7
+      }
+    },
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "role": "Specialist",
+      "title": "Sales Agent",
+      "description": "Prospect research (DTC/ecommerce founders), personalized cold email via SES, opt-out list checking, positive reply escalation to Max",
+      "model": "gpt-4o-mini",
+      "provider": "openai",
+      "channels": ["email"],
+      "specialties": ["cold_email", "outreach", "prospect_research", "sales"],
+      "active": true,
+      "system_prompt_file": "prompts/mercury.md",
+      "budget": {
+        "monthly_token_limit": 1000000,
+        "monthly_usd_limit": 10.0,
+        "alert_at_percent": 80.0,
+        "on_exceed": "pause",
+        "fallback_model": ""
+      },
+      "guard_rails": {
+        "max_emails_per_day": 20,
+        "max_words_per_email": 100,
+        "cooldown_seconds": 90,
+        "check_optout_before_send": true,
+        "escalate_positive_replies": true
+      }
+    }
+  ],
+  "escalation_rules": [
+    {
+      "id": "mercury-positive-reply",
+      "condition": {
+        "type": "keyword_match",
+        "keywords": ["interested", "tell me more", "sounds good", "demo", "pricing", "schedule a call", "let's talk"]
+      },
+      "action": {
+        "type": "escalate_to_lead"
+      },
+      "enabled": true
+    },
+    {
+      "id": "fidus-health-critical",
+      "condition": {
+        "type": "keyword_match",
+        "keywords": ["disk full", "out of memory", "database down", "connection refused", "500 error"]
+      },
+      "action": {
+        "type": "notify_owner",
+        "channel": "telegram",
+        "message_template": "🚨 CRITICAL: {{alert_message}}"
+      },
+      "enabled": true
+    },
+    {
+      "id": "budget-low",
+      "condition": {
+        "type": "budget_low",
+        "threshold_percent": 90.0
+      },
+      "action": {
+        "type": "notify_owner",
+        "channel": "telegram",
+        "message_template": "⚠️ Budget alert: {{agent_name}} at {{usage_percent}}% of monthly limit"
+      },
+      "enabled": true
+    },
+    {
+      "id": "agent-timeout",
+      "condition": {
+        "type": "response_timeout",
+        "timeout_seconds": 120
+      },
+      "action": {
+        "type": "escalate_to_lead"
+      },
+      "enabled": true
+    }
+  ],
+  "delegation_links": [
+    { "source": "max", "target": "vigor", "direction": "one_way" },
+    { "source": "max", "target": "fidus", "direction": "one_way" },
+    { "source": "max", "target": "optimo", "direction": "one_way" },
+    { "source": "max", "target": "mercury", "direction": "one_way" },
+    { "source": "mercury", "target": "max", "direction": "one_way" },
+    { "source": "fidus", "target": "max", "direction": "one_way" },
+    { "source": "vigor", "target": "max", "direction": "one_way" },
+    { "source": "optimo", "target": "max", "direction": "one_way" }
+  ]
+}

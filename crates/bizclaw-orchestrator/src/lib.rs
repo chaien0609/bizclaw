@@ -9,4 +9,5 @@
 pub mod budget;
 pub mod heartbeat;
 pub mod team;
+pub mod team_loader;
 pub mod ticket;

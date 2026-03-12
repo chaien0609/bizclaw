@@ -103,7 +103,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **🤖 Multi-Agent** | Tạo nhiều agent với vai trò khác nhau, gán vào kênh. Orchestrator quản lý N agents |
 | **📚 Knowledge RAG** | Hybrid search (FTS5 + Vector cosine similarity). Upload tài liệu → AI tự trả lời |
 | **🖐️ Autonomous Hands** | Agent chạy background 24/7 — Research, Analytics, Content, Monitoring, Security. Tự retry, tự report |
-| **🔄 Workflows** | 17 workflow templates có sẵn. Multi-step pipeline: Sequential, FanOut, Collect, Conditional, Loop, Transform |
+| **🔄 Workflows** | 23 workflow templates có sẵn. Multi-step pipeline: Sequential, FanOut, Collect, Conditional, Loop, Transform |
 | **⏰ Scheduler** | Cron, interval, one-time tasks. Agent tự chạy background, gửi kết quả qua Telegram/Zalo/Email/Webhook |
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
 | **🌐 Web Dashboard** | 20+ trang UI (VI/EN), modular lazy-loading, WebSocket real-time, Full CRUD, Dark/Light mode |
@@ -182,7 +182,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
   Output: Bài viết hoàn chỉnh
 ```
 
-**17 Workflow Templates có sẵn:**
+**23 Workflow Templates có sẵn:**
 
 | # | Category | Workflow | Flow |
 |---|----------|----------|------|
@@ -203,6 +203,12 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | 15 | 💬 Biz | **Customer Feedback** | Thu thập → Phân loại → Insights → Action Plan |
 | 16 | ⚖️ Biz | **Contract Review** | Đọc HĐ → Rủi ro pháp lý → Đề xuất sửa → Tóm tắt CEO |
 | 17 | 🚀 Biz | **Product Launch** | Research → Plan → Content + PR (FanOut) → Launch Kit |
+| 18 | 🤖 Agent Team | **Vigor TrendScout** | FanOut scan PH·HN·Reddit → Merge → Score Report |
+| 19 | 🤖 Agent Team | **Vigor Blog Pipeline** | Keyword Research → Draft → SEO Optimize → Quality Loop |
+| 20 | 🤖 Agent Team | **Fidus Health Check** | Instance·DB·Disk·RAM·Cache → Alert |
+| 21 | 🤖 Agent Team | **Fidus Cost Tracker** | Token usage by model → Budget tracking → Anomaly |
+| 22 | 🤖 Agent Team | **Optimo Funnel Audit** | Conversion metrics → Drop-off → A/B test recommendations |
+| 23 | 🤖 Agent Team | **Mercury Outreach** | Prospect Research → Draft Email → Opt-out Check → SES |
 
 ---
 
@@ -224,6 +230,33 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 - **Gán Agent ↔ Channel**: Mỗi agent gán vào 1+ kênh (Telegram, Zalo, Discord, Webhook, Web, Xiaozhi Voice)
 - **Provider riêng**: Mỗi agent chọn provider/model tối ưu cho vai trò
 - **Group Chat**: Nhiều agent cộng tác giải quyết 1 vấn đề
+
+### 🎯 Agent Team Orchestration — Micro SaaS Operations
+
+> 5-agent AI team tự vận hành doanh nghiệp Micro SaaS. JSON config + scheduled workflows + budget tracking.
+
+```
+  ┌───────────────── Agent Team ─────────────────┐
+  │                                               │
+  │  🎯 MAX (COO)        Claude Sonnet 4  Telegram│
+  │  ├─ 📈 VIGOR (Growth)  Gemini Flash   SEO+Blog│
+  │  ├─ 🔧 FIDUS (Ops)     DeepSeek V3    Infra   │
+  │  ├─ 🧪 OPTIMO (Opt.)   Gemini Flash   A/B Test│
+  │  └─ 📧 MERCURY (Sales) GPT-4o Mini    Email   │
+  │                                               │
+  │  Budget: Per-agent token/USD limits            │
+  │  Guard Rails: Email limits, test rules, etc.   │
+  │  Scheduler: 7 automated tasks (cron/interval)  │
+  └───────────────────────────────────────────────┘
+```
+
+| Agent | Role | Model | Specialty | Schedule |
+|-------|------|-------|-----------|----------|
+| 🎯 **Max** | COO / Orchestrator | Claude Sonnet 4 | Phân tuyến, phê duyệt, tổng hợp, Telegram | Daily briefing 7AM |
+| 📈 **Vigor** | Growth | Gemini Flash | SEO, Blog, TrendScout, Social Monitoring | Scan mỗi 2h |
+| 🔧 **Fidus** | Ops | DeepSeek V3 | Health check, Cost tracking, Cache, Runaway | Health mỗi 5 phút |
+| 🧪 **Optimo** | Optimizer | Gemini Flash | Funnel audit, A/B testing (1 test, 7 ngày, 95%) | Weekly Monday 9AM |
+| 📧 **Mercury** | Sales | GPT-4o Mini | Cold email (<100 words, <20/ngày, CAN-SPAM) | Weekday 10AM |
 
 ---
 
@@ -427,7 +460,8 @@ BizClaw Platform được thiết kế với kiến trúc **Process-level Isolat
 | `bizclaw-scheduler` | Scheduled tasks + Retry + Notifications | ✅ |
 | `bizclaw-runtime` | Agent runtime lifecycle | ✅ |
 | `bizclaw-hands` | Autonomous Hands (7 types) | ✅ |
-| `bizclaw-workflows` | Workflow orchestration (6 step types) | ✅ |
+| `bizclaw-workflows` | Workflow orchestration (6 step types, 23 templates) | ✅ |
+| `bizclaw-orchestrator` | Agent Team, Token Budget, Heartbeat Monitor, Ticket System | ✅ |
 | `bizclaw-skills` | Agent skill modules | ✅ |
 | `bizclaw-ffi` | Android FFI layer | ✅ |
 | `bizclaw-db` | Database layer (SQLite + PostgreSQL) | ✅ |
@@ -496,10 +530,11 @@ llm:
 | Metric | Value |
 |--------|-------|
 | **Language** | 100% Rust + Kotlin (Android) |
-| **Crates** | 19 |
-| **Lines of Code** | ~58,000+ |
-| **Tests** | 199+ passing |
-| **Workflow Templates** | 17 |
+| **Crates** | 20 |
+| **Lines of Code** | ~60,000+ |
+| **Tests** | 237+ passing |
+| **Workflow Templates** | 23 (incl. 6 Agent Team workflows) |
+| **Agent Team** | 5 specialized agents (Max, Vigor, Fidus, Optimo, Mercury) |
 | **Binary Size** | bizclaw ~12MB |
 | **Dashboard Pages** | 20+ (27 lazy-loaded modules) |
 | **Agent Templates** | 51 |
@@ -534,7 +569,8 @@ cd bizclaw && cargo build --release
 - **Progress Updates** — Mid-task status messaging so users see what the agent is doing
 - **Multi-Agent** — Create teams of agents with different roles, assign to channels
 - **Autonomous Hands** — Background agents that run 24/7: Research, Content, Analytics, Monitoring, Security
-- **Workflows** — 17 pre-built multi-step AI pipelines
+- **Workflows** — 23 pre-built multi-step AI pipelines (incl. 6 Agent Team workflows)
+- **Agent Team** — 5-agent AI team (COO, Growth, Ops, Optimizer, Sales) with automated scheduling, budget tracking, and guard rails
 - **51 Agent Templates** — Pre-built for HR, Sales, Finance, Marketing, Legal, IT
 - **Knowledge RAG** — Hybrid FTS5 + Vector search. Upload docs, AI answers from your content
 - **Scheduler** — Cron, interval, one-time tasks with retry and multi-channel notification

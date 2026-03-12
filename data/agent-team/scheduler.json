@@ -1,0 +1,125 @@
+{
+  "version": "1.0.0",
+  "description": "Pre-configured scheduled tasks for Agent Team",
+  "tasks": [
+    {
+      "name": "TrendScout Scan",
+      "agent": "vigor",
+      "workflow": "vigor_trend_scout",
+      "schedule": {
+        "type": "cron",
+        "expression": "0 */2 * * *"
+      },
+      "prompt": "Scan current tech/SaaS trends across Product Hunt, Hacker News, and Reddit. Focus on AI tools, automation, and developer productivity.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 2,
+        "base_delay_secs": 60,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "name": "Platform Health Check",
+      "agent": "fidus",
+      "workflow": "fidus_health_check",
+      "schedule": {
+        "type": "interval",
+        "every_secs": 300
+      },
+      "prompt": "Run platform health check: instance, database, disk, RAM, cache hit rate, runaway requests. Alert on any critical issues.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 3,
+        "base_delay_secs": 30,
+        "backoff_multiplier": 1.5
+      }
+    },
+    {
+      "name": "Daily Cost Report",
+      "agent": "fidus",
+      "workflow": "fidus_cost_tracker",
+      "schedule": {
+        "type": "cron",
+        "expression": "0 23 * * *"
+      },
+      "prompt": "Generate daily token cost report by agent and model. Compare with yesterday, check budget status, flag anomalies.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 2,
+        "base_delay_secs": 60,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "name": "Cache Hit Monitor",
+      "agent": "fidus",
+      "workflow": null,
+      "schedule": {
+        "type": "interval",
+        "every_secs": 900
+      },
+      "prompt": "Check cache hit rate. If below 60%, investigate cause and report to Max immediately with analysis and remediation suggestions.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 1,
+        "base_delay_secs": 30,
+        "backoff_multiplier": 1.0
+      }
+    },
+    {
+      "name": "Weekly Funnel Audit",
+      "agent": "optimo",
+      "workflow": "optimo_funnel_audit",
+      "schedule": {
+        "type": "cron",
+        "expression": "0 9 * * 1"
+      },
+      "prompt": "Perform weekly conversion funnel audit. Analyze visit→signup→trial→paid rates, identify biggest drop-offs, propose A/B tests. Remember: 1 test at a time, minimum 7 days.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 2,
+        "base_delay_secs": 120,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "name": "CEO Daily Briefing",
+      "agent": "max",
+      "workflow": null,
+      "schedule": {
+        "type": "cron",
+        "expression": "0 7 * * *"
+      },
+      "prompt": "Generate the daily CEO briefing. Synthesize updates from all team agents: Vigor (growth/trends), Fidus (ops/costs), Optimo (conversion/tests), Mercury (outreach/pipeline). Format as concise Telegram message.",
+      "deliver_to": "telegram",
+      "enabled": true,
+      "retry": {
+        "max_retries": 2,
+        "base_delay_secs": 60,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "name": "Prospect Research",
+      "agent": "mercury",
+      "workflow": "mercury_outreach",
+      "schedule": {
+        "type": "cron",
+        "expression": "0 10 * * 1-5"
+      },
+      "prompt": "Research 5 new DTC/ecommerce founder prospects matching our ICP. Draft personalized cold emails (<100 words each). Check opt-out list. Prepare for sending via SES. Max 20 emails/day.",
+      "deliver_to": "agent:max",
+      "enabled": true,
+      "retry": {
+        "max_retries": 1,
+        "base_delay_secs": 300,
+        "backoff_multiplier": 1.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "description": "Mercury email opt-out list — CAN-SPAM compliance",
+  "optout_emails": [],
+  "optout_domains": [],
+  "last_updated": "2026-03-12T00:00:00Z",
+  "sent_log": []
+}

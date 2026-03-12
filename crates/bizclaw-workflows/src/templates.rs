@@ -24,6 +24,13 @@ pub fn builtin_workflows() -> Vec<Workflow> {
         customer_feedback_analysis(),
         contract_review(),
         product_launch_checklist(),
+        // Agent Team — Micro SaaS Operations
+        vigor_trend_scout(),
+        vigor_blog_pipeline(),
+        fidus_health_check(),
+        fidus_cost_tracker(),
+        optimo_funnel_audit(),
+        mercury_outreach(),
     ]
 }
 
@@ -1140,6 +1147,458 @@ pub fn product_launch_checklist() -> Workflow {
     ))
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Agent Team Workflows — Micro SaaS Operations
+// ═══════════════════════════════════════════════════════════════
+
+/// Vigor TrendScout — scan trends every 2h, analyze, report to Max.
+///
+/// Runs on cron `0 */2 * * *`. Agent: Vigor (Gemini Flash).
+/// Output: Trend report with scores, sent to Max for synthesis.
+pub fn vigor_trend_scout() -> Workflow {
+    Workflow::new(
+        "vigor_trend_scout",
+        "TrendScout — Scan Product Hunt · HN · Reddit · Twitter → Score → Report",
+    )
+    .with_tags(vec!["growth", "trends", "vigor", "agent_team", "automated"])
+    .with_timeout(600)
+    // Parallel scan multiple platforms
+    .add_step(
+        WorkflowStep::new("scan-producthunt", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Scan Product Hunt for the latest trending products in our SaaS category.\n\
+                 Focus on: AI tools, automation, developer tools, business ops.\n\n\
+                 For each relevant product, report:\n\
+                 - Name & tagline\n\
+                 - Upvote count\n\
+                 - Relevance score (1-10) to our Micro SaaS\n\
+                 - Key takeaway or competitive insight\n\n\
+                 Context: {{input}}"
+            )
+            .with_timeout(180),
+    )
+    .add_step(
+        WorkflowStep::new("scan-hackernews", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Scan Hacker News front page and recent Show HN posts.\n\
+                 Focus on: SaaS launches, AI agent discussions, developer tool trends.\n\n\
+                 For each relevant thread, report:\n\
+                 - Title & points\n\
+                 - Key discussion themes\n\
+                 - Relevance score (1-10)\n\
+                 - Actionable insight for our product\n\n\
+                 Context: {{input}}"
+            )
+            .with_timeout(180),
+    )
+    .add_step(
+        WorkflowStep::new("scan-reddit", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Scan Reddit communities: r/SaaS, r/Entrepreneur, r/startups, r/IndieHackers.\n\
+                 Focus on: trending discussions, pain points, product recommendations.\n\n\
+                 For each relevant post:\n\
+                 - Subreddit, title, upvotes\n\
+                 - Key pain point or opportunity\n\
+                 - Relevance score (1-10)\n\
+                 - Potential content/engagement opportunity\n\n\
+                 Context: {{input}}"
+            )
+            .with_timeout(180),
+    )
+    // FanOut: scan all 3 platforms in parallel
+    .add_step(WorkflowStep::new(
+        "parallel-scan",
+        "max",
+        StepType::FanOut {
+            parallel_steps: vec![
+                "scan-producthunt".into(),
+                "scan-hackernews".into(),
+                "scan-reddit".into(),
+            ],
+        },
+    ))
+    // Collect results
+    .add_step(WorkflowStep::new(
+        "merge-trends",
+        "max",
+        StepType::Collect {
+            strategy: CollectStrategy::Merge,
+            evaluator: None,
+        },
+    ))
+    // Synthesize into scored report
+    .add_step(
+        WorkflowStep::new("synthesize", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Synthesize all trend data into a single TrendScout report.\n\n\
+                 Raw data:\n{{input}}\n\n\
+                 Create the report in this format:\n\
+                 🔍 TREND SCOUT — [Current Time]\n\n\
+                 🔥 HOT TRENDS (Score ≥ 7)\n\
+                 1. [Trend] — Score: [X] — Source: [Platform]\n\
+                    Action: [What we should do]\n\n\
+                 📊 MONITORING (Score 4-6)\n\
+                 • [Trend] — Score: [X] — [Brief note]\n\n\
+                 💡 CONTENT OPPORTUNITIES\n\
+                 • [Blog/social post idea based on trends]\n\n\
+                 ⚡ COMPETITOR ALERTS\n\
+                 • [Any competitor launches or major moves]"
+            )
+            .with_timeout(180),
+    )
+}
+
+/// Vigor Blog Pipeline — research keyword → draft → SEO optimize → review.
+///
+/// Agent: Vigor (Gemini Flash). Human-triggered or scheduled.
+/// Output: SEO-optimized blog post ready for publishing.
+pub fn vigor_blog_pipeline() -> Workflow {
+    Workflow::new(
+        "vigor_blog_pipeline",
+        "Blog Pipeline — Keyword Research → Draft → SEO Optimize → Quality Review",
+    )
+    .with_tags(vec!["growth", "blog", "seo", "vigor", "agent_team", "content"])
+    .with_timeout(1200)
+    .add_step(
+        WorkflowStep::new("keyword-research", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Research SEO keywords for a blog post about:\n\n\
+                 {{input}}\n\n\
+                 Identify:\n\
+                 1. Primary keyword (search volume 100-1000/mo, low-medium competition)\n\
+                 2. Secondary keywords (3-5 related terms)\n\
+                 3. Long-tail variations (5-10)\n\
+                 4. Search intent analysis (informational/transactional/navigational)\n\
+                 5. Competitor content analysis (top 3 ranking pages)\n\
+                 6. Content gap opportunities\n\
+                 7. Recommended word count and structure"
+            )
+            .with_timeout(300)
+            .with_retries(1),
+    )
+    .add_step(
+        WorkflowStep::new("draft", "vigor", StepType::Sequential)
+            .with_prompt(
+                "Write a comprehensive blog post based on this keyword research:\n\n\
+                 {{input}}\n\n\
+                 Requirements:\n\
+                 - 1200-2000 words\n\
+                 - Clear H1, H2, H3 hierarchy\n\
+                 - Include primary keyword in H1, first paragraph, and 2-3 H2s\n\
+                 - Natural keyword density (1-2%)\n\
+                 - Actionable advice with specific examples\n\
+                 - Include a FAQ section (3-5 questions) for featured snippets\n\
+                 - End with a clear CTA related to our product\n\
+                 - Tone: Professional, helpful, slightly casual (American English)\n\
+                 - E-E-A-T compliant: show expertise and experience"
+            )
+            .with_timeout(600)
+            .with_retries(1),
+    )
+    .add_step(
+        WorkflowStep::new("seo-optimize", "vigor", StepType::Sequential)
+            .with_prompt(
+                "SEO-optimize this blog post draft:\n\n\
+                 {{input}}\n\n\
+                 Optimize:\n\
+                 1. Meta title (50-60 chars, include primary keyword)\n\
+                 2. Meta description (150-160 chars, compelling, include keyword)\n\
+                 3. URL slug (short, keyword-rich)\n\
+                 4. Internal link suggestions (2-3 relevant pages)\n\
+                 5. Image alt text suggestions (3-5 images)\n\
+                 6. Schema markup recommendation\n\
+                 7. Readability score check (aim for Grade 8)\n\
+                 8. Keyword placement audit\n\n\
+                 Return the optimized post with all SEO metadata."
+            )
+            .with_timeout(300),
+    )
+    // Quality review loop
+    .add_step(WorkflowStep::new(
+        "quality-gate",
+        "max",
+        StepType::Loop {
+            body_step: "seo-optimize".into(),
+            config: LoopConfig::new(2, Condition::new("quality", "contains", "APPROVED")),
+        },
+    ))
+    .add_step(WorkflowStep::new(
+        "publish-ready",
+        "vigor",
+        StepType::Transform {
+            template: "## 📝 Blog Post Ready for Publishing\n\n\
+                {{input}}\n\n\
+                ---\n\
+                ✅ SEO Optimized | Quality Reviewed\n\
+                📊 Workflow: Keyword Research → Draft → SEO → Review\n\
+                🤖 Generated by Vigor (Growth Agent)"
+                .to_string(),
+        },
+    ))
+}
+
+/// Fidus Health Check — monitor instance, DB, disk, RAM, cache.
+///
+/// Runs every 5 minutes (Interval 300s). Agent: Fidus (DeepSeek V3).
+/// Output: Health status report, alerts on critical issues.
+pub fn fidus_health_check() -> Workflow {
+    Workflow::new(
+        "fidus_health_check",
+        "Health Check — Instance · DB · Disk · RAM · Cache → Alert if Critical",
+    )
+    .with_tags(vec!["ops", "health", "monitoring", "fidus", "agent_team", "automated"])
+    .with_timeout(120)
+    .add_step(
+        WorkflowStep::new("check-infra", "fidus", StepType::Sequential)
+            .with_prompt(
+                "Perform a platform health check. Check the following:\n\n\
+                 1. **Instance**: CPU usage, memory usage, process count, uptime\n\
+                 2. **Database**: Connection pool status, query latency, table sizes\n\
+                 3. **Disk**: Usage percentage, growth rate, estimated days to full\n\
+                 4. **RAM**: Available vs used, swap usage, OOM risk\n\
+                 5. **Cache**: Hit rate (ALERT if below 60%), eviction rate\n\
+                 6. **Network**: Response times to key endpoints\n\n\
+                 Report format:\n\
+                 🔧 HEALTH CHECK — [Timestamp]\n\n\
+                 Instance: [🟢/🟡/🔴] | CPU: [X]% | RAM: [X]/[X]GB\n\
+                 Database: [🟢/🟡/🔴] | Conn: [X]/[X] | Latency: [X]ms\n\
+                 Disk:     [🟢/🟡/🔴] | [X]% used | ~[X] days to full\n\
+                 Cache:    [🟢/🟡/🔴] | Hit rate: [X]%\n\n\
+                 ⚠️ ALERTS: [list any issues]\n\
+                 ✅ ALL CLEAR [if none]\n\n\
+                 Context: {{input}}"
+            )
+            .with_timeout(60),
+    )
+    .add_step(
+        WorkflowStep::new("check-runaway", "fidus", StepType::Sequential)
+            .with_prompt(
+                "Check for runaway requests and anomalies:\n\n\
+                 {{input}}\n\n\
+                 1. Request count per endpoint in last 24h\n\
+                 2. ALERT if any endpoint > 200 requests/day\n\
+                 3. Identify source: bot traffic, retry storm, infinite loop, DDoS\n\
+                 4. Recommendation (throttle, block, investigate)\n\n\
+                 ⚠️ NEVER auto-block or restart without Max approval.\n\
+                 Report anomalies only."
+            )
+            .with_timeout(60),
+    )
+}
+
+/// Fidus Cost Tracker — daily token cost report by model.
+///
+/// Runs daily at 23:00 (cron `0 23 * * *`). Agent: Fidus.
+/// Output: Cost breakdown by model, comparison with yesterday, budget status.
+pub fn fidus_cost_tracker() -> Workflow {
+    Workflow::new(
+        "fidus_cost_tracker",
+        "Daily Cost Report — Token usage by model · Budget tracking · Anomaly detection",
+    )
+    .with_tags(vec!["ops", "cost", "budget", "fidus", "agent_team", "automated"])
+    .with_timeout(300)
+    .add_step(
+        WorkflowStep::new("collect-costs", "fidus", StepType::Sequential)
+            .with_prompt(
+                "Generate the daily token cost report.\n\n\
+                 Context: {{input}}\n\n\
+                 Report format:\n\
+                 💰 DAILY COST REPORT — [Date]\n\n\
+                 | Agent | Model | Tokens | Cost ($) |\n\
+                 |-------|-------|--------|----------|\n\
+                 | Max | Claude Sonnet 4 | [X]K | $[X] |\n\
+                 | Vigor | Gemini Flash | [X]K | $[X] |\n\
+                 | Fidus | DeepSeek V3 | [X]K | $[X] |\n\
+                 | Optimo | Gemini Flash | [X]K | $[X] |\n\
+                 | Mercury | GPT-4o Mini | [X]K | $[X] |\n\
+                 | TOTAL | — | [X]M | $[X] |\n\n\
+                 📊 vs Yesterday: [+/-X]% tokens, [+/-X]% cost\n\
+                 📈 Month-to-date: $[X] / $[X] budget ([X]%)\n\n\
+                 ⚠️ ANOMALIES: [cost spikes > 2x daily average]\n\
+                 💡 OPTIMIZATION: [suggestions to reduce cost]"
+            )
+            .with_timeout(180),
+    )
+    .add_step(WorkflowStep::new(
+        "format-report",
+        "fidus",
+        StepType::Transform {
+            template: "## 💰 Daily Cost Report\n\n\
+                {{input}}\n\n\
+                ---\n\
+                🤖 Generated by Fidus (Ops Agent) | Auto-sent daily at 23:00"
+                .to_string(),
+        },
+    ))
+}
+
+/// Optimo Funnel Audit — weekly conversion funnel analysis.
+///
+/// Runs weekly Monday 9AM (cron `0 9 * * 1`). Agent: Optimo.
+/// Output: Funnel metrics, drop-off analysis, A/B test recommendations.
+pub fn optimo_funnel_audit() -> Workflow {
+    Workflow::new(
+        "optimo_funnel_audit",
+        "Weekly Funnel Audit — Conversion metrics · Drop-off analysis · A/B test suggestions",
+    )
+    .with_tags(vec!["optimizer", "funnel", "conversion", "ab_test", "optimo", "agent_team"])
+    .with_timeout(900)
+    .add_step(
+        WorkflowStep::new("analyze-funnel", "optimo", StepType::Sequential)
+            .with_prompt(
+                "Perform the weekly conversion funnel audit.\n\n\
+                 Context: {{input}}\n\n\
+                 Analyze each stage:\n\
+                 1. **Visit → Signup**: Landing page conversion rate\n\
+                 2. **Signup → Trial**: Activation rate\n\
+                 3. **Trial → Paid**: Trial-to-paid conversion\n\
+                 4. **Overall**: End-to-end conversion\n\n\
+                 For each stage:\n\
+                 - Current rate vs target vs last week\n\
+                 - Trend direction (↑↓→)\n\
+                 - Drop-off volume (how many users lost)"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("diagnose-dropoff", "optimo", StepType::Sequential)
+            .with_prompt(
+                "Diagnose the biggest conversion drop-offs:\n\n\
+                 {{input}}\n\n\
+                 For the biggest drop-off stage:\n\
+                 1. **Root cause hypothesis** (3 possible reasons)\n\
+                 2. **Supporting evidence** (data points, user behavior)\n\
+                 3. **Quick fixes** (implement this week)\n\
+                 4. **A/B test proposal**:\n\
+                    - Hypothesis: Changing X will improve Y because Z\n\
+                    - Primary metric to measure\n\
+                    - Minimum sample size for significance\n\
+                    - Expected duration (minimum 7 days)\n\n\
+                 ⚠️ RULES:\n\
+                 - Only 1 A/B test at a time\n\
+                 - Minimum 7 days before any decision\n\
+                 - 95% confidence required to declare winner"
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("active-tests", "optimo", StepType::Sequential)
+            .with_prompt(
+                "Report on any currently running A/B tests:\n\n\
+                 {{input}}\n\n\
+                 For each active test:\n\
+                 🧪 A/B TEST STATUS — [Test Name]\n\
+                 Status: Running (Day [X]/[min 7])\n\
+                 Control: [X]% conversion (n=[X])\n\
+                 Variant: [X]% conversion (n=[X])\n\
+                 Confidence: [X]% (need 95%)\n\
+                 Estimated completion: [Date]\n\
+                 Decision: WAIT / WINNER / LOSER / INCONCLUSIVE\n\n\
+                 If no tests running, state that clearly and reference the new proposal."
+            )
+            .with_timeout(180),
+    )
+    .add_step(WorkflowStep::new(
+        "funnel-report",
+        "optimo",
+        StepType::Transform {
+            template: "## 🧪 Weekly Funnel Audit\n\n\
+                {{input}}\n\n\
+                ---\n\
+                📊 Rules: 1 test at a time | Min 7 days | 95% confidence\n\
+                🤖 Generated by Optimo (Optimizer Agent) | Weekly Monday 9AM"
+                .to_string(),
+        },
+    ))
+}
+
+/// Mercury Outreach — research prospects → draft cold email → send via SES.
+///
+/// Agent: Mercury (GPT-5 Mini). Scheduled daily 10AM, max 20 emails/day.
+/// Guard rails: <100 words, 90s cooldown, opt-out check, positive reply escalation.
+pub fn mercury_outreach() -> Workflow {
+    Workflow::new(
+        "mercury_outreach",
+        "Cold Outreach — Prospect Research → Draft Email → Opt-out Check → Send via SES",
+    )
+    .with_tags(vec!["sales", "outreach", "email", "mercury", "agent_team", "cold_email"])
+    .with_timeout(900)
+    .add_step(
+        WorkflowStep::new("research-prospects", "mercury", StepType::Sequential)
+            .with_prompt(
+                "Research 5 new DTC/ecommerce founder prospects.\n\n\
+                 Context: {{input}}\n\n\
+                 Ideal Customer Profile:\n\
+                 - DTC or ecommerce brand\n\
+                 - Team size: 2-50 people\n\
+                 - Revenue: $100K - $10M ARR\n\
+                 - Tech-savvy founder/co-founder\n\
+                 - Active on Twitter/LinkedIn/IndieHackers\n\n\
+                 For each prospect, provide:\n\
+                 👤 [Name] — [Company] ([One-line description])\n\
+                 Role: [Title] | Size: ~[X] employees | Revenue: ~$[X]\n\
+                 Pain point: [Specific problem our product solves]\n\
+                 Hook: [Personal detail for email personalization]\n\
+                 Score: [1-10 fit score]\n\
+                 Email: [If publicly available]\n\n\
+                 Only include prospects with score ≥ 7."
+            )
+            .with_timeout(300)
+            .with_retries(1),
+    )
+    .add_step(
+        WorkflowStep::new("draft-emails", "mercury", StepType::Sequential)
+            .with_prompt(
+                "Draft personalized cold emails for each prospect:\n\n\
+                 {{input}}\n\n\
+                 ⛔ HARD RULES:\n\
+                 - Each email MUST be under 100 words\n\
+                 - Personalized subject line (< 50 chars)\n\
+                 - 1 sentence personal hook\n\
+                 - 1-2 sentences value prop\n\
+                 - 1 soft CTA (question, not demand)\n\
+                 - Include unsubscribe link placeholder\n\
+                 - American English, professional tone\n\
+                 - NO generic greetings (Dear Sir/Madam)\n\
+                 - NO multiple CTAs\n\
+                 - NO aggressive sales language\n\n\
+                 Format each email clearly with SUBJECT and BODY separated."
+            )
+            .with_timeout(300),
+    )
+    .add_step(
+        WorkflowStep::new("optout-check", "mercury", StepType::Sequential)
+            .with_prompt(
+                "Verify opt-out compliance for these emails:\n\n\
+                 {{input}}\n\n\
+                 Check each recipient against:\n\
+                 1. Opt-out list (data/agent-team/optout.json)\n\
+                 2. 30-day no-repeat rule (check sent_log)\n\
+                 3. CAN-SPAM Act compliance\n\
+                 4. Domain blacklist\n\n\
+                 For each email, mark:\n\
+                 ✅ CLEAR — safe to send\n\
+                 ❌ BLOCKED — [reason]\n\n\
+                 Only CLEAR emails proceed to sending."
+            )
+            .with_timeout(120),
+    )
+    .add_step(WorkflowStep::new(
+        "send-report",
+        "mercury",
+        StepType::Transform {
+            template: "## 📧 Outreach Batch Ready\n\n\
+                {{input}}\n\n\
+                ---\n\
+                ⛔ Limits: <20 emails/day | <100 words | 90s cooldown\n\
+                📋 CAN-SPAM compliant | Opt-out checked\n\
+                🤖 Generated by Mercury (Sales Agent)\n\
+                ⚠️ Positive replies will be escalated to Max immediately"
+                .to_string(),
+        },
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1147,7 +1606,7 @@ mod tests {
     #[test]
     fn test_builtin_workflows_count() {
         let workflows = builtin_workflows();
-        assert_eq!(workflows.len(), 17);
+        assert_eq!(workflows.len(), 23);
     }
 
     #[test]
