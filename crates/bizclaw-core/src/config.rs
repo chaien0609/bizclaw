@@ -336,10 +336,20 @@ pub struct AutonomyConfig {
     pub allowed_commands: Vec<String>,
     #[serde(default = "default_forbidden_paths")]
     pub forbidden_paths: Vec<String>,
+    /// Tools that require human approval before execution (enterprise).
+    /// Example: ["shell", "http_request", "execute_code"]
+    #[serde(default)]
+    pub approval_required_tools: Vec<String>,
+    /// Auto-deny approval after this many seconds (0 = never, default 300).
+    #[serde(default = "default_approval_timeout")]
+    pub auto_approve_timeout_secs: u64,
 }
 
 fn default_autonomy_level() -> String {
     "supervised".into()
+}
+fn default_approval_timeout() -> u64 {
+    300
 }
 fn default_allowed_commands() -> Vec<String> {
     vec!["git", "npm", "cargo", "ls", "cat", "grep"]
@@ -363,6 +373,8 @@ impl Default for AutonomyConfig {
             workspace_only: true,
             allowed_commands: default_allowed_commands(),
             forbidden_paths: default_forbidden_paths(),
+            approval_required_tools: vec![],
+            auto_approve_timeout_secs: default_approval_timeout(),
         }
     }
 }

@@ -21,6 +21,7 @@ pub mod loop_detector;
 pub mod model_router;
 pub mod orchestrator;
 pub mod proactive;
+pub mod progress;
 pub mod stealth_browser;
 
 use bizclaw_core::config::BizClawConfig;

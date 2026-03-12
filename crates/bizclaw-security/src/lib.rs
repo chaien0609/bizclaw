@@ -2,9 +2,11 @@
 //! Security policies, sandboxing, and secrets encryption.
 
 pub mod allowlist;
+pub mod approval;
 pub mod injection;
 pub mod sandbox;
 pub mod secrets;
+pub mod vault;
 
 use async_trait::async_trait;
 use bizclaw_core::config::AutonomyConfig;

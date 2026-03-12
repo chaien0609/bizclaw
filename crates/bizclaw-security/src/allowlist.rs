@@ -106,6 +106,8 @@ mod tests {
             allowed_commands: commands.iter().map(|s| s.to_string()).collect(),
             forbidden_paths: paths.iter().map(|s| s.to_string()).collect(),
             workspace_only: false,
+            approval_required_tools: vec![],
+            auto_approve_timeout_secs: 300,
         }
     }
 

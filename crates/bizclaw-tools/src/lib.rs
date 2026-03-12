@@ -27,6 +27,7 @@
 pub mod browser;
 pub mod byterover;
 pub mod calendar;
+pub mod custom_tool;
 pub mod config_manager;
 pub mod document_reader;
 pub mod edit_file;
@@ -104,6 +105,21 @@ impl ToolRegistry {
         )));
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         reg
+    }
+
+    /// Register the custom_tool manager for agent self-extending tools.
+    pub fn register_custom_tools(&mut self, workspace_dir: std::path::PathBuf) {
+        // Register the manager tool (create/list/delete/execute)
+        self.register(Box::new(custom_tool::CustomToolManager::new(
+            workspace_dir.clone(),
+        )));
+        // Load existing custom tools from disk
+        let tools = custom_tool::load_custom_tools(&workspace_dir);
+        let count = tools.len();
+        self.register_many(tools);
+        if count > 0 {
+            tracing::info!("🛠️ Loaded {count} custom tool(s) from disk");
+        }
     }
 
     /// Register ByteRover Context Tree tools.
