@@ -67,7 +67,7 @@ async fn dashboard_page() -> axum::response::Response {
         .header("Cache-Control", "no-store, no-cache, must-revalidate")
         .header("Pragma", "no-cache")
         .body(axum::body::Body::from(super::dashboard::dashboard_v2_html()))
-        .unwrap()
+        .expect("static response")
 }
 
 /// Serve the LEGACY monolithic dashboard at /legacy.
@@ -77,7 +77,7 @@ async fn legacy_dashboard_page() -> axum::response::Response {
         .header("Cache-Control", "no-store, no-cache, must-revalidate")
         .header("Pragma", "no-cache")
         .body(axum::body::Body::from(super::dashboard::dashboard_html()))
-        .unwrap()
+        .expect("static response")
 }
 
 /// Serve embedded dashboard static files (/static/dashboard/*).
@@ -95,12 +95,12 @@ async fn dashboard_static(
             .header("Cache-Control", "no-store, no-cache, must-revalidate")
             .header("Pragma", "no-cache")
             .body(axum::body::Body::from(*content))
-            .unwrap()
+            .expect("static response")
     } else {
         axum::response::Response::builder()
             .status(axum::http::StatusCode::NOT_FOUND)
             .body(axum::body::Body::from("Not Found"))
-            .unwrap()
+            .expect("404 response")
     }
 }
 
@@ -209,7 +209,7 @@ async fn require_auth(
                     .body(axum::body::Body::from(
                         serde_json::json!({"ok": false, "error": "Too many failed attempts. Try again in 60 seconds."}).to_string()
                     ))
-                    .unwrap();
+                    .expect("429 response");
             }
         }
     }
@@ -235,7 +235,7 @@ async fn require_auth(
         .body(axum::body::Body::from(
             serde_json::json!({"ok": false, "error": "Unauthorized — invalid or missing JWT token"}).to_string()
         ))
-        .unwrap()
+        .expect("401 response")
 }
 
 /// Rate-limiting middleware for public endpoints.
@@ -279,7 +279,7 @@ async fn rate_limit(
                 .body(axum::body::Body::from(
                     serde_json::json!({"ok": false, "error": "Rate limit exceeded. Max 60 requests per minute."}).to_string()
                 ))
-                .unwrap();
+                .expect("429 response");
         }
     }
 
@@ -395,13 +395,13 @@ async fn require_role_admin(
             .body(axum::body::Body::from(
                 serde_json::json!({"ok": false, "error": "Forbidden — admin role required", "required_role": "admin", "your_role": user.role_str}).to_string()
             ))
-            .unwrap();
+            .expect("403 response");
     }
     // No auth user injected — shouldn't happen if require_auth ran first
     axum::response::Response::builder()
         .status(axum::http::StatusCode::UNAUTHORIZED)
         .body(axum::body::Body::from("Unauthorized"))
-        .unwrap()
+        .expect("401 response")
 }
 
 /// RBAC middleware — require Manager or higher role.
@@ -421,39 +421,45 @@ async fn require_role_manager(
             .body(axum::body::Body::from(
                 serde_json::json!({"ok": false, "error": "Forbidden — manager role required", "required_role": "manager", "your_role": user.role_str}).to_string()
             ))
-            .unwrap();
+            .expect("403 response");
     }
     axum::response::Response::builder()
         .status(axum::http::StatusCode::UNAUTHORIZED)
         .body(axum::body::Body::from("Unauthorized"))
-        .unwrap()
+        .expect("401 response")
 }
 
-/// Security headers middleware — CSP, HSTS, XSS protection.
+/// Security headers middleware — CSP, HSTS, XSS protection, Permissions-Policy.
 async fn security_headers(
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     let mut response = next.run(req).await;
     let headers = response.headers_mut();
-    headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
-    headers.insert("X-Frame-Options", "DENY".parse().unwrap());
+    headers.insert("X-Content-Type-Options", "nosniff".parse().expect("static header"));
+    headers.insert("X-Frame-Options", "DENY".parse().expect("static header"));
     headers.insert(
         "Referrer-Policy",
-        "strict-origin-when-cross-origin".parse().unwrap(),
+        "strict-origin-when-cross-origin".parse().expect("static header"),
     );
-    headers.insert("X-XSS-Protection", "1; mode=block".parse().unwrap());
+    headers.insert("X-XSS-Protection", "1; mode=block".parse().expect("static header"));
     // HSTS — tell browsers to always use HTTPS (1 year)
     headers.insert(
         "Strict-Transport-Security",
-        "max-age=31536000; includeSubDomains".parse().unwrap(),
+        "max-age=31536000; includeSubDomains".parse().expect("static header"),
     );
     // CSP — restrict script/style sources (includes esm.sh for Preact CDN)
+    // SECURITY: removed 'unsafe-eval' — only 'unsafe-inline' kept for embedded Preact dashboard
     headers.insert("Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://esm.sh; frame-ancestors 'none'"
-        .parse().unwrap());
+        "default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://esm.sh; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        .parse().expect("static CSP header"));
+    // Permissions-Policy — restrict browser features not needed by the dashboard
+    headers.insert("Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+        .parse().expect("static header"));
     response
 }
+
 
 /// Build the Axum router with all routes.
 pub fn build_router(state: AppState) -> Router {

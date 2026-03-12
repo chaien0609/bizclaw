@@ -62,7 +62,7 @@ async fn require_auth(
         .body(axum::body::Body::from(
             serde_json::json!({"ok": false, "error": "Unauthorized — invalid or missing JWT token"}).to_string()
         ))
-        .unwrap()
+        .expect("401 response")
 }
 
 /// Admin API server.
@@ -359,20 +359,24 @@ async fn platform_security_headers(
 ) -> axum::response::Response {
     let mut response = next.run(req).await;
     let headers = response.headers_mut();
-    headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
-    headers.insert("X-Frame-Options", "SAMEORIGIN".parse().unwrap());
-    headers.insert("X-XSS-Protection", "1; mode=block".parse().unwrap());
+    headers.insert("X-Content-Type-Options", "nosniff".parse().expect("static header"));
+    headers.insert("X-Frame-Options", "SAMEORIGIN".parse().expect("static header"));
+    headers.insert("X-XSS-Protection", "1; mode=block".parse().expect("static header"));
     headers.insert(
         "Referrer-Policy",
-        "strict-origin-when-cross-origin".parse().unwrap(),
+        "strict-origin-when-cross-origin".parse().expect("static header"),
     );
     // HSTS — only when behind reverse proxy (production)
     if std::env::var("BIZCLAW_BIND_ALL").unwrap_or_default() != "1" {
         headers.insert(
             "Strict-Transport-Security",
-            "max-age=31536000; includeSubDomains".parse().unwrap(),
+            "max-age=31536000; includeSubDomains".parse().expect("static header"),
         );
     }
+    // Permissions-Policy — restrict browser features
+    headers.insert("Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        .parse().expect("static header"));
     response
 }
 
@@ -1026,7 +1030,7 @@ async fn login(
 ) -> Json<serde_json::Value> {
     // Rate limiting — max 5 attempts per email per 5 minutes
     {
-        let mut attempts = state.login_attempts.lock().unwrap();
+        let mut attempts = state.login_attempts.lock().unwrap_or_else(|p| p.into_inner());
         let now = std::time::Instant::now();
         if let Some((count, first_at)) = attempts.get(&req.email) {
             if now.duration_since(*first_at).as_secs() < 300 && *count >= 5 {

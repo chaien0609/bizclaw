@@ -1,148 +1,177 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════
-# BizClaw AI Agent Platform — One-Click Install (Standalone)
-# Usage: curl -sSL https://bizclaw.vn/install.sh | sudo bash
-# Works on: Ubuntu/Debian VPS, Raspberry Pi, any Linux with systemd
-#
-# This installs the STANDALONE (single-tenant) version.
-# For multi-tenant Cloud, see docker-compose.yml
-# ═══════════════════════════════════════════════════════════════
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  BizClaw — 1-Click Install & Deploy Script                      ║
+# ║  Self-hosted AI Agent Platform for Vietnamese Businesses         ║
+# ║  Usage: curl -fsSL https://bizclaw.vn/install.sh | bash          ║
+# ╚══════════════════════════════════════════════════════════════════╝
 
-set -e
+set -euo pipefail
 
-REPO="https://github.com/nguyenduchoai/bizclaw.git"
-INSTALL_DIR="/opt/bizclaw"
-BIN_DIR="/usr/local/bin"
-DATA_DIR="$HOME/.bizclaw"
-SERVICE_NAME="bizclaw"
+# ── Colors ─────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+BOLD='\033[1m'
 
+# ── Banner ─────────────────────────────────────────────
 echo ""
-echo "  🦀 BizClaw AI Agent — Standalone Installer"
-echo "  ════════════════════════════════════════════"
-echo ""
-
-# Check root or sudo
-if [ "$(id -u)" -ne 0 ]; then
-  echo "⚠️  Please run as root or with sudo"
-  echo "  sudo bash -c \"\$(curl -sSL https://bizclaw.vn/install.sh)\""
-  exit 1
-fi
-
-# Detect OS
-if [ -f /etc/os-release ]; then
-  . /etc/os-release
-  OS=$ID
-else
-  OS="unknown"
-fi
-
-echo "📦 OS detected: $OS ($PRETTY_NAME)"
-echo "📦 Architecture: $(uname -m)"
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║${NC}  ${BOLD}🦞 BizClaw — AI Agent Platform${NC}                  ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  ${GREEN}Self-hosted • Free • Made in Vietnam 🇻🇳${NC}        ${CYAN}║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# ── Step 1: Install dependencies ────────────────────────────
-echo "🔧 [1/5] Installing dependencies..."
-if [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
-  apt-get update -qq
-  apt-get install -y -qq git curl build-essential pkg-config libssl-dev >/dev/null 2>&1
-elif [ "$OS" = "fedora" ] || [ "$OS" = "centos" ] || [ "$OS" = "rhel" ]; then
-  dnf install -y git curl gcc make openssl-devel >/dev/null 2>&1
-else
-  echo "⚠️  Unknown OS. Please install git, curl, gcc, openssl-dev manually."
-fi
-echo "  ✅ Dependencies installed"
+# ── Pre-flight Checks ─────────────────────────────────
+info() { echo -e "${BLUE}ℹ${NC}  $1"; }
+success() { echo -e "${GREEN}✅${NC} $1"; }
+warn() { echo -e "${YELLOW}⚠${NC}  $1"; }
+error() { echo -e "${RED}❌${NC} $1"; exit 1; }
 
-# ── Step 2: Install Rust (if not present) ───────────────────
-echo "🦀 [2/5] Checking Rust toolchain..."
-if ! command -v cargo &>/dev/null; then
-  echo "  📥 Installing Rust..."
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y >/dev/null 2>&1
-  source "$HOME/.cargo/env"
-  echo "  ✅ Rust installed: $(rustc --version)"
-else
-  source "$HOME/.cargo/env" 2>/dev/null || true
-  echo "  ✅ Rust already installed: $(rustc --version)"
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        error "$1 is required but not installed. Install it first."
+    fi
+}
+
+info "Checking system requirements..."
+check_command "docker"
+check_command "docker" # docker compose is subcommand
+check_command "git"
+check_command "curl"
+success "All requirements met!"
+
+# ── Configuration ──────────────────────────────────────
+INSTALL_DIR="${BIZCLAW_DIR:-/opt/bizclaw}"
+DOMAIN="${BIZCLAW_DOMAIN:-}"
+ADMIN_EMAIL="${BIZCLAW_ADMIN_EMAIL:-admin@bizclaw.local}"
+ADMIN_PASSWORD="${BIZCLAW_ADMIN_PASSWORD:-}"
+
+echo ""
+info "Installation directory: ${BOLD}${INSTALL_DIR}${NC}"
+
+# Interactive mode if no env vars
+if [ -z "$DOMAIN" ]; then
+    echo ""
+    echo -e "${BOLD}🌐 Domain Configuration${NC}"
+    echo "  Enter your domain (e.g., bizclaw.vn)"
+    echo "  Leave empty for localhost (development mode)"
+    read -p "  Domain: " DOMAIN
+    DOMAIN="${DOMAIN:-localhost}"
 fi
 
-# ── Step 3: Clone & build ───────────────────────────────────
-echo "🔨 [3/5] Building BizClaw (this takes 2-5 minutes)..."
+if [ -z "$ADMIN_PASSWORD" ]; then
+    ADMIN_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
+    warn "Generated admin password: ${BOLD}${ADMIN_PASSWORD}${NC}"
+    echo "  ⚠  Save this password! It won't be shown again."
+fi
+
+# ── Clone & Setup ──────────────────────────────────────
+echo ""
+info "Setting up BizClaw..."
+
 if [ -d "$INSTALL_DIR" ]; then
-  cd "$INSTALL_DIR" && git pull origin master --quiet
+    warn "Directory ${INSTALL_DIR} exists. Pulling latest..."
+    cd "$INSTALL_DIR"
+    git pull origin master 2>/dev/null || true
 else
-  git clone --quiet "$REPO" "$INSTALL_DIR"
-  cd "$INSTALL_DIR"
+    info "Cloning BizClaw..."
+    git clone https://github.com/nguyenduchoai/bizclaw.git "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
 fi
 
-# Build ONLY the standalone binary (no PostgreSQL needed)
-cargo build --release --bin bizclaw 2>&1 | tail -3
-echo "  ✅ Build complete"
+# ── Generate JWT Secret ───────────────────────────────
+JWT_SECRET=$(openssl rand -hex 32)
 
-# ── Step 4: Install binary ─────────────────────────────────
-echo "📦 [4/5] Installing binary..."
-cp "$INSTALL_DIR/target/release/bizclaw" "$BIN_DIR/bizclaw"
-chmod +x "$BIN_DIR/bizclaw"
-echo "  ✅ bizclaw → $BIN_DIR/bizclaw ($(du -h $BIN_DIR/bizclaw | cut -f1))"
+# ── Create .env File ─────────────────────────────────
+cat > "$INSTALL_DIR/.env" <<EOF
+# BizClaw Environment Configuration
+# Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-# Create data directory
-mkdir -p "$DATA_DIR"
+# Domain
+BIZCLAW_DOMAIN=${DOMAIN}
+BIZCLAW_BIND_ALL=1
 
-# Run init wizard if no config exists
-if [ ! -f "$DATA_DIR/config.toml" ]; then
-  echo ""
-  echo "  📝 Running setup wizard..."
-  "$BIN_DIR/bizclaw" init || true
-fi
+# Authentication
+JWT_SECRET=${JWT_SECRET}
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-# ── Step 5: Setup systemd service ───────────────────────────
-echo "🚀 [5/5] Setting up systemd service..."
+# Platform
+BASE_PORT=9001
+RUST_LOG=info
 
-cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
-[Unit]
-Description=BizClaw AI Agent (Standalone)
-After=network.target
+# Nginx
+NGINX_CONTAINER_NAME=bizclaw-nginx
+NGINX_UPSTREAM_HOST=bizclaw
 
-[Service]
-Type=simple
-User=root
-ExecStart=${BIN_DIR}/bizclaw serve --port 3000
-Restart=always
-RestartSec=5
-Environment=RUST_LOG=info
-Environment=BIZCLAW_CONFIG=${DATA_DIR}/config.toml
-
-[Install]
-WantedBy=multi-user.target
+# Optional: PostgreSQL for Enterprise features
+# DATABASE_URL=postgres://bizclaw:pass@db:5432/bizclaw_platform
 EOF
 
-systemctl daemon-reload
-systemctl enable "${SERVICE_NAME}" >/dev/null 2>&1
-systemctl restart "${SERVICE_NAME}"
-sleep 2
+success "Configuration saved to ${INSTALL_DIR}/.env"
 
-# ── Done! ───────────────────────────────────────────────────
-SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+# ── Docker Compose ────────────────────────────────────
+echo ""
+info "Building and starting BizClaw..."
 
+if [ -f "docker-compose.prod.yml" ]; then
+    docker compose -f docker-compose.prod.yml up -d --build
+elif [ -f "docker-compose.yml" ]; then
+    docker compose up -d --build
+else
+    error "No docker-compose file found in ${INSTALL_DIR}"
+fi
+
+# ── Wait for Health Check ─────────────────────────────
 echo ""
-echo "  ╔═══════════════════════════════════════════════════════╗"
-echo "  ║  🎉  BizClaw installed successfully!                  ║"
-echo "  ╠═══════════════════════════════════════════════════════╣"
-echo "  ║                                                       ║"
-echo "  ║  Dashboard:  http://${SERVER_IP}:3000                 ║"
-echo "  ║  CLI Chat:   bizclaw chat                             ║"
-echo "  ║  CLI Info:   bizclaw info                             ║"
-echo "  ║                                                       ║"
-echo "  ║  Status:     systemctl status ${SERVICE_NAME}         ║"
-echo "  ║  Logs:       journalctl -u ${SERVICE_NAME} -f         ║"
-echo "  ║  Config:     ${DATA_DIR}/config.toml                  ║"
-echo "  ║                                                       ║"
-echo "  ╚═══════════════════════════════════════════════════════╝"
+info "Waiting for BizClaw to start..."
+MAX_WAIT=60
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if curl -s "http://localhost:9000/health" | grep -q '"status":"ok"' 2>/dev/null; then
+        break
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+    echo -n "."
+done
 echo ""
-echo "  💡 Next steps:"
-echo "     1. Open the dashboard: http://${SERVER_IP}:3000"
-echo "     2. Configure your AI provider in the dashboard"
-echo "     3. Start chatting: bizclaw chat"
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    warn "BizClaw is still starting... Check logs: docker compose logs -f"
+else
+    success "BizClaw is running!"
+fi
+
+# ── Print Summary ─────────────────────────────────────
 echo ""
-echo "  📱 Optional — add Ollama for free local AI:"
-echo "     curl -fsSL https://ollama.ai/install.sh | sh"
-echo "     ollama pull qwen3:0.6b   # ~500MB, good for Pi"
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║${NC}  ${BOLD}🎉 BizClaw Installed Successfully!${NC}              ${CYAN}║${NC}"
+echo -e "${CYAN}╠══════════════════════════════════════════════════╣${NC}"
+if [ "$DOMAIN" = "localhost" ]; then
+echo -e "${CYAN}║${NC}  Dashboard:  ${GREEN}http://localhost:9000${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  Platform:   ${GREEN}http://localhost:8888${NC}               ${CYAN}║${NC}"
+else
+echo -e "${CYAN}║${NC}  Dashboard:  ${GREEN}https://${DOMAIN}${NC}                   ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  Platform:   ${GREEN}https://apps.${DOMAIN}${NC}              ${CYAN}║${NC}"
+fi
+echo -e "${CYAN}║${NC}                                                  ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  ${BOLD}Login Credentials:${NC}                              ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  Email:     ${YELLOW}${ADMIN_EMAIL}${NC}                      ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  Password:  ${YELLOW}${ADMIN_PASSWORD}${NC}                   ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}                                                  ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  ${BOLD}Quick Start:${NC}                                    ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  1. Login to Platform                            ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  2. Add an AI Provider (OpenAI, Gemini, etc.)    ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  3. Create your first Agent                      ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  4. Connect Zalo/Telegram channels               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  5. Start chatting with your AI!                  ${CYAN}║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "  📖 Docs: ${BLUE}https://github.com/nguyenduchoai/bizclaw${NC}"
+echo -e "  🐛 Issues: ${BLUE}https://github.com/nguyenduchoai/bizclaw/issues${NC}"
+echo -e "  ⭐ Star us: ${BLUE}https://github.com/nguyenduchoai/bizclaw${NC}"
 echo ""
