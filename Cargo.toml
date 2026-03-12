@@ -88,7 +88,7 @@ async-imap = { version = "0.11", default-features = false, features = ["runtime-
 native-tls = "0.2"
 mail-parser = "0.9"
 # Database abstraction
-sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json", "uuid", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres", "mysql", "sqlite", "any", "chrono", "json", "uuid", "migrate"] }
 # PDF processing for RAG
 pdf_oxide = "0.3"
 

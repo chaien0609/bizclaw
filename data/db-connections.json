@@ -1,0 +1,40 @@
+{
+  "connections": [
+    {
+      "id": "bizclaw_pg",
+      "db_type": "postgres",
+      "connection_string": "vault://db_bizclaw_pg_uri",
+      "read_only": true,
+      "max_rows": 500,
+      "timeout_secs": 15,
+      "description": "BizClaw PostgreSQL — platform data (read-only)",
+      "sensitive_columns": ["password_hash", "api_key", "secret"],
+      "allowed_tables": [],
+      "enabled": true
+    },
+    {
+      "id": "app_mysql",
+      "db_type": "mysql",
+      "connection_string": "vault://db_app_mysql_uri",
+      "read_only": true,
+      "max_rows": 200,
+      "timeout_secs": 10,
+      "description": "App MySQL — customer data (read-only)",
+      "sensitive_columns": ["password", "card_number", "ssn", "phone"],
+      "allowed_tables": ["customers", "orders", "products", "categories"],
+      "enabled": false
+    },
+    {
+      "id": "local_sqlite",
+      "db_type": "sqlite",
+      "connection_string": "sqlite:///tmp/bizclaw_analytics.db",
+      "read_only": true,
+      "max_rows": 1000,
+      "timeout_secs": 5,
+      "description": "Local SQLite — analytics & logs",
+      "sensitive_columns": [],
+      "allowed_tables": [],
+      "enabled": false
+    }
+  ]
+}

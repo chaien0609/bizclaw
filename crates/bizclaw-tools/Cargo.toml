@@ -22,7 +22,9 @@ pdf-extract = "0.10.0"
 zip = "8.1.0"
 calamine = "0.33.0"
 regex = "1.12.3"
+sqlx = { workspace = true, features = ["any"] }
 uuid = { version = "1", features = ["v4"] }
 rusqlite.workspace = true
 dirs.workspace = true
 bizclaw-db.workspace = true
+bizclaw-security.workspace = true

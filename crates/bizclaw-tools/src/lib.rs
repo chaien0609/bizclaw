@@ -29,6 +29,9 @@ pub mod byterover;
 pub mod calendar;
 pub mod custom_tool;
 pub mod config_manager;
+pub mod db_connection;
+pub mod db_query;
+pub mod db_safety;
 pub mod document_reader;
 pub mod edit_file;
 pub mod execute_code;
@@ -103,6 +106,7 @@ impl ToolRegistry {
         reg.register(Box::new(calendar::CalendarTool::new(
             calendar::CalendarConfig::default(),
         )));
+        reg.register(Box::new(db_query::DbQueryTool::new()));
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         reg
     }
