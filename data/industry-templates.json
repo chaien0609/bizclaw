@@ -169,6 +169,124 @@
         "Doanh thu hoa hồng tổng cộng Q1?",
         "Lead nào chưa được chăm quá 3 ngày?"
       ]
+    },
+    {
+      "id": "healthcare",
+      "name": "Phòng khám / Clinic",
+      "description": "Quản lý lịch hẹn, bệnh nhân, dịch vụ cho phòng khám, nha khoa, thẩm mỹ viện",
+      "icon": "🏥",
+      "db_connections": [
+        {
+          "id": "clinic_main",
+          "db_type": "mysql",
+          "description": "Database phòng khám",
+          "connection_string": "mysql://user:pass@localhost/clinic_db",
+          "allowed_tables": ["patients", "appointments", "services", "doctors", "treatments", "invoices", "rooms"],
+          "sensitive_columns": ["phone", "email", "cccd", "address", "medical_history", "diagnosis"],
+          "max_rows": 200,
+          "enabled": true
+        }
+      ],
+      "api_endpoints": [
+        {
+          "id": "create_appointment",
+          "url": "https://api.myclinic.vn/appointments",
+          "method": "POST",
+          "description": "Đặt lịch hẹn khám",
+          "allowed_fields": ["patient_name", "phone", "service_id", "doctor_id", "datetime", "note"],
+          "dangerous": false
+        },
+        {
+          "id": "send_reminder",
+          "url": "https://api.myclinic.vn/reminders",
+          "method": "POST",
+          "description": "Gửi nhắc lịch hẹn cho bệnh nhân",
+          "allowed_fields": ["appointment_id", "channel", "message"],
+          "dangerous": false
+        }
+      ],
+      "agents": [
+        {
+          "name": "Lễ tân AI",
+          "persona": "Lễ tân phòng khám thân thiện, tư vấn dịch vụ và đặt lịch",
+          "system_prompt": "Bạn là lễ tân AI cho phòng khám. Khi khách hỏi:\n1. Dùng db_query query bảng services để tư vấn giá dịch vụ\n2. Kiểm tra lịch trống bác sĩ (bảng appointments + doctors)\n3. Đặt lịch hẹn qua api_connector 'create_appointment'\n4. Gửi xác nhận qua Zalo/Telegram\nLƯU Ý: Không bao giờ tiết lộ thông tin bệnh án của bệnh nhân khác.",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["zalo", "telegram"]
+        },
+        {
+          "name": "Nhắc lịch tự động",
+          "persona": "Hệ thống nhắc lịch hẹn thông minh",
+          "system_prompt": "Bạn là AI nhắc lịch hẹn. Mỗi sáng 7h:\n1. Query lịch hẹn trong ngày (bảng appointments)\n2. Gửi nhắc nhở cho bệnh nhân trước 2 tiếng\n3. Gửi danh sách lịch hẹn cho bác sĩ\n4. Cảnh báo nếu có ca hủy hoặc dời lịch",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["telegram", "zalo"]
+        }
+      ],
+      "sample_queries": [
+        "Hôm nay bác sĩ Nguyễn còn lịch trống lúc mấy giờ?",
+        "Dịch vụ tẩy trắng răng giá bao nhiêu?",
+        "Tháng này phòng khám có bao nhiêu bệnh nhân mới?",
+        "Doanh thu tuần này so với tuần trước?",
+        "Dịch vụ nào được đặt nhiều nhất?"
+      ]
+    },
+    {
+      "id": "education",
+      "name": "Giáo dục / Đào tạo",
+      "description": "Quản lý học viên, lớp học, học phí cho trung tâm đào tạo, ngoại ngữ, STEM",
+      "icon": "🎓",
+      "db_connections": [
+        {
+          "id": "edu_main",
+          "db_type": "mysql",
+          "description": "Database trung tâm đào tạo",
+          "connection_string": "mysql://user:pass@localhost/edu_db",
+          "allowed_tables": ["students", "classes", "courses", "enrollments", "payments", "teachers", "schedules", "rooms"],
+          "sensitive_columns": ["phone", "email", "parent_phone", "address", "cccd"],
+          "max_rows": 500,
+          "enabled": true
+        }
+      ],
+      "api_endpoints": [
+        {
+          "id": "create_enrollment",
+          "url": "https://api.myedu.vn/enrollments",
+          "method": "POST",
+          "description": "Đăng ký học viên vào khóa học",
+          "allowed_fields": ["student_name", "phone", "course_id", "class_id", "note"],
+          "dangerous": false
+        },
+        {
+          "id": "send_attendance_report",
+          "url": "https://api.myedu.vn/reports/attendance",
+          "method": "POST",
+          "description": "Gửi báo cáo điểm danh cho phụ huynh",
+          "allowed_fields": ["student_id", "class_id", "date", "status", "channel"],
+          "dangerous": false
+        }
+      ],
+      "agents": [
+        {
+          "name": "Tư vấn tuyển sinh",
+          "persona": "Chuyên viên tư vấn thân thiện, am hiểu chương trình đào tạo",
+          "system_prompt": "Bạn là tư vấn viên AI cho trung tâm đào tạo. Khi phụ huynh/học viên hỏi:\n1. Dùng db_query query bảng courses, classes để tư vấn lịch học, học phí\n2. Kiểm tra lớp còn chỗ trống không (bảng enrollments)\n3. Tư vấn khóa phù hợp theo trình độ, ngân sách\n4. Đăng ký qua api_connector 'create_enrollment'\nHoạt bát, nhiệt tình, dùng emoji phù hợp.",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["zalo", "telegram"]
+        },
+        {
+          "name": "Báo cáo đào tạo",
+          "persona": "Hệ thống phân tích dữ liệu giáo dục",
+          "system_prompt": "Bạn là AI báo cáo cho trung tâm đào tạo. Tasks:\n1. Hàng tuần: Tổng hợp tỷ lệ đi học, bỏ học theo lớp\n2. Mỗi tháng: Doanh thu học phí, so sánh tháng trước\n3. Gợi ý lớp cần mở thêm dựa trên demand\n4. Cảnh báo học viên vắng nhiều (>3 buổi)",
+          "tools": ["db_schema", "db_query"],
+          "channels": ["telegram"]
+        }
+      ],
+      "sample_queries": [
+        "Khóa IELTS bắt đầu khi nào? Học phí bao nhiêu?",
+        "Lớp A1 còn bao nhiêu chỗ trống?",
+        "Học viên nào vắng nhiều nhất tháng này?",
+        "Doanh thu học phí tháng này so với tháng trước?",
+        "Khóa học nào có tỷ lệ hoàn thành cao nhất?"
+      ]
     }
   ]
 }

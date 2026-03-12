@@ -1032,7 +1032,8 @@ pub async fn webhook_inbound(
     let json: serde_json::Value = match serde_json::from_str(&body) {
         Ok(v) => v,
         Err(e) => {
-            return Json(serde_json::json!({"ok": false, "error": format!("Invalid JSON: {e}")}));
+            tracing::warn!("[security] Invalid JSON from client: {e}");
+            return Json(serde_json::json!({"ok": false, "error": "Invalid JSON format"}));
         }
     };
     let content = json["content"].as_str().unwrap_or("").to_string();
@@ -1453,7 +1454,7 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> Json<serde_js
                 .collect();
             Json(serde_json::json!({ "providers": provider_json }))
         }
-        Err(e) => Json(serde_json::json!({ "ok": false, "error": format!("DB error: {e}") })),
+        Err(e) => internal_error("list_providers", e),
     }
 }
 
@@ -1556,8 +1557,9 @@ pub async fn fetch_provider_models(
     let provider = match state.db.get_provider(&name) {
         Ok(p) => p,
         Err(e) => {
+            tracing::warn!("[security] Provider lookup failed for '{}': {e}", name);
             return Json(
-                serde_json::json!({"ok": false, "error": format!("Provider not found: {e}")}),
+                serde_json::json!({"ok": false, "error": "Provider not found or unavailable"}),
             );
         }
     };
@@ -1822,7 +1824,8 @@ pub async fn ollama_models() -> Json<serde_json::Value> {
             }
         }
         Err(e) => {
-            Json(serde_json::json!({"ok": false, "error": format!("Ollama not running: {e}")}))
+            tracing::warn!("[security] Ollama connection failed: {e}");
+            Json(serde_json::json!({"ok": false, "error": "Local AI service is not running or unreachable"}))
         }
     }
 }
@@ -3067,8 +3070,9 @@ pub async fn connect_telegram(
     let bot_info = match tg.get_me().await {
         Ok(me) => me,
         Err(e) => {
+            tracing::warn!("[security] Telegram bot token verification failed: {e}");
             return Json(
-                serde_json::json!({"ok": false, "error": format!("Invalid bot token: {e}")}),
+                serde_json::json!({"ok": false, "error": "Invalid bot token — please check and try again"}),
             );
         }
     };
@@ -3334,7 +3338,8 @@ Output ONLY valid JSON, no markdown fences."#
         Some(agent) => match agent.process(&prompt).await {
             Ok(r) => r,
             Err(e) => {
-                return Json(serde_json::json!({"ok": false, "error": format!("AI error: {e}")}));
+                tracing::error!("[security] Agent processing error: {e}");
+                return Json(serde_json::json!({"ok": false, "error": "AI processing error — please try again"}));
             }
         },
         None => {
@@ -4368,8 +4373,9 @@ pub async fn xiaozhi_webhook(
     let req: bizclaw_channels::xiaozhi::XiaozhiRequest = match serde_json::from_str(&body) {
         Ok(r) => r,
         Err(e) => {
+            tracing::warn!("[security] Invalid Xiaozhi request format: {e}");
             return Json(
-                serde_json::json!({"ok": false, "error": format!("Invalid request: {e}")}),
+                serde_json::json!({"ok": false, "error": "Invalid request format"}),
             );
         }
     };
