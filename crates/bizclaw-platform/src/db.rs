@@ -722,13 +722,15 @@ impl PlatformDb {
         enabled: bool,
         config_json: &str,
     ) -> Result<TenantChannel> {
+        // instance_id defaults to empty for single-instance channels
+        let instance_id = "";
         let id = format!("{}-{}", tenant_id, channel_type);
         self.conn.execute(
-            "INSERT INTO tenant_channels (id, tenant_id, channel_type, enabled, config_json, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
-             ON CONFLICT(tenant_id, channel_type) DO UPDATE SET
-               enabled = ?4, config_json = ?5, updated_at = datetime('now')",
-            params![id, tenant_id, channel_type, enabled as i32, config_json],
+            "INSERT INTO tenant_channels (id, tenant_id, channel_type, instance_id, enabled, config_json, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
+             ON CONFLICT(tenant_id, channel_type, instance_id) DO UPDATE SET
+               enabled = ?5, config_json = ?6, updated_at = datetime('now')",
+            params![id, tenant_id, channel_type, instance_id, enabled as i32, config_json],
         ).map_err(|e| BizClawError::Memory(format!("Upsert channel: {e}")))?;
         self.get_channel(&id)
     }

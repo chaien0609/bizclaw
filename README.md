@@ -13,7 +13,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-100%25-orange?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-403%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-199%2B%20passing-brightgreen)]()
 [![Version](https://img.shields.io/badge/version-v1.0.0-purple)]()
 [![Website](https://img.shields.io/badge/🌐_Website-bizclaw.vn-blue)](https://bizclaw.vn)
 [![Facebook](https://img.shields.io/badge/📘_Fanpage-bizclaw.vn-1877F2?logo=facebook)](https://www.facebook.com/bizclaw.vn)
@@ -97,7 +97,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 |----------|----------|
 | **🔌 18 Providers** | OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, MiniMax, xAI (Grok), Mistral, BytePlus ModelArk, Cohere, Perplexity, DashScope/Qwen, Ollama, llama.cpp, Brain Engine, CLIProxy, vLLM |
 | **💬 10 Channels** | CLI, Telegram, Discord, Email (IMAP/SMTP), Webhook, WhatsApp, Zalo (Personal + OA), **🎙️ Xiaozhi ESP32 Voice** |
-| **🛠️ 13 Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, Calendar, Doc Reader |
+| **🛠️ 14+ Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, Calendar, Doc Reader, **Custom Tool** (agent self-creates) |
 | **🔗 MCP** | Model Context Protocol — kết nối MCP servers bên ngoài, mở rộng tools không giới hạn |
 | **🧠 Brain Engine** | GGUF inference offline: mmap, quantization, Flash Attention, SIMD (ARM NEON, x86 AVX2) |
 | **🤖 Multi-Agent** | Tạo nhiều agent với vai trò khác nhau, gán vào kênh. Orchestrator quản lý N agents |
@@ -108,7 +108,11 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **🎨 51 Agent Templates** | Gallery 13 danh mục nghiệp vụ: HR, Sales, Finance, Marketing, Legal, IT... cài 1 click |
 | **🌐 Web Dashboard** | 20+ trang UI (VI/EN), modular lazy-loading, WebSocket real-time, Full CRUD, Dark/Light mode |
 | **🎙️ Xiaozhi Voice** | Kết nối ESP32 Xiaozhi (~$5) làm AI Assistant vật lý. Voice → Agent → Voice. OpenAI-compatible API + Webhook. $0/tháng |
-| **🔒 Bảo mật** | AES-256 API key encryption, RBAC 4-tier (Admin/Manager/User/Viewer), Audit Trail, Per-IP rate limiting, HMAC-SHA256, Command allowlist, Runtime sandbox |
+| **🔐 Vault** | Secret Vault (`vault://`) — mã hóa API keys at rest với AES-256-CBC. Config dùng `vault://key_name` → auto-resolve. CLI: `bizclaw vault set/get/list` |
+| **✅ Approval Gates** | Human-in-the-loop cho tools nhạy cảm (shell, http_request, execute_code). Submit → Approve/Deny/Expire. Enterprise compliance |
+| **🛠️ Custom Tools** | Agent tự tạo tools (bash/python/node) cho task lặp lại. Hot-reload, sandboxed execution (env_clear), dangerous pattern validation |
+| **📊 Progress Updates** | Mid-task status messaging — user thấy "🔍 Searching..." thay vì im lặng. ProgressSender trait cho channels |
+| **🔒 Bảo mật** | AES-256 API key encryption, Vault URI scheme, RBAC 4-tier (Admin/Manager/User/Viewer), Prompt Injection Scanner (8 patterns, 80+ keywords, EN/VI/CN/JP/KR), SSRF Protection (IPv4+IPv6), Audit Trail, Per-IP rate limiting, HMAC-SHA256, Command allowlist, Runtime sandbox, Docker non-root user |
 | **🖥️ Desktop App** | macOS (.dmg), Windows (.exe), Linux (.deb) — 13MB, auto-open browser, zero config |
 | **☁️ Cloud Platform** | Multi-tenant SaaS, PaaS remote nodes, JWT SSO, PostgreSQL, Nginx auto-config |
 | **🔑 JWT SSO** | Đăng nhập 1 lần từ Platform → vào thẳng mọi tenant dashboard, không cần pairing code |
@@ -414,10 +418,10 @@ BizClaw Platform được thiết kế với kiến trúc **Process-level Isolat
 | `bizclaw-providers` | 18 LLM providers | ✅ |
 | `bizclaw-channels` | 10 channel types (incl. Zalo OA, Xiaozhi Voice) | ✅ |
 | `bizclaw-memory` | SQLite + FTS5, Brain workspace | ✅ |
-| `bizclaw-tools` | 13 native tools + MCP bridge | ✅ |
+| `bizclaw-tools` | 14+ native tools + Custom Tool authoring + MCP bridge | ✅ |
 | `bizclaw-mcp` | MCP client (JSON-RPC 2.0) | ✅ |
-| `bizclaw-security` | AES-256, Sandbox, Allowlists | ✅ |
-| `bizclaw-agent` | Think-Act-Observe loop, Circuit Breaker, Model Router, Stealth Browser | ✅ |
+| `bizclaw-security` | Secret Vault (`vault://`), Approval Gates, AES-256-CBC, Prompt Injection Scanner, SSRF Protection, Sandbox, Allowlists | ✅ |
+| `bizclaw-agent` | Think-Act-Observe loop, Progress Updates, Circuit Breaker, Model Router, Stealth Browser | ✅ |
 | `bizclaw-gateway` | HTTP + WS + Dashboard (20+ pages) | ✅ |
 | `bizclaw-knowledge` | Knowledge RAG (FTS5 + Vector) | ✅ |
 | `bizclaw-scheduler` | Scheduled tasks + Retry + Notifications | ✅ |
@@ -493,14 +497,14 @@ llm:
 |--------|-------|
 | **Language** | 100% Rust + Kotlin (Android) |
 | **Crates** | 19 |
-| **Lines of Code** | ~57,000+ |
-| **Tests** | 403 passing |
+| **Lines of Code** | ~58,000+ |
+| **Tests** | 199+ passing |
 | **Workflow Templates** | 17 |
 | **Binary Size** | bizclaw ~12MB |
 | **Dashboard Pages** | 20+ (27 lazy-loaded modules) |
 | **Agent Templates** | 51 |
-| **Security** | RBAC, AES-256, Audit Trail, Prometheus |
-| **Last Updated** | 2026-03-11 |
+| **Security** | Vault, Approval Gates, Prompt Injection Scanner, RBAC, AES-256-CBC, SSRF Protection, Audit Trail, Prometheus |
+| **Last Updated** | 2026-03-12 |
 
 ---
 
@@ -524,16 +528,19 @@ cd bizclaw && cargo build --release
 
 - **16 AI Providers** — OpenAI, Anthropic, Gemini, DeepSeek, Groq, Ollama, and more
 - **10 Channels** — CLI, Telegram, Discord, Email, Webhook, WhatsApp, Zalo (Personal + OA), Xiaozhi ESP32 Voice
-- **13 Tools** + MCP support for unlimited extensions
+- **14+ Tools** + Custom Tool authoring (agent self-creates tools) + MCP support for unlimited extensions
+- **Secret Vault** — `vault://` URI scheme for encrypted API key storage. AES-256-CBC at rest
+- **Approval Gates** — Human-in-the-loop for sensitive tool actions (enterprise compliance)
+- **Progress Updates** — Mid-task status messaging so users see what the agent is doing
 - **Multi-Agent** — Create teams of agents with different roles, assign to channels
 - **Autonomous Hands** — Background agents that run 24/7: Research, Content, Analytics, Monitoring, Security
-- **Workflows** — 17 pre-built multi-step AI pipelines: Content, Research, Meeting Recap, CEO Briefing, Competitor Analysis, Proposal, Weekly Report, Slide Creator, Email Drip, Hiring, Feedback, Contract, Product Launch
+- **Workflows** — 17 pre-built multi-step AI pipelines
 - **51 Agent Templates** — Pre-built for HR, Sales, Finance, Marketing, Legal, IT
 - **Knowledge RAG** — Hybrid FTS5 + Vector search. Upload docs, AI answers from your content
-- **Scheduler** — Cron, interval, one-time tasks with retry and multi-channel notification (Telegram, Zalo OA, Email)
+- **Scheduler** — Cron, interval, one-time tasks with retry and multi-channel notification
 - **20+ Dashboard Pages** — Full CRUD UI with VI/EN, WebSocket real-time, Dark/Light mode
 - **Android Agent** — On-device LLM with 20 device tools, runs 100% offline
-- **Enterprise Security** — AES-256 encrypted API keys, RBAC 4-tier access control, audit trail, per-IP rate limiting, Prometheus monitoring, backup/restore
+- **Enterprise Security** — Secret Vault, Approval Gates, Prompt Injection Scanner (8 patterns, 80+ keywords), SSRF Protection, AES-256-CBC, RBAC 4-tier, audit trail, per-IP rate limiting, Docker non-root, Prometheus
 - **Circuit Breaker** — Auto-stops cascading failures when providers go down, with exponential backoff
 - **Model Router** — Intelligent model selection based on task complexity (Fast/Primary/Premium tiers)
 - **Stealth Browser** — Anti-detection headless Chrome with WebGL/navigator/plugin spoofing
