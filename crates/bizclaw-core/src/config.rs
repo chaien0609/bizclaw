@@ -89,6 +89,21 @@ pub struct BizClawConfig {
     /// Reasoning effort for OpenAI-compatible ("low", "medium", "high"). Empty = default.
     #[serde(default)]
     pub reasoning_effort: String,
+    /// Enterprise SSO configuration (SAML/OIDC).
+    #[serde(default)]
+    pub sso: SsoConfig,
+    /// Analytics and metrics configuration.
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
+    /// LLM fine-tuning pipeline configuration.
+    #[serde(default)]
+    pub fine_tuning: FineTuningConfig,
+    /// Edge/IoT gateway configuration.
+    #[serde(default)]
+    pub edge_gateway: EdgeGatewayConfig,
+    /// Plugin marketplace configuration.
+    #[serde(default)]
+    pub plugin_marketplace: PluginMarketplaceConfig,
 }
 
 fn default_api_key() -> String {
@@ -127,6 +142,11 @@ impl Default for BizClawConfig {
             extended_thinking: false,
             thinking_budget_tokens: 0,
             reasoning_effort: String::new(),
+            sso: SsoConfig::default(),
+            analytics: AnalyticsConfig::default(),
+            fine_tuning: FineTuningConfig::default(),
+            edge_gateway: EdgeGatewayConfig::default(),
+            plugin_marketplace: PluginMarketplaceConfig::default(),
         }
     }
 }
@@ -757,6 +777,314 @@ pub struct QualityGateConfig {
     /// Maximum revision rounds before accepting response.
     #[serde(default)]
     pub max_revisions: Option<u32>,
+}
+
+// ═══ Enterprise SSO Configuration ═══
+
+/// SSO authentication configuration (SAML 2.0 / OpenID Connect).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SsoConfig {
+    /// Enable SSO authentication.
+    #[serde(default)]
+    pub enabled: bool,
+    /// SSO provider type: "saml" or "oidc".
+    #[serde(default = "default_sso_provider")]
+    pub provider: String,
+    /// OIDC: Issuer URL (e.g. https://accounts.google.com).
+    #[serde(default)]
+    pub issuer_url: String,
+    /// OIDC: Client ID.
+    #[serde(default)]
+    pub client_id: String,
+    /// OIDC: Client Secret.
+    #[serde(default)]
+    pub client_secret: String,
+    /// OIDC: Redirect URI after authentication.
+    #[serde(default)]
+    pub redirect_uri: String,
+    /// OIDC: Scopes to request.
+    #[serde(default = "default_sso_scopes")]
+    pub scopes: Vec<String>,
+    /// SAML: IdP Metadata URL.
+    #[serde(default)]
+    pub idp_metadata_url: String,
+    /// SAML: SP Entity ID.
+    #[serde(default)]
+    pub sp_entity_id: String,
+    /// Allow local password login alongside SSO.
+    #[serde(default = "bool_true")]
+    pub allow_local_login: bool,
+    /// Auto-create users on first SSO login.
+    #[serde(default = "bool_true")]
+    pub auto_provision: bool,
+    /// Default role for auto-provisioned users.
+    #[serde(default = "default_sso_role")]
+    pub default_role: String,
+}
+
+fn default_sso_provider() -> String { "oidc".into() }
+fn default_sso_scopes() -> Vec<String> { vec!["openid".into(), "email".into(), "profile".into()] }
+fn default_sso_role() -> String { "user".into() }
+
+impl Default for SsoConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_sso_provider(),
+            issuer_url: String::new(),
+            client_id: String::new(),
+            client_secret: String::new(),
+            redirect_uri: String::new(),
+            scopes: default_sso_scopes(),
+            idp_metadata_url: String::new(),
+            sp_entity_id: String::new(),
+            allow_local_login: true,
+            auto_provision: true,
+            default_role: default_sso_role(),
+        }
+    }
+}
+
+// ═══ Analytics Configuration ═══
+
+/// Analytics and metrics tracking configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyticsConfig {
+    /// Enable analytics collection.
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    /// Data retention period in days.
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
+    /// Track token usage per conversation.
+    #[serde(default = "bool_true")]
+    pub track_tokens: bool,
+    /// Track tool usage statistics.
+    #[serde(default = "bool_true")]
+    pub track_tools: bool,
+    /// Track channel activity metrics.
+    #[serde(default = "bool_true")]
+    pub track_channels: bool,
+    /// Track response latency.
+    #[serde(default = "bool_true")]
+    pub track_latency: bool,
+    /// Export format: "json", "csv", "prometheus".
+    #[serde(default = "default_export_format")]
+    pub export_format: String,
+    /// Prometheus metrics endpoint path.
+    #[serde(default = "default_metrics_path")]
+    pub metrics_path: String,
+    /// Daily report recipients (email addresses).
+    #[serde(default)]
+    pub report_recipients: Vec<String>,
+}
+
+fn default_retention_days() -> u32 { 90 }
+fn default_export_format() -> String { "json".into() }
+fn default_metrics_path() -> String { "/metrics".into() }
+
+impl Default for AnalyticsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            retention_days: default_retention_days(),
+            track_tokens: true,
+            track_tools: true,
+            track_channels: true,
+            track_latency: true,
+            export_format: default_export_format(),
+            metrics_path: default_metrics_path(),
+            report_recipients: vec![],
+        }
+    }
+}
+
+// ═══ Fine-Tuning Pipeline Configuration ═══
+
+/// LLM fine-tuning pipeline configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FineTuningConfig {
+    /// Enable fine-tuning pipeline.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Provider for fine-tuning: "openai", "together", "fireworks".
+    #[serde(default = "default_ft_provider")]
+    pub provider: String,
+    /// API key for fine-tuning provider (if different from main).
+    #[serde(default)]
+    pub api_key: String,
+    /// Base model to fine-tune.
+    #[serde(default = "default_ft_base_model")]
+    pub base_model: String,
+    /// Training dataset path or directory.
+    #[serde(default = "default_ft_dataset_dir")]
+    pub dataset_dir: String,
+    /// Number of training epochs.
+    #[serde(default = "default_ft_epochs")]
+    pub epochs: u32,
+    /// Learning rate multiplier.
+    #[serde(default = "default_ft_lr")]
+    pub learning_rate_multiplier: f32,
+    /// Batch size.
+    #[serde(default = "default_ft_batch")]
+    pub batch_size: u32,
+    /// Auto-collect training data from conversations.
+    #[serde(default)]
+    pub auto_collect: bool,
+    /// Minimum rating to include in training data (1-5).
+    #[serde(default = "default_ft_min_rating")]
+    pub min_rating: u32,
+    /// Max training samples to collect.
+    #[serde(default = "default_ft_max_samples")]
+    pub max_samples: u32,
+}
+
+fn default_ft_provider() -> String { "openai".into() }
+fn default_ft_base_model() -> String { "gpt-4o-mini-2024-07-18".into() }
+fn default_ft_dataset_dir() -> String { "~/.bizclaw/fine-tuning/datasets".into() }
+fn default_ft_epochs() -> u32 { 3 }
+fn default_ft_lr() -> f32 { 1.8 }
+fn default_ft_batch() -> u32 { 4 }
+fn default_ft_min_rating() -> u32 { 4 }
+fn default_ft_max_samples() -> u32 { 10000 }
+
+impl Default for FineTuningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_ft_provider(),
+            api_key: String::new(),
+            base_model: default_ft_base_model(),
+            dataset_dir: default_ft_dataset_dir(),
+            epochs: default_ft_epochs(),
+            learning_rate_multiplier: default_ft_lr(),
+            batch_size: default_ft_batch(),
+            auto_collect: false,
+            min_rating: default_ft_min_rating(),
+            max_samples: default_ft_max_samples(),
+        }
+    }
+}
+
+// ═══ Edge/IoT Gateway Configuration ═══
+
+/// Edge deployment and IoT gateway configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EdgeGatewayConfig {
+    /// Enable edge gateway mode.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Edge node ID (unique per deployment).
+    #[serde(default)]
+    pub node_id: String,
+    /// MQTT broker URL (e.g. mqtt://localhost:1883).
+    #[serde(default)]
+    pub mqtt_broker: String,
+    /// MQTT topic prefix for commands.
+    #[serde(default = "default_mqtt_topic")]
+    pub mqtt_topic_prefix: String,
+    /// CoAP server port for lightweight IoT devices.
+    #[serde(default = "default_coap_port")]
+    pub coap_port: u16,
+    /// Sync interval with cloud (seconds). 0 = disabled.
+    #[serde(default = "default_sync_interval")]
+    pub sync_interval_secs: u32,
+    /// Cloud API endpoint for syncing.
+    #[serde(default)]
+    pub cloud_endpoint: String,
+    /// Offline queue capacity (messages buffered when cloud disconnected).
+    #[serde(default = "default_offline_queue")]
+    pub offline_queue_size: u32,
+    /// Supported device protocols.
+    #[serde(default = "default_protocols")]
+    pub protocols: Vec<String>,
+    /// Xiaozhi voice device integration.
+    #[serde(default)]
+    pub xiaozhi_enabled: bool,
+    /// Xiaozhi Server OTA endpoint.
+    #[serde(default)]
+    pub xiaozhi_ota_url: String,
+}
+
+fn default_mqtt_topic() -> String { "bizclaw/edge".into() }
+fn default_coap_port() -> u16 { 5683 }
+fn default_sync_interval() -> u32 { 60 }
+fn default_offline_queue() -> u32 { 1000 }
+fn default_protocols() -> Vec<String> { vec!["mqtt".into(), "http".into(), "websocket".into()] }
+
+impl Default for EdgeGatewayConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            node_id: String::new(),
+            mqtt_broker: String::new(),
+            mqtt_topic_prefix: default_mqtt_topic(),
+            coap_port: default_coap_port(),
+            sync_interval_secs: default_sync_interval(),
+            cloud_endpoint: String::new(),
+            offline_queue_size: default_offline_queue(),
+            protocols: default_protocols(),
+            xiaozhi_enabled: false,
+            xiaozhi_ota_url: String::new(),
+        }
+    }
+}
+
+// ═══ Plugin Marketplace Configuration ═══
+
+/// Plugin marketplace and extension management.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginMarketplaceConfig {
+    /// Enable plugin marketplace.
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    /// Plugin registry URL.
+    #[serde(default = "default_plugin_registry")]
+    pub registry_url: String,
+    /// Local plugin directory.
+    #[serde(default = "default_plugin_dir")]
+    pub plugin_dir: String,
+    /// Auto-update installed plugins.
+    #[serde(default)]
+    pub auto_update: bool,
+    /// Verify plugin signatures before install.
+    #[serde(default = "bool_true")]
+    pub verify_signatures: bool,
+    /// Installed plugins list.
+    #[serde(default)]
+    pub installed: Vec<PluginEntry>,
+}
+
+/// A single installed plugin.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginEntry {
+    /// Plugin ID.
+    pub id: String,
+    /// Plugin version.
+    #[serde(default)]
+    pub version: String,
+    /// Whether plugin is enabled.
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    /// Plugin-specific config (JSON).
+    #[serde(default)]
+    pub config: serde_json::Value,
+}
+
+fn default_plugin_registry() -> String { "https://plugins.bizclaw.vn/api/v1".into() }
+fn default_plugin_dir() -> String { "~/.bizclaw/plugins".into() }
+
+impl Default for PluginMarketplaceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            registry_url: default_plugin_registry(),
+            plugin_dir: default_plugin_dir(),
+            auto_update: false,
+            verify_signatures: true,
+            installed: vec![],
+        }
+    }
 }
 
 #[cfg(test)]

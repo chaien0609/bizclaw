@@ -783,6 +783,18 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/api/v1/usage", get(super::routes::get_usage))
         .route("/api/v1/usage/daily", get(super::routes::get_usage_daily))
         .route("/api/v1/usage/limits", get(super::routes::get_plan_limits))
+        // Enterprise: SSO
+        .route("/api/v1/sso/config", get(super::routes::sso_config_get).post(super::routes::sso_config_post))
+        // Enterprise: Analytics
+        .route("/api/v1/analytics", get(super::routes::analytics_metrics))
+        // Enterprise: Fine-Tuning
+        .route("/api/v1/fine-tuning/config", get(super::routes::fine_tuning_config_get))
+        .route("/api/v1/fine-tuning/datasets", get(super::routes::fine_tuning_datasets))
+        // Enterprise: Edge IoT Gateway
+        .route("/api/v1/edge/status", get(super::routes::edge_gateway_status))
+        // Enterprise: Plugin Marketplace
+        .route("/api/v1/plugins", get(super::routes::plugins_list))
+        .route("/api/v1/plugins/install", post(super::routes::plugin_install))
         // WebSocket (chat)
         .route("/ws", get(super::ws::ws_handler));
 

@@ -108,9 +108,15 @@ export const PAGES = [
   { id: 'cost', icon: '💰', label: 'Cost Tracking' },
   { id: 'activity', icon: '⚡', label: 'Activity Feed' },
   { id: 'sep3', sep: true },
+  { id: 'analytics', icon: '📈', label: 'Analytics' },
+  { id: 'plugins', icon: '🛒', label: 'Plugin Marketplace' },
+  { id: 'sso', icon: '🔐', label: 'Enterprise SSO' },
+  { id: 'finetuning', icon: '🧪', label: 'Fine-Tuning' },
+  { id: 'edgegateway', icon: '📡', label: 'Edge IoT Gateway' },
+  { id: 'sep4', sep: true },
   { id: 'apikeys', icon: '🔑', label: 'API Keys' },
   { id: 'usage', icon: '📊', label: 'Usage & Quotas' },
-  { id: 'sep4', sep: true },
+  { id: 'sep5', sep: true },
   { id: 'configfile', icon: '📄', label: 'nav.config' },
 ];
 

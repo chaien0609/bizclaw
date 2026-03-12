@@ -57,6 +57,11 @@ async function loadPage(pageId) {
     wiki:          { file: 'wiki.js',          export: 'WikiPage' },
     apikeys:       { file: 'api_keys.js',      export: 'ApiKeysPage' },
     usage:         { file: 'usage.js',         export: 'UsagePage' },
+    analytics:     { file: 'analytics.js',     export: 'AnalyticsPage' },
+    plugins:       { file: 'plugins.js',       export: 'PluginsPage' },
+    sso:           { file: 'sso.js',           export: 'SsoPage' },
+    finetuning:    { file: 'fine_tuning.js',   export: 'FineTuningPage' },
+    edgegateway:   { file: 'edge_gateway.js',  export: 'EdgeGatewayPage' },
   };
 
   const mapping = PAGE_MAP[pageId];
