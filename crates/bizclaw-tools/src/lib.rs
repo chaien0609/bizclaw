@@ -18,6 +18,7 @@
 //! | plan | Structured task decomposition |
 //! | session_context | Session self-awareness for agent |
 //! | group_summarizer | Buffer + summarize group messages |
+//! | zalo_tool | Zalo automation: groups, DMs, reports |
 //! | calendar | Google Calendar integration |
 //! | document_reader | Offline PDF/DOCX/XLSX/CSV reader |
 //! | brv_query | ByteRover Context Tree search (92% accuracy) |
@@ -50,6 +51,7 @@ pub mod registry;
 pub mod session_context;
 pub mod shell;
 pub mod web_search;
+pub mod zalo_tool;
 
 use bizclaw_core::traits::Tool;
 
@@ -112,6 +114,8 @@ impl ToolRegistry {
         reg.register(Box::new(db_schema::DbSchemaTool::new()));
         reg.register(Box::new(api_connector::ApiConnectorTool::new()));
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
+        // Zalo Power Tool
+        reg.register(Box::new(zalo_tool::ZaloTool::new()));
         reg
     }
 
