@@ -1,5 +1,5 @@
 //! # BizClaw Tools
-//! Built-in tool execution system — 19+ tools for AI agent operations.
+//! Built-in tool execution system — 20+ tools for AI agent operations.
 //!
 //! ## Tool Registry
 //! | Tool | Description |
@@ -33,6 +33,7 @@ pub mod config_manager;
 pub mod db_connection;
 pub mod db_query;
 pub mod db_safety;
+pub mod db_schema;
 pub mod document_reader;
 pub mod edit_file;
 pub mod execute_code;
@@ -108,6 +109,7 @@ impl ToolRegistry {
             calendar::CalendarConfig::default(),
         )));
         reg.register(Box::new(db_query::DbQueryTool::new()));
+        reg.register(Box::new(db_schema::DbSchemaTool::new()));
         reg.register(Box::new(api_connector::ApiConnectorTool::new()));
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         reg
