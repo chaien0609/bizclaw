@@ -5244,6 +5244,16 @@ pub async fn tools_list(State(state): State<Arc<AppState>>) -> Json<serde_json::
         serde_json::json!({"name":"config_manager","icon":"⚙️","desc":"Read/write config.toml at runtime","enabled":true,"builtin":true}),
         serde_json::json!({"name":"memory_search","icon":"🧠","desc":"Search past conversations via FTS5","enabled":true,"builtin":true}),
         serde_json::json!({"name":"doc_reader","icon":"📄","desc":"PDF, DOCX, Excel, CSV extraction","enabled":true,"builtin":true}),
+        // Zalo & Messaging tools
+        serde_json::json!({"name":"zalo_tool","icon":"💬","desc":"Zalo Personal/OA: gửi tin, đọc nhóm, kết bạn, tóm tắt","enabled":true,"builtin":true}),
+        serde_json::json!({"name":"group_summarizer","icon":"📝","desc":"Tóm tắt nội dung nhóm chat & gửi báo cáo","enabled":true,"builtin":true}),
+        // Database & API tools
+        serde_json::json!({"name":"db_query","icon":"🗄️","desc":"Execute SQL queries (SQLite, PostgreSQL, MySQL)","enabled":true,"builtin":true}),
+        serde_json::json!({"name":"db_schema","icon":"📐","desc":"Inspect database schema, tables, columns","enabled":true,"builtin":true}),
+        serde_json::json!({"name":"api_connector","icon":"🔗","desc":"REST API connector with auth & headers","enabled":true,"builtin":true}),
+        // Calendar & Browser
+        serde_json::json!({"name":"calendar","icon":"📅","desc":"Google Calendar: tạo/xem/xóa sự kiện","enabled":true,"builtin":true}),
+        serde_json::json!({"name":"browser","icon":"🌍","desc":"Browser automation: screenshot, navigate, click","enabled":true,"builtin":true}),
     ];
     // Load custom tools
     let dir = tools_dir(&state);
