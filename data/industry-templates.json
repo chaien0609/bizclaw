@@ -1,0 +1,174 @@
+{
+  "templates": [
+    {
+      "id": "retail",
+      "name": "Bán lẻ / Retail",
+      "description": "Quản lý đơn hàng, kho, khách hàng cho cửa hàng bán lẻ",
+      "icon": "🛒",
+      "db_connections": [
+        {
+          "id": "retail_main",
+          "db_type": "mysql",
+          "description": "Database chính cửa hàng",
+          "connection_string": "mysql://user:pass@localhost/retail_db",
+          "allowed_tables": ["orders", "order_items", "products", "categories", "customers", "inventory"],
+          "sensitive_columns": ["phone", "email", "address", "cccd"],
+          "max_rows": 500,
+          "enabled": true
+        }
+      ],
+      "api_endpoints": [
+        {
+          "id": "update_order_status",
+          "url": "https://api.myshop.vn/orders/{id}/status",
+          "method": "PATCH",
+          "description": "Cập nhật trạng thái đơn hàng",
+          "allowed_fields": ["status", "note", "shipping_code"],
+          "dangerous": false
+        },
+        {
+          "id": "create_inventory_alert",
+          "url": "https://api.myshop.vn/inventory/alerts",
+          "method": "POST",
+          "description": "Tạo cảnh báo tồn kho thấp",
+          "allowed_fields": ["product_id", "threshold", "channel"],
+          "dangerous": false
+        }
+      ],
+      "agents": [
+        {
+          "name": "Trợ lý Bán hàng",
+          "persona": "Nhân viên bán hàng giỏi, tư vấn sản phẩm, kiểm tra tồn kho",
+          "system_prompt": "Bạn là trợ lý bán hàng AI cho cửa hàng. Khi khách hỏi sản phẩm, hãy:\n1. Dùng db_schema để hiểu cấu trúc bảng products, inventory\n2. Dùng db_query để tìm sản phẩm phù hợp và kiểm tra tồn kho\n3. Tư vấn dựa trên data thật\n4. Nếu cần cập nhật đơn, dùng api_connector endpoint 'update_order_status'",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["zalo", "telegram"]
+        },
+        {
+          "name": "Quản lý Kho",
+          "persona": "Quản lý kho thông minh, theo dõi tồn kho và cảnh báo",
+          "system_prompt": "Bạn là quản lý kho AI. Mỗi sáng:\n1. Dùng db_query kiểm tra tồn kho dưới ngưỡng\n2. Tạo cảnh báo qua api_connector 'create_inventory_alert'\n3. Gửi báo cáo tồn kho cho sếp",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["telegram"]
+        }
+      ],
+      "sample_queries": [
+        "Top 10 sản phẩm bán chạy nhất tháng này?",
+        "Doanh thu hôm nay so với hôm qua?",
+        "Sản phẩm nào sắp hết hàng (tồn kho < 10)?",
+        "Khách hàng nào mua nhiều nhất?",
+        "Đơn hàng nào chưa giao?"
+      ]
+    },
+    {
+      "id": "fnb",
+      "name": "F&B / Nhà hàng - Quán café",
+      "description": "Quản lý menu, đơn hàng, nguyên liệu cho F&B",
+      "icon": "🍜",
+      "db_connections": [
+        {
+          "id": "fnb_main",
+          "db_type": "mysql",
+          "description": "Database nhà hàng/quán café",
+          "connection_string": "mysql://user:pass@localhost/fnb_db",
+          "allowed_tables": ["menu_items", "orders", "order_items", "ingredients", "tables", "staff", "shifts", "customers"],
+          "sensitive_columns": ["phone", "email"],
+          "max_rows": 500,
+          "enabled": true
+        }
+      ],
+      "api_endpoints": [
+        {
+          "id": "update_menu_availability",
+          "url": "https://api.myrestaurant.vn/menu/{id}/availability",
+          "method": "PATCH",
+          "description": "Cập nhật trạng thái còn/hết món",
+          "allowed_fields": ["available", "reason"],
+          "dangerous": false
+        },
+        {
+          "id": "send_kitchen_notification",
+          "url": "https://api.myrestaurant.vn/kitchen/notify",
+          "method": "POST",
+          "description": "Gửi thông báo cho bếp",
+          "allowed_fields": ["order_id", "message", "priority"],
+          "dangerous": false
+        }
+      ],
+      "agents": [
+        {
+          "name": "Trợ lý Nhà hàng",
+          "persona": "Nhân viên phục vụ thông minh, tư vấn menu và nhận order",
+          "system_prompt": "Bạn là trợ lý AI cho nhà hàng/quán café. Khi khách hỏi:\n1. Dùng db_query query bảng menu_items để tư vấn\n2. Kiểm tra nguyên liệu còn không (bảng ingredients)\n3. Nếu món hết, gợi ý món tương tự\n4. Thông báo bếp qua api_connector 'send_kitchen_notification'",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["zalo", "telegram"]
+        }
+      ],
+      "sample_queries": [
+        "Doanh thu quán hôm nay?",
+        "Món nào bán chạy nhất tuần này?",
+        "Nguyên liệu nào sắp hết?",
+        "Ca làm việc hôm nay ai trực?",
+        "So sánh doanh thu tuần này và tuần trước?"
+      ]
+    },
+    {
+      "id": "realestate",
+      "name": "Bất động sản / Real Estate",
+      "description": "Quản lý lead, khách hàng, dự án, hợp đồng BĐS",
+      "icon": "🏠",
+      "db_connections": [
+        {
+          "id": "bds_main",
+          "db_type": "postgresql",
+          "description": "Database CRM bất động sản",
+          "connection_string": "postgres://user:pass@localhost/realty_db",
+          "allowed_tables": ["leads", "customers", "properties", "projects", "contracts", "agents", "commissions", "appointments"],
+          "sensitive_columns": ["phone", "email", "cccd", "address", "bank_account"],
+          "max_rows": 500,
+          "enabled": true
+        }
+      ],
+      "api_endpoints": [
+        {
+          "id": "update_lead_status",
+          "url": "https://api.myrealty.vn/leads/{id}/status",
+          "method": "PATCH",
+          "description": "Cập nhật trạng thái lead (mới, đang chăm, đã chốt)",
+          "allowed_fields": ["status", "note", "assigned_agent"],
+          "dangerous": false
+        },
+        {
+          "id": "schedule_viewing",
+          "url": "https://api.myrealty.vn/appointments",
+          "method": "POST",
+          "description": "Đặt lịch xem nhà",
+          "allowed_fields": ["lead_id", "property_id", "datetime", "agent_id", "note"],
+          "dangerous": false
+        }
+      ],
+      "agents": [
+        {
+          "name": "Trợ lý Sales BĐS",
+          "persona": "Chuyên viên tư vấn BĐS chuyên nghiệp, hiểu thị trường",
+          "system_prompt": "Bạn là trợ lý AI cho công ty bất động sản. Khi nhận lead mới:\n1. Dùng db_query tìm dự án/căn hộ phù hợp ngân sách, khu vực\n2. Tư vấn dựa trên data thật (giá, diện tích, tiện ích)\n3. Đặt lịch xem nhà qua api_connector 'schedule_viewing'\n4. Cập nhật trạng thái lead qua 'update_lead_status'",
+          "tools": ["db_schema", "db_query", "api_connector"],
+          "channels": ["zalo", "telegram", "email"]
+        },
+        {
+          "name": "Báo cáo BĐS",
+          "persona": "Phân tích dữ liệu BĐS, tạo báo cáo tự động",
+          "system_prompt": "Bạn là AI phân tích dữ liệu BĐS. Hàng ngày:\n1. Query lead pipeline: bao nhiêu lead mới, đang chăm, đã chốt\n2. Doanh số agent: ai bán tốt nhất\n3. Tồn kho: còn bao nhiêu căn chưa bán\n4. Tạo báo cáo gửi sếp qua Telegram",
+          "tools": ["db_schema", "db_query"],
+          "channels": ["telegram"]
+        }
+      ],
+      "sample_queries": [
+        "Hôm nay có bao nhiêu lead mới?",
+        "Agent nào chốt nhiều deal nhất tháng này?",
+        "Dự án nào còn nhiều căn chưa bán?",
+        "Doanh thu hoa hồng tổng cộng Q1?",
+        "Lead nào chưa được chăm quá 3 ngày?"
+      ]
+    }
+  ]
+}

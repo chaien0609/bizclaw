@@ -1,0 +1,72 @@
+{
+  "scheduled_reports": [
+    {
+      "id": "daily_revenue",
+      "name": "📊 Báo cáo doanh thu hàng ngày",
+      "schedule": "0 8 * * *",
+      "schedule_description": "Mỗi ngày lúc 8:00 sáng",
+      "connection_id": "retail_main",
+      "queries": [
+        {
+          "label": "Doanh thu hôm nay",
+          "sql": "SELECT SUM(total) as revenue, COUNT(*) as order_count FROM orders WHERE DATE(created_at) = CURDATE()"
+        },
+        {
+          "label": "So sánh hôm qua",
+          "sql": "SELECT SUM(total) as revenue FROM orders WHERE DATE(created_at) = CURDATE() - INTERVAL 1 DAY"
+        },
+        {
+          "label": "Top 5 sản phẩm",
+          "sql": "SELECT p.name, SUM(oi.quantity) as qty, SUM(oi.subtotal) as revenue FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE DATE(oi.created_at) = CURDATE() GROUP BY p.id ORDER BY revenue DESC LIMIT 5"
+        }
+      ],
+      "prompt_template": "Dựa trên data trên, hãy viết báo cáo doanh thu ngắn gọn bằng tiếng Việt, bao gồm:\n- Doanh thu hôm nay và so sánh % với hôm qua\n- Top 5 sản phẩm bán chạy\n- Nhận xét ngắn và gợi ý",
+      "channels": ["telegram", "zalo"],
+      "enabled": true
+    },
+    {
+      "id": "weekly_inventory",
+      "name": "📦 Báo cáo tồn kho hàng tuần",
+      "schedule": "0 9 * * 1",
+      "schedule_description": "Mỗi thứ Hai lúc 9:00 sáng",
+      "connection_id": "retail_main",
+      "queries": [
+        {
+          "label": "Sản phẩm tồn kho thấp",
+          "sql": "SELECT p.name, i.quantity, i.reorder_level FROM inventory i JOIN products p ON i.product_id = p.id WHERE i.quantity <= i.reorder_level ORDER BY i.quantity ASC"
+        },
+        {
+          "label": "Tổng giá trị tồn kho",
+          "sql": "SELECT SUM(i.quantity * p.price) as total_value, COUNT(*) as total_products FROM inventory i JOIN products p ON i.product_id = p.id"
+        }
+      ],
+      "prompt_template": "Viết báo cáo tồn kho ngắn gọn:\n- Sản phẩm cần nhập thêm (tồn kho thấp)\n- Tổng giá trị kho\n- Đề xuất nhập hàng",
+      "channels": ["telegram"],
+      "enabled": true
+    },
+    {
+      "id": "monthly_business_review",
+      "name": "📈 Báo cáo kinh doanh tháng",
+      "schedule": "0 8 1 * *",
+      "schedule_description": "Ngày 1 hàng tháng lúc 8:00",
+      "connection_id": "retail_main",
+      "queries": [
+        {
+          "label": "Doanh thu tháng",
+          "sql": "SELECT SUM(total) as revenue, COUNT(*) as orders, COUNT(DISTINCT customer_id) as unique_customers FROM orders WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())"
+        },
+        {
+          "label": "Doanh thu tháng trước",
+          "sql": "SELECT SUM(total) as revenue FROM orders WHERE MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)"
+        },
+        {
+          "label": "Top 10 khách hàng",
+          "sql": "SELECT c.name, SUM(o.total) as total_spent, COUNT(*) as order_count FROM orders o JOIN customers c ON o.customer_id = c.id WHERE MONTH(o.created_at) = MONTH(CURDATE()) GROUP BY c.id ORDER BY total_spent DESC LIMIT 10"
+        }
+      ],
+      "prompt_template": "Viết báo cáo kinh doanh tháng chi tiết:\n- Doanh thu tháng, tăng/giảm % so tháng trước\n- Tổng đơn hàng, khách hàng unique\n- Top 10 khách VIP\n- Nhận xét tổng quan và dự đoán tháng tới",
+      "channels": ["telegram", "zalo", "email"],
+      "enabled": true
+    }
+  ]
+}

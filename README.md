@@ -123,8 +123,48 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **📋 Audit Trail** | Ghi log toàn bộ thao tác: ai làm gì, lúc nào, cái gì — compliance SOC2/ISO 27001 |
 | **💾 Backup/Restore** | Export/Import JSON — backup agents, channels, settings. Disaster recovery |
 | **👑 RBAC** | 4 tầng phân quyền: Admin → Manager → User → Viewer. 60+ routes bảo vệ |
+| **📊 RAG-from-DB** | AI tự khám phá DB → tự viết SQL → lấy data realtime → phân tích. Hỏi tiếng Việt, trả lời bằng data sống |
+| **🏭 Industry Templates** | 3 template ngành (Bán lẻ, F&B, BĐS) — cài xong chạy luôn, không cần custom |
+| **📅 Scheduled Reports** | Agent tự query + phân tích + gửi báo cáo mỗi sáng qua Telegram/Zalo/Email |
 
 ---
+
+## 📊 RAG-from-DB — Hỏi Database Bằng Tiếng Việt
+
+> **Thay thế NotebookLM** nhưng mạnh hơn — data luôn realtime, không cần upload tài liệu tĩnh!
+
+```
+User: "Doanh thu tháng này so với tháng trước?"
+
+Agent flow:
+  1️⃣ db_schema → Hiểu bảng orders có cột total, created_at
+  2️⃣ db_query  → SELECT SUM(total) FROM orders WHERE ...
+  3️⃣ AI phân tích → "Tháng 3: 150M, tăng 23% so tháng 2"
+  4️⃣ api_connector → POST /reports (lưu báo cáo tự động)
+```
+
+**3 tools tạo thành pipeline:**
+| Tool | Vai trò | Bảo vệ |
+|------|---------|--------|
+| `db_schema` | 🗺️ Khám phá cấu trúc DB (tables, columns, data mẫu) | Table allowlist |
+| `db_query` | 📖 ĐỌC — query MySQL/PostgreSQL/SQLite | 5 tầng: SQL safety, row limit, Vault, PII redact, table restrict |
+| `api_connector` | ✏️ GHI — gọi REST API cập nhật data | Field allowlist, dangerous flag, approval gate |
+
+## 🏭 Industry Templates — Cài Xong Chạy Luôn
+
+| Template | File | DB + Agent + API sẵn |
+|----------|------|---------------------|
+| 🛒 **Bán lẻ** | `data/industry-templates.json` | 2 agents (Sales + Kho), POS/Inventory/Customer tables |
+| 🍜 **F&B** | `data/industry-templates.json` | Agent nhà hàng, menu/order/ingredients tables |
+| 🏠 **Bất động sản** | `data/industry-templates.json` | 2 agents (Sales + Báo cáo), lead/property/contract tables |
+
+## 📅 Scheduled Reports — Agent Tự Gửi Báo Cáo Mỗi Sáng
+
+| Report | Lịch | Kênh |
+|--------|------|------|
+| 📊 Doanh thu hàng ngày | ⏰ 8:00 sáng mỗi ngày | Telegram, Zalo |
+| 📦 Tồn kho hàng tuần | ⏰ 9:00 sáng thứ Hai | Telegram |
+| 📈 Kinh doanh tổng hợp | ⏰ 8:00 sáng ngày 1 hàng tháng | Telegram, Zalo, Email |
 
 ## 🖐️ Autonomous Hands — Nhân viên AI ca đêm
 
