@@ -4358,6 +4358,24 @@ pub async fn mcp_list_servers(State(state): State<Arc<AppState>>) -> Json<serde_
     Json(serde_json::json!({"ok": true, "servers": servers, "count": servers.len()}))
 }
 
+/// GET /api/v1/mcp/catalog — returns the curated MCP server catalog (30+ tools).
+pub async fn mcp_catalog() -> Json<serde_json::Value> {
+    // Try loading from data/mcp-servers-catalog.json
+    let paths = [
+        "data/mcp-servers-catalog.json",
+        "/root/.bizclaw/data/mcp-servers-catalog.json",
+    ];
+    for path in &paths {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(catalog) = serde_json::from_str::<serde_json::Value>(&content) {
+                return Json(catalog);
+            }
+        }
+    }
+    // Fallback: empty
+    Json(serde_json::json!([]))
+}
+
 // ═══ Xiaozhi Webhook Bridge ═══
 
 /// Xiaozhi webhook inbound — receives voice commands from Xiaozhi Server.

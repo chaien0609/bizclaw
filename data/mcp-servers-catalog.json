@@ -1,0 +1,412 @@
+[
+  {
+    "id": "filesystem",
+    "name": "📁 File System",
+    "description": "Quản lý file nâng cao — đọc, tạo, tìm kiếm, di chuyển file trong thư mục cho phép",
+    "category": "core",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["file", "directory", "search"]
+  },
+  {
+    "id": "github",
+    "name": "🐙 GitHub",
+    "description": "Quản lý GitHub repos — issues, PRs, code search, file content, commits",
+    "category": "developer",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Tạo Personal Access Token tại https://github.com/settings/tokens",
+    "tags": ["git", "code", "issues", "pr"]
+  },
+  {
+    "id": "gitlab",
+    "name": "🦊 GitLab",
+    "description": "Quản lý GitLab repos — issues, merge requests, pipelines, CI/CD",
+    "category": "developer",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-gitlab"],
+    "env": {
+      "GITLAB_PERSONAL_ACCESS_TOKEN": "",
+      "GITLAB_API_URL": "https://gitlab.com/api/v4"
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "tags": ["git", "ci-cd", "merge-request"]
+  },
+  {
+    "id": "slack",
+    "name": "💬 Slack",
+    "description": "Tích hợp Slack — đọc/gửi tin nhắn, quản lý channels, tìm kiếm",
+    "category": "communication",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-slack"],
+    "env": {
+      "SLACK_BOT_TOKEN": "",
+      "SLACK_TEAM_ID": ""
+    },
+    "difficulty": "medium",
+    "requires_key": true,
+    "key_instructions": "Tạo Slack App tại https://api.slack.com/apps → Bot Token (xoxb-...)",
+    "tags": ["chat", "team", "notification"]
+  },
+  {
+    "id": "google-drive",
+    "name": "📂 Google Drive",
+    "description": "Truy cập Google Drive — đọc, tìm kiếm, tải file từ Drive",
+    "category": "productivity",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-google-drive"],
+    "env": {},
+    "difficulty": "medium",
+    "requires_key": true,
+    "key_instructions": "Cần OAuth2 credentials từ Google Cloud Console",
+    "tags": ["document", "storage", "google"]
+  },
+  {
+    "id": "google-maps",
+    "name": "🗺️ Google Maps",
+    "description": "Tìm kiếm địa điểm, directions, geocoding — hữu ích cho F&B, BĐS, logistics",
+    "category": "productivity",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-google-maps"],
+    "env": {
+      "GOOGLE_MAPS_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "tags": ["maps", "location", "directions"]
+  },
+  {
+    "id": "brave-search",
+    "name": "🔍 Brave Search",
+    "description": "Tìm kiếm web qua Brave API — kết quả chất lượng, không quảng cáo",
+    "category": "search",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-brave-search"],
+    "env": {
+      "BRAVE_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Đăng ký API key miễn phí tại https://api.search.brave.com/",
+    "tags": ["search", "web", "research"]
+  },
+  {
+    "id": "postgres",
+    "name": "🐘 PostgreSQL",
+    "description": "Kết nối PostgreSQL trực tiếp — query, schema discovery, data analysis",
+    "category": "database",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@localhost:5432/dbname"],
+    "env": {},
+    "difficulty": "medium",
+    "requires_key": false,
+    "key_instructions": "Thay connection string trong args",
+    "tags": ["database", "sql", "analytics"]
+  },
+  {
+    "id": "sqlite",
+    "name": "📦 SQLite",
+    "description": "Kết nối SQLite — query file .db trực tiếp, không cần server",
+    "category": "database",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-sqlite", "/path/to/database.db"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["database", "sql", "local"]
+  },
+  {
+    "id": "puppeteer",
+    "name": "🌐 Puppeteer Browser",
+    "description": "Điều khiển Chrome headless — chụp screenshot, scrape web, fill form, test UI",
+    "category": "automation",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["browser", "scraping", "screenshot", "automation"]
+  },
+  {
+    "id": "memory",
+    "name": "🧠 Persistent Memory",
+    "description": "Bộ nhớ dài hạn cho agent — lưu/tìm kiếm knowledge graph dạng entities + relations",
+    "category": "core",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-memory"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["memory", "knowledge", "graph"]
+  },
+  {
+    "id": "sequential-thinking",
+    "name": "🤔 Sequential Thinking",
+    "description": "Suy luận tuần tự, phân tích bước-bước — cải thiện chất lượng reasoning",
+    "category": "core",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["reasoning", "thinking", "analysis"]
+  },
+  {
+    "id": "notion",
+    "name": "📝 Notion",
+    "description": "Tích hợp Notion — đọc/tạo/cập nhật pages, databases, comments",
+    "category": "productivity",
+    "command": "npx",
+    "args": ["-y", "notion-mcp-server"],
+    "env": {
+      "NOTION_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Tạo Integration tại https://www.notion.so/my-integrations",
+    "tags": ["notes", "wiki", "database", "project"]
+  },
+  {
+    "id": "linear",
+    "name": "📋 Linear",
+    "description": "Quản lý issues trên Linear — tạo issues, cập nhật status, tìm kiếm",
+    "category": "developer",
+    "command": "npx",
+    "args": ["-y", "mcp-linear"],
+    "env": {
+      "LINEAR_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "tags": ["issues", "project-management", "agile"]
+  },
+  {
+    "id": "sentry",
+    "name": "🐛 Sentry",
+    "description": "Giám sát lỗi từ Sentry — xem issues, stack traces, trends, resolve bugs",
+    "category": "developer",
+    "command": "npx",
+    "args": ["-y", "@sentry/mcp-server"],
+    "env": {
+      "SENTRY_AUTH_TOKEN": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "tags": ["monitoring", "errors", "debugging"]
+  },
+  {
+    "id": "cloudflare",
+    "name": "☁️ Cloudflare",
+    "description": "Quản lý Cloudflare — Workers, KV, D1, R2, DNS records",
+    "category": "infrastructure",
+    "command": "npx",
+    "args": ["-y", "@cloudflare/mcp-server-cloudflare"],
+    "env": {},
+    "difficulty": "medium",
+    "requires_key": true,
+    "key_instructions": "Login qua OAuth khi khởi chạy",
+    "tags": ["cloud", "dns", "workers", "serverless"]
+  },
+  {
+    "id": "supabase",
+    "name": "⚡ Supabase",
+    "description": "Quản lý Supabase — database, auth, storage, edge functions",
+    "category": "database",
+    "command": "npx",
+    "args": ["-y", "@supabase/mcp-server"],
+    "env": {
+      "SUPABASE_URL": "",
+      "SUPABASE_SERVICE_ROLE_KEY": ""
+    },
+    "difficulty": "medium",
+    "requires_key": true,
+    "tags": ["database", "auth", "storage", "baas"]
+  },
+  {
+    "id": "stripe",
+    "name": "💳 Stripe",
+    "description": "Quản lý thanh toán Stripe — customers, subscriptions, invoices, payments",
+    "category": "business",
+    "command": "npx",
+    "args": ["-y", "@stripe/mcp"],
+    "env": {
+      "STRIPE_SECRET_KEY": ""
+    },
+    "difficulty": "medium",
+    "requires_key": true,
+    "key_instructions": "Lấy Secret Key tại https://dashboard.stripe.com/apikeys",
+    "tags": ["payment", "billing", "subscription"]
+  },
+  {
+    "id": "todoist",
+    "name": "✅ Todoist",
+    "description": "Quản lý tasks — tạo/cập nhật/hoàn thành tasks, projects, labels",
+    "category": "productivity",
+    "command": "npx",
+    "args": ["-y", "mcp-todoist"],
+    "env": {
+      "TODOIST_API_TOKEN": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "tags": ["tasks", "todo", "productivity"]
+  },
+  {
+    "id": "time",
+    "name": "🕐 Time",
+    "description": "Xem giờ hiện tại, chuyển đổi timezone, tính toán ngày tháng",
+    "category": "core",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-time"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["time", "timezone", "date"]
+  },
+  {
+    "id": "fetch",
+    "name": "🌍 Fetch / URL Reader",
+    "description": "Đọc nội dung từ URL — lấy text, HTML, JSON từ bất kỳ website nào",
+    "category": "core",
+    "command": "npx",
+    "args": ["-y", "@anthropic/mcp-server-fetch"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["web", "scraping", "api", "url"]
+  },
+  {
+    "id": "context7",
+    "name": "📚 Context7 Docs",
+    "description": "Tra cứu docs thư viện/framework mới nhất — React, Next.js, Python, v.v.",
+    "category": "developer",
+    "command": "npx",
+    "args": ["-y", "@context7/mcp"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["docs", "documentation", "library", "framework"]
+  },
+  {
+    "id": "firecrawl",
+    "name": "🔥 Firecrawl",
+    "description": "Crawl website chuyên sâu — scrape, extract data, batch processing",
+    "category": "automation",
+    "command": "npx",
+    "args": ["-y", "firecrawl-mcp"],
+    "env": {
+      "FIRECRAWL_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Đăng ký tại https://firecrawl.dev/",
+    "tags": ["scraping", "crawling", "data-extraction"]
+  },
+  {
+    "id": "obsidian",
+    "name": "📓 Obsidian",
+    "description": "Tích hợp Obsidian vault — đọc/tạo/tìm kiếm notes, tags, links",
+    "category": "productivity",
+    "command": "npx",
+    "args": ["-y", "mcp-obsidian"],
+    "env": {
+      "OBSIDIAN_VAULT_PATH": ""
+    },
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["notes", "knowledge", "markdown", "zettelkasten"]
+  },
+  {
+    "id": "exa",
+    "name": "🔎 Exa Search",
+    "description": "AI-powered semantic search — tìm kiếm theo ý nghĩa, không chỉ keyword",
+    "category": "search",
+    "command": "npx",
+    "args": ["-y", "exa-mcp-server"],
+    "env": {
+      "EXA_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Đăng ký tại https://exa.ai/",
+    "tags": ["search", "semantic", "ai-search"]
+  },
+  {
+    "id": "docker",
+    "name": "🐳 Docker",
+    "description": "Quản lý Docker containers, images, networks — DevOps trực tiếp",
+    "category": "infrastructure",
+    "command": "npx",
+    "args": ["-y", "mcp-docker"],
+    "env": {},
+    "difficulty": "medium",
+    "requires_key": false,
+    "tags": ["docker", "containers", "devops"]
+  },
+  {
+    "id": "redis",
+    "name": "🔴 Redis",
+    "description": "Thao tác Redis — get/set keys, pub/sub, streams, cache management",
+    "category": "database",
+    "command": "npx",
+    "args": ["-y", "redis-mcp-server"],
+    "env": {
+      "REDIS_URL": "redis://localhost:6379"
+    },
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["cache", "database", "pub-sub"]
+  },
+  {
+    "id": "youtube",
+    "name": "📺 YouTube",
+    "description": "Tìm kiếm và lấy transcript video YouTube — nghiên cứu, học tập",
+    "category": "search",
+    "command": "npx",
+    "args": ["-y", "mcp-youtube"],
+    "env": {},
+    "difficulty": "easy",
+    "requires_key": false,
+    "tags": ["video", "transcript", "research"]
+  },
+  {
+    "id": "email-send",
+    "name": "📧 Email (Resend)",
+    "description": "Gửi email qua Resend API — transactional email, templates, attachments",
+    "category": "communication",
+    "command": "npx",
+    "args": ["-y", "mcp-resend"],
+    "env": {
+      "RESEND_API_KEY": ""
+    },
+    "difficulty": "easy",
+    "requires_key": true,
+    "key_instructions": "Đăng ký tại https://resend.com/",
+    "tags": ["email", "notification", "marketing"]
+  },
+  {
+    "id": "aws",
+    "name": "☁️ AWS",
+    "description": "Quản lý tài nguyên AWS — S3, EC2, Lambda, CloudWatch, IAM",
+    "category": "infrastructure",
+    "command": "npx",
+    "args": ["-y", "mcp-aws"],
+    "env": {
+      "AWS_ACCESS_KEY_ID": "",
+      "AWS_SECRET_ACCESS_KEY": "",
+      "AWS_REGION": "ap-southeast-1"
+    },
+    "difficulty": "hard",
+    "requires_key": true,
+    "tags": ["cloud", "aws", "s3", "lambda"]
+  }
+]

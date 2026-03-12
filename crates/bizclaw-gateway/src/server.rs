@@ -767,6 +767,7 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         .route("/api/v1/tools", get(super::routes::tools_list))
         // MCP read
         .route("/api/v1/mcp/servers", get(super::routes::mcp_list_servers))
+        .route("/api/v1/mcp/catalog", get(super::routes::mcp_catalog))
         // Workflows read
         .route("/api/v1/workflows", get(super::routes::workflows_list))
         .route(
