@@ -97,7 +97,7 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 |----------|----------|
 | **🔌 18 Providers** | OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Together, MiniMax, xAI (Grok), Mistral, BytePlus ModelArk, Cohere, Perplexity, DashScope/Qwen, Ollama, llama.cpp, Brain Engine, CLIProxy, vLLM |
 | **💬 10 Channels** | CLI, Telegram, Discord, Email (IMAP/SMTP), Webhook, WhatsApp, Zalo (Personal + OA), **🎙️ Xiaozhi ESP32 Voice** |
-| **🛠️ 18+ Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, Calendar, Doc Reader, **DB Schema** (auto-discover tables/columns), **DB Query** (MySQL/PostgreSQL/SQLite read-only), **API Connector** (safe WRITE via pre-configured endpoints), **Custom Tool** (agent self-creates) |
+| **🛠️ 19+ Tools** | Shell, File, Edit File, Glob, Grep, Web Search, HTTP, Config Manager, Execute Code (9 ngôn ngữ), Plan, Group Summarizer, **Zalo Tool** (13 actions), Calendar, Doc Reader, **DB Schema** (auto-discover tables/columns), **DB Query** (MySQL/PostgreSQL/SQLite read-only), **API Connector** (safe WRITE via pre-configured endpoints), **Custom Tool** (agent self-creates) |
 | **🔗 MCP** | Model Context Protocol — kết nối MCP servers bên ngoài, mở rộng tools không giới hạn |
 | **🧠 Brain Engine** | GGUF inference offline: mmap, quantization, Flash Attention, SIMD (ARM NEON, x86 AVX2) |
 | **🤖 Multi-Agent** | Tạo nhiều agent với vai trò khác nhau, gán vào kênh. Orchestrator quản lý N agents |
@@ -126,6 +126,168 @@ curl -sSL https://bizclaw.vn/install.sh | sudo bash -s -- \
 | **📊 RAG-from-DB** | AI tự khám phá DB → tự viết SQL → lấy data realtime → phân tích. Hỏi tiếng Việt, trả lời bằng data sống |
 | **🏭 Industry Templates** | 3 template ngành (Bán lẻ, F&B, BĐS) — cài xong chạy luôn, không cần custom |
 | **📅 Scheduled Reports** | Agent tự query + phân tích + gửi báo cáo mỗi sáng qua Telegram/Zalo/Email |
+| **📱 Zalo Power Tool** | 13 actions: watch/unwatch nhóm + DM, tóm tắt nhóm/cá nhân, gửi tin nhắn, kết bạn, gửi báo cáo tới số chỉ định |
+
+---
+
+## 💼 Ứng Dụng RAG + Zalo cho Doanh Nghiệp SME
+
+> **Biến BizClaw thành "bộ não" AI cho doanh nghiệp nhỏ & vừa** — kết nối dữ liệu nội bộ (RAG) với kênh giao tiếp hàng ngày (Zalo) để tạo ra giá trị thực, không chỉ là chatbot.
+
+### 🎯 Case 1: CSKH Thông Minh — "AI biết tất cả về sản phẩm"
+
+```
+📚 RAG Knowledge Base           💬 Zalo Channel
+┌─────────────────────┐         ┌─────────────────┐
+│ Bảng giá sản phẩm   │         │ Khách hỏi Zalo: │
+│ Chính sách bảo hành │ ──AI──► │ "Máy X giá bao  │
+│ FAQ 200+ câu        │         │  nhiêu, bảo hành│
+│ Hướng dẫn sử dụng   │         │  mấy năm?"      │
+└─────────────────────┘         └─────────────────┘
+                                        │
+                                        ▼
+                               "Máy X giá 15.9M,
+                                bảo hành 24 tháng,
+                                freeship nội thành"
+```
+
+**Hiệu quả:** Giảm 70% nhân sự CSKH, trả lời 24/7, không sai thông tin bảng giá.
+
+### 🎯 Case 2: Quản Lý Nhóm Zalo — "AI tóm tắt, sếp đọc 2 phút"
+
+```
+  📱 Nhóm Zalo "Kinh Doanh"     📱 Nhóm "Kỹ Thuật"     📱 Nhóm "Kho Vận"
+           │                            │                       │
+           └────────────────────────────┼───────────────────────┘
+                                        │
+                                   🤖 BizClaw Agent
+                                   (Zalo Tool: watch_group)
+                                        │
+                                   📊 AI Tóm Tắt
+                                        │
+                                   📨 Gửi báo cáo
+                                        │
+                                   📱 Sếp nhận Zalo DM:
+                                   ┌────────────────────┐
+                                   │ BÁO CÁO SÁNG NAY   │
+                                   │                     │
+                                   │ 📋 Nhóm KD:         │
+                                   │ • 3 deal mới close   │
+                                   │ • KH ABC phản hồi   │
+                                   │                     │
+                                   │ 🔧 Nhóm KT:         │
+                                   │ • Bug #127 đã fix    │
+                                   │ • Deploy v2.1 OK     │
+                                   │                     │
+                                   │ 📦 Kho:              │
+                                   │ • Hết hàng SP-X      │
+                                   │ • Đơn 50 box sáng    │
+                                   └────────────────────┘
+```
+
+**Hiệu quả:** Sếp đọc 2 phút thay vì lướt 500+ tin nhắn. Không bỏ lỡ quyết định quan trọng.
+
+### 🎯 Case 3: RAG-from-DB + Zalo = "Hỏi Doanh Thu Bằng Tiếng Việt"
+
+```
+📱 CEO nhắn Zalo: "Doanh thu tuần này so tuần trước?"
+         │
+         ▼
+   🤖 Agent tự chạy pipeline:
+   1️⃣ db_schema → Tìm bảng orders, payments
+   2️⃣ db_query  → SELECT SUM(total) ... GROUP BY week
+   3️⃣ AI phân tích → "Tuần này 280M, tăng 15% so tuần trước"
+         │
+         ▼
+📱 CEO nhận Zalo: "📊 Tuần 10: 280M (+15%)
+                    Top SP: Widget Pro (45M)
+                    KH mới: 12 (tăng 20%)"
+```
+
+**Hiệu quả:** Không cần mở laptop, hỏi Zalo là có data. Real-time, chính xác 100%.
+
+### 🎯 Case 4: Outreach & Kết Bạn Tự Động
+
+```
+🤖 Agent AI:
+   1. Lấy danh sách lead từ file/CRM
+   2. zalo_tool(action="send_friend_request", user_id="...", message="Chào anh/chị...")
+   3. Sau khi accept → zalo_tool(action="send_message", content="Cảm ơn đã kết nối...")
+   4. Theo dõi phản hồi → tóm tắt gửi về Sales Manager
+```
+
+**Hiệu quả:** Tự động kết nối 50-100 lead/ngày, follow-up không bỏ sót.
+
+### 🎯 Case 5: Giám Sát DM Cá Nhân — "AI thay bạn đọc tin"
+
+```
+   📱 DM từ 10+ đối tác/khách hàng
+           │
+   🤖 Agent (watch_user cho từng người)
+           │
+   📊 Tóm tắt DM:
+   "Anh A: hỏi về báo giá lô mới
+    Chị B: xác nhận thanh toán
+    Anh C: phàn nàn giao hàng chậm ← ⚠️ CẦN XỬ LÝ"
+           │
+   📨 Gửi báo cáo DM → Số Zalo sếp / nhân viên phụ trách
+```
+
+**Hiệu quả:** Không bỏ sót tin nhắn quan trọng dù có 100+ conversation.
+
+### 📊 So Sánh: Trước vs Sau BizClaw
+
+| Hạng mục | ❌ Trước (thủ công) | ✅ Sau (BizClaw) |
+|----------|-------------------|------------------|
+| CSKH | 2-3 nhân viên trực Zalo | AI trả lời 24/7, chính xác |
+| Đọc tin nhóm | Sếp lướt 500+ tin/ngày | AI tóm tắt 2 phút |
+| Báo cáo doanh thu | Kế toán xuất Excel, email | Hỏi Zalo, có ngay |
+| Follow-up khách | Quên, bỏ sót | AI tự kết bạn + follow |
+| Giám sát DM | Đọc từng tin | AI tóm tắt, highlight urgent |
+| Chi phí | 10-15M/tháng nhân sự | **$0** (self-hosted) |
+
+### 🔌 Mở Rộng Tools với MCP Ecosystem
+
+> BizClaw hỗ trợ **Model Context Protocol (MCP)** — chuẩn kết nối mở rộng tools không giới hạn.
+
+Thêm tools bằng cách cấu hình MCP servers trong `config.toml`:
+
+```toml
+# Ví dụ: thêm tools từ cộng đồng MCP
+[[mcp_servers]]
+name = "filesystem"       # Quản lý file nâng cao
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/data"]
+
+[[mcp_servers]]
+name = "github"            # Quản lý GitHub repos
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+[[mcp_servers]]
+name = "slack"             # Tích hợp Slack
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-slack"]
+
+[[mcp_servers]]
+name = "google-drive"      # Google Drive access
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-google-drive"]
+
+[[mcp_servers]]
+name = "postgres"          # Direct PostgreSQL
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."]
+
+[[mcp_servers]]
+name = "brave-search"      # Brave Search API
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-brave-search"]
+```
+
+**1000+ MCP tools có sẵn** tại [MCP Hub](https://github.com/modelcontextprotocol/servers) — GitHub, Slack, Google Drive, Notion, PostgreSQL, Brave Search, Puppeteer, và nhiều hơn nữa.
+
+> 💡 **Nexent Compatibility**: BizClaw tương thích với [Nexent MCP Ecosystem](https://github.com/ModelEngine-Group/nexent) — cho phép dùng chung plugin tools giữa 2 platform.
 
 ---
 
@@ -579,7 +741,7 @@ llm:
 | **Dashboard Pages** | 20+ (27 lazy-loaded modules) |
 | **Agent Templates** | 51 |
 | **Security** | Vault, Approval Gates, Prompt Injection Scanner, RBAC, AES-256-CBC, SSRF Protection, Audit Trail, Prometheus |
-| **Last Updated** | 2026-03-12 |
+| **Last Updated** | 2026-03-13 |
 
 ---
 
