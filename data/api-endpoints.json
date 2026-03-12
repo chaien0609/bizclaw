@@ -1,0 +1,54 @@
+{
+  "endpoints": [
+    {
+      "id": "update_order_status",
+      "url": "https://api.myapp.com/orders/{id}/status",
+      "method": "PATCH",
+      "auth_header": "Authorization",
+      "auth_value": "vault://api_myapp_token",
+      "description": "Cập nhật trạng thái đơn hàng",
+      "allowed_fields": ["status", "note"],
+      "dangerous": false,
+      "enabled": true
+    },
+    {
+      "id": "create_customer_note",
+      "url": "https://api.myapp.com/customers/{customer_id}/notes",
+      "method": "POST",
+      "auth_value": "vault://api_myapp_token",
+      "description": "Thêm ghi chú cho khách hàng",
+      "allowed_fields": ["content", "type", "priority"],
+      "dangerous": false,
+      "enabled": true
+    },
+    {
+      "id": "send_notification",
+      "url": "https://api.myapp.com/notifications/send",
+      "method": "POST",
+      "auth_value": "vault://api_myapp_token",
+      "description": "Gửi thông báo cho user",
+      "allowed_fields": ["user_id", "title", "message", "channel"],
+      "dangerous": false,
+      "enabled": true
+    },
+    {
+      "id": "update_product_price",
+      "url": "https://api.myapp.com/products/{id}/price",
+      "method": "PATCH",
+      "auth_value": "vault://api_myapp_token",
+      "description": "Cập nhật giá sản phẩm — cần approve",
+      "allowed_fields": ["price", "currency", "reason"],
+      "dangerous": true,
+      "enabled": true
+    },
+    {
+      "id": "delete_record",
+      "url": "https://api.myapp.com/{resource}/{id}",
+      "method": "DELETE",
+      "auth_value": "vault://api_myapp_token",
+      "description": "Xoá record — LUÔN cần approve",
+      "dangerous": true,
+      "enabled": true
+    }
+  ]
+}

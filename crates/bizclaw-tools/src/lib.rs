@@ -1,5 +1,5 @@
 //! # BizClaw Tools
-//! Built-in tool execution system — 17+ tools for AI agent operations.
+//! Built-in tool execution system — 19+ tools for AI agent operations.
 //!
 //! ## Tool Registry
 //! | Tool | Description |
@@ -24,6 +24,7 @@
 //! | brv_curate | Add knowledge to ByteRover Context Tree |
 //! + MCP server tools (dynamic)
 
+pub mod api_connector;
 pub mod browser;
 pub mod byterover;
 pub mod calendar;
@@ -107,6 +108,7 @@ impl ToolRegistry {
             calendar::CalendarConfig::default(),
         )));
         reg.register(Box::new(db_query::DbQueryTool::new()));
+        reg.register(Box::new(api_connector::ApiConnectorTool::new()));
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         reg
     }
