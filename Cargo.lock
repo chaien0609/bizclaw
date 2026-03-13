@@ -542,6 +542,7 @@ dependencies = [
  "bizclaw-memory",
  "bizclaw-scheduler",
  "bizclaw-security",
+ "bizclaw-tools",
  "chrono",
  "futures",
  "hmac",

@@ -795,6 +795,13 @@ pub fn build_router_from_arc(shared: Arc<AppState>) -> Router {
         // Enterprise: Plugin Marketplace
         .route("/api/v1/plugins", get(super::routes::plugins_list))
         .route("/api/v1/plugins/install", post(super::routes::plugin_install))
+        // NL Query (Text2SQL RAG)
+        .route("/api/v1/nl-query/status", get(super::routes::nl_query_status))
+        .route("/api/v1/nl-query/ask", post(super::routes::nl_query_ask))
+        .route("/api/v1/nl-query/index", post(super::routes::nl_query_index))
+        .route("/api/v1/nl-query/rules/{conn_id}", get(super::routes::nl_query_rules_get))
+        .route("/api/v1/nl-query/rules", post(super::routes::nl_query_rules_add))
+        .route("/api/v1/nl-query/examples/{conn_id}", get(super::routes::nl_query_examples_get))
         // WebSocket (chat)
         .route("/ws", get(super::ws::ws_handler));
 

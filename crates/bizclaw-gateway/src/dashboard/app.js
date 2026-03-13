@@ -62,6 +62,7 @@ async function loadPage(pageId) {
     sso:           { file: 'sso.js',           export: 'SsoPage' },
     finetuning:    { file: 'fine_tuning.js',   export: 'FineTuningPage' },
     edgegateway:   { file: 'edge_gateway.js',  export: 'EdgeGatewayPage' },
+    dbassistant:   { file: 'db_assistant.js',  export: 'DbAssistantPage' },
   };
 
   const mapping = PAGE_MAP[pageId];

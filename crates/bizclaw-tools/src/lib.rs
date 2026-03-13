@@ -32,9 +32,11 @@ pub mod calendar;
 pub mod custom_tool;
 pub mod config_manager;
 pub mod db_connection;
+pub mod db_examples;
 pub mod db_query;
 pub mod db_safety;
 pub mod db_schema;
+pub mod db_semantic;
 pub mod document_reader;
 pub mod edit_file;
 pub mod execute_code;
@@ -44,6 +46,7 @@ pub mod grep_search;
 pub mod group_summarizer;
 pub mod http_request;
 pub mod memory_search;
+pub mod nl_query;
 pub mod orchestration;
 pub mod plan_store;
 pub mod plan_tool;
@@ -116,6 +119,8 @@ impl ToolRegistry {
         reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         // Zalo Power Tool
         reg.register(Box::new(zalo_tool::ZaloTool::new()));
+        // NL Query (Text2SQL RAG pipeline)
+        reg.register(Box::new(nl_query::NlQueryTool::new()));
         reg
     }
 
